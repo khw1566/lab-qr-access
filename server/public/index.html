@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>실습실 출입</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<style>
+  :root { --bg:#f5f6f8; --card:#fff; --text:#1d2129; --muted:#6b7280; --line:#e5e7eb; --accent:#2563eb; --ok:#16a34a; --warn:#d97706; --bad:#dc2626; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#111418; --card:#1b1f24; --text:#e8eaed; --muted:#9aa0a6; --line:#2c3138; } }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif; background:var(--bg); color:var(--text); }
+  main { max-width:560px; margin:0 auto; padding:16px; }
+  h1 { font-size:20px; margin:8px 0 16px; display:flex; justify-content:space-between; align-items:center; }
+  h2 { font-size:16px; margin:0 0 12px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; margin-bottom:12px; }
+  label { display:block; font-size:13px; color:var(--muted); margin:10px 0 4px; }
+  input, select, textarea { width:100%; padding:10px; font-size:16px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); }
+  button { padding:10px 14px; font-size:15px; border:0; border-radius:8px; background:var(--accent); color:#fff; cursor:pointer; }
+  button.ghost { background:transparent; color:var(--accent); border:1px solid var(--line); }
+  button.bad { background:var(--bad); }
+  button.small { padding:6px 10px; font-size:13px; }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .grow { flex:1; }
+  .muted { color:var(--muted); font-size:13px; }
+  .badge { font-size:12px; padding:2px 8px; border-radius:99px; color:#fff; }
+  .approved { background:var(--ok); } .pending { background:var(--warn); } .rejected, .cancelled { background:var(--muted); }
+  .tabs { display:flex; gap:6px; margin-bottom:12px; overflow-x:auto; }
+  .tabs button { background:var(--card); color:var(--text); border:1px solid var(--line); white-space:nowrap; }
+  .tabs button.on { background:var(--accent); color:#fff; }
+  #qrbox { text-align:center; }
+  #qrbox img, #qrbox svg { width:min(80vw,320px); height:auto; background:#fff; padding:12px; border-radius:12px; }
+  .bar { height:4px; background:var(--line); border-radius:2px; overflow:hidden; margin:10px auto; width:min(80vw,320px); }
+  .bar > i { display:block; height:100%; background:var(--accent); transition:width 1s linear; }
+  #toast { position:fixed; left:50%; bottom:24px; transform:translateX(-50%); background:#111; color:#fff; padding:10px 16px; border-radius:8px; font-size:14px; display:none; max-width:90vw; }
+  .hidden { display:none !important; }
+  .list-item { border-top:1px solid var(--line); padding:10px 0; }
+  .list-item:first-child { border-top:0; }
+</style>
+</head>
+<body>
+<main>
+  <h1><span>🔐 실습실 출입</span><button id="logoutBtn" class="ghost small hidden">로그아웃</button></h1>
+
+  <!-- 로그인 / 가입 -->
+  <section id="authView" class="card hidden">
+    <div class="tabs"><button data-auth="login" class="on">로그인</button><button data-auth="register">가입</button></div>
+    <label>학번</label><input id="sno" inputmode="numeric" autocomplete="username">
+    <div id="nameWrap" class="hidden"><label>이름</label><input id="sname" autocomplete="name"></div>
+    <label>비밀번호</label><input id="spw" type="password" autocomplete="current-password">
+    <div style="margin-top:14px"><button id="authBtn" style="width:100%">로그인</button></div>
+  </section>
+
+  <section id="appView" class="hidden">
+    <div class="tabs" id="mainTabs">
+      <button data-tab="my" class="on">내 신청</button>
+      <button data-tab="new">이용 신청</button>
+      <button data-tab="admin" class="hidden" id="adminTabBtn">관리자</button>
+    </div>
+
+    <!-- 내 신청 -->
+    <div id="tab-my">
+      <div id="qrCard" class="card hidden">
+        <h2 id="qrTitle">입장 QR</h2>
+        <div id="qrbox"></div>
+        <div class="bar"><i id="qrBar"></i></div>
+        <p class="muted" style="text-align:center">출입문 카메라에 화면을 보여주세요. QR은 30초마다 바뀌며 캡처본은 사용할 수 없습니다.</p>
+        <div style="text-align:center"><button class="ghost" id="qrClose">닫기</button></div>
+      </div>
+      <div class="card"><h2>신청 내역</h2><div id="myList" class="muted">불러오는 중…</div></div>
+    </div>
+
+    <!-- 이용 신청 -->
+    <div id="tab-new" class="hidden">
+      <div class="card">
+        <h2>실습실 이용 신청</h2>
+        <label>실습실</label><select id="room"></select>
+        <label>날짜</label><input id="date" type="date">
+        <div class="row">
+          <div class="grow"><label>시작</label><input id="start" type="time" step="1800" value="13:00"></div>
+          <div class="grow"><label>종료</label><input id="end" type="time" step="1800" value="15:00"></div>
+        </div>
+        <label>사용 목적</label><input id="purpose" placeholder="예: 캡스톤 프로젝트 회로 실습">
+        <p class="muted" id="roomRule"></p>
+        <button id="reqBtn" style="width:100%">신청하기</button>
+      </div>
+    </div>
+
+    <!-- 관리자 -->
+    <div id="tab-admin" class="hidden">
+      <div class="tabs" id="adminTabs">
+        <button data-a="res" class="on">승인 대기</button>
+        <button data-a="users">가입 승인</button>
+        <button data-a="rooms">자동 승인 설정</button>
+        <button data-a="logs">출입 기록</button>
+        <button data-a="devices">단말</button>
+      </div>
+      <div class="card" id="adminBody">…</div>
+    </div>
+  </section>
+</main>
+<div id="toast"></div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+const STATUS = { approved:'승인', pending:'대기', rejected:'반려', cancelled:'취소' };
+let me = null, rooms = [], qrTimer = null;
+
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.style.display = 'block'; clearTimeout(t._h); t._h = setTimeout(() => t.style.display = 'none', 3000); }
+async function api(path, opts = {}) {
+  const res = await fetch(path, { ...opts, headers: { 'content-type':'application/json' }, body: opts.body ? JSON.stringify(opts.body) : undefined });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || '요청 실패');
+  return data;
+}
+const fmt = (ms) => new Date(ms).toLocaleString('ko-KR', { month:'numeric', day:'numeric', weekday:'short', hour:'2-digit', minute:'2-digit', hour12:false });
+const fmtT = (ms) => new Date(ms).toLocaleTimeString('ko-KR', { hour:'2-digit', minute:'2-digit', hour12:false });
+
+// ---------- 인증 ----------
+let authMode = 'login';
+document.querySelectorAll('[data-auth]').forEach((b) => b.onclick = () => {
+  authMode = b.dataset.auth;
+  document.querySelectorAll('[data-auth]').forEach((x) => x.classList.toggle('on', x === b));
+  $('#nameWrap').classList.toggle('hidden', authMode !== 'register');
+  $('#authBtn').textContent = authMode === 'login' ? '로그인' : '가입 신청';
+});
+$('#authBtn').onclick = async () => {
+  const student_no = $('#sno').value.trim(), password = $('#spw').value;
+  try {
+    if (authMode === 'register') {
+      const r = await api('/api/auth/register', { method:'POST', body:{ student_no, name:$('#sname').value.trim(), password } });
+      if (r.status === 'pending') { toast('가입 신청 완료. 관리자 승인 후 로그인할 수 있습니다.'); return; }
+    }
+    await api('/api/auth/login', { method:'POST', body:{ student_no, password } });
+    boot();
+  } catch (e) { toast(e.message); }
+};
+$('#logoutBtn').onclick = async () => { await api('/api/auth/logout', { method:'POST' }); location.reload(); };
+
+// ---------- 탭 ----------
+document.querySelectorAll('[data-tab]').forEach((b) => b.onclick = () => {
+  document.querySelectorAll('[data-tab]').forEach((x) => x.classList.toggle('on', x === b));
+  ['my','new','admin'].forEach((t) => $('#tab-' + t).classList.toggle('hidden', t !== b.dataset.tab));
+  if (b.dataset.tab === 'my') loadMy();
+  if (b.dataset.tab === 'admin') loadAdmin();
+});
+
+// ---------- 내 신청 ----------
+async function loadMy() {
+  const { reservations } = await api('/api/reservations');
+  if (!reservations.length) { $('#myList').textContent = '신청 내역이 없습니다.'; return; }
+  const now = Date.now();
+  $('#myList').innerHTML = reservations.map((r) => {
+    const canQr = r.status === 'approved' && now <= r.end_at;
+    const canCancel = ['pending','approved'].includes(r.status) && now < r.end_at;
+    return `<div class="list-item">
+      <div class="row"><b class="grow">${esc(r.room_name)}</b><span class="badge ${r.status}">${STATUS[r.status]}</span></div>
+      <div class="muted">${fmt(r.start_at)} ~ ${fmtT(r.end_at)} · ${esc(r.purpose)}</div>
+      ${r.reject_reason ? `<div class="muted">반려 사유: ${esc(r.reject_reason)}</div>` : ''}
+      <div class="row" style="margin-top:6px">
+        ${canQr ? `<button class="small" onclick="showQr(${r.id}, '${esc(r.room_name)}')">입장 QR 보기</button>` : ''}
+        ${canCancel ? `<button class="small ghost" onclick="cancelRes(${r.id})">취소</button>` : ''}
+      </div></div>`;
+  }).join('');
+}
+async function cancelRes(id) { if (!confirm('신청을 취소할까요?')) return; try { await api(`/api/reservations/${id}/cancel`, { method:'POST' }); loadMy(); } catch (e) { toast(e.message); } }
+
+async function showQr(id, roomName) {
+  clearTimeout(qrTimer);
+  $('#qrCard').classList.remove('hidden');
+  $('#qrTitle').textContent = roomName + ' 입장 QR';
+  window.scrollTo({ top:0, behavior:'smooth' });
+  const tick = async () => {
+    try {
+      const { token, refresh_in_ms } = await api(`/api/reservations/${id}/qr`);
+      const qr = qrcode(0, 'M'); qr.addData(token); qr.make();
+      $('#qrbox').innerHTML = qr.createSvgTag({ cellSize:8, margin:2, scalable:true });
+      const bar = $('#qrBar'); bar.style.transition = 'none'; bar.style.width = (refresh_in_ms / 300) + '%';
+      requestAnimationFrame(() => { bar.style.transition = `width ${refresh_in_ms}ms linear`; bar.style.width = '0%'; });
+      qrTimer = setTimeout(tick, refresh_in_ms + 200);
+    } catch (e) { $('#qrbox').innerHTML = `<p>${esc(e.message)}</p>`; }
+  };
+  tick();
+  try { await navigator.wakeLock?.request('screen'); } catch {}
+}
+$('#qrClose').onclick = () => { clearTimeout(qrTimer); $('#qrCard').classList.add('hidden'); };
+document.addEventListener('visibilitychange', () => { if (document.hidden) clearTimeout(qrTimer); });
+
+// ---------- 신청 ----------
+function renderRoomRule() {
+  const r = rooms.find((x) => x.id == $('#room').value); if (!r) return;
+  $('#roomRule').textContent = r.auto_approve
+    ? `자동 승인: ${r.open_hour}시~${r.close_hour}시, 최대 ${r.max_minutes}분 이내 신청은 바로 승인됩니다.`
+    : '관리자 승인 후 QR이 발급됩니다.';
+}
+$('#room').onchange = renderRoomRule;
+$('#reqBtn').onclick = async () => {
+  const d = $('#date').value;
+  const start_at = new Date(`${d}T${$('#start').value}:00+09:00`).getTime();
+  const end_at = new Date(`${d}T${$('#end').value}:00+09:00`).getTime();
+  try {
+    const r = await api('/api/reservations', { method:'POST', body:{ room_id:Number($('#room').value), start_at, end_at, purpose:$('#purpose').value } });
+    toast(r.status === 'approved' ? '자동 승인되었습니다!' : '신청 완료. 관리자 승인을 기다려 주세요.');
+    document.querySelector('[data-tab=my]').click();
+  } catch (e) { toast(e.message); }
+};
+
+// ---------- 관리자 ----------
+let adminView = 'res';
+document.querySelectorAll('[data-a]').forEach((b) => b.onclick = () => {
+  adminView = b.dataset.a;
+  document.querySelectorAll('[data-a]').forEach((x) => x.classList.toggle('on', x === b));
+  loadAdmin();
+});
+async function adminAct(path, body) { try { await api(path, { method:'POST', body }); loadAdmin(); } catch (e) { toast(e.message); } }
+async function loadAdmin() {
+  const el = $('#adminBody'); el.textContent = '불러오는 중…';
+  try {
+    if (adminView === 'res') {
+      const { reservations } = await api('/api/admin/reservations?status=pending');
+      el.innerHTML = reservations.length ? reservations.map((r) => `<div class="list-item">
+        <b>${esc(r.name)}</b> <span class="muted">${esc(r.student_no)}</span>
+        <div class="muted">${esc(r.room_name)} · ${fmt(r.start_at)} ~ ${fmtT(r.end_at)}</div>
+        <div class="muted">${esc(r.purpose)}</div>
+        <div class="row" style="margin-top:6px"><button class="small" onclick="adminAct('/api/admin/reservations/${r.id}/approve')">승인</button>
+        <button class="small bad" onclick="adminAct('/api/admin/reservations/${r.id}/reject', { reason: prompt('반려 사유') || '' })">반려</button></div></div>`).join('') : '승인 대기 중인 신청이 없습니다.';
+    } else if (adminView === 'users') {
+      const { users } = await api('/api/admin/users?status=pending');
+      el.innerHTML = users.length ? users.map((u) => `<div class="list-item row"><span class="grow"><b>${esc(u.name)}</b> <span class="muted">${esc(u.student_no)}</span></span>
+        <button class="small" onclick="adminAct('/api/admin/users/${u.id}/activate')">승인</button>
+        <button class="small bad" onclick="adminAct('/api/admin/users/${u.id}/block')">거절</button></div>`).join('') : '가입 대기 중인 학생이 없습니다.';
+    } else if (adminView === 'rooms') {
+      const { rooms: rs } = await api('/api/rooms');
+      el.innerHTML = rs.map((r) => `<div class="list-item" data-room="${r.id}">
+        <label>이름</label><input data-f="name" value="${esc(r.name)}">
+        <label><input type="checkbox" data-f="auto_approve" ${r.auto_approve ? 'checked' : ''} style="width:auto"> 규칙에 맞으면 자동 승인</label>
+        <div class="row"><div class="grow"><label>허용 시작(시)</label><input type="number" data-f="open_hour" value="${r.open_hour}"></div>
+        <div class="grow"><label>허용 종료(시)</label><input type="number" data-f="close_hour" value="${r.close_hour}"></div></div>
+        <div class="row"><div class="grow"><label>최대 이용(분)</label><input type="number" data-f="max_minutes" value="${r.max_minutes}"></div>
+        <div class="grow"><label>동시 정원</label><input type="number" data-f="capacity" value="${r.capacity}"></div>
+        <div class="grow"><label>조기 입장(분)</label><input type="number" data-f="early_minutes" value="${r.early_minutes}"></div></div>
+        <button class="small" style="margin-top:8px" onclick="saveRoom(${r.id})">저장</button></div>`).join('');
+    } else if (adminView === 'logs') {
+      const { logs } = await api('/api/admin/logs');
+      el.innerHTML = logs.length ? logs.map((l) => `<div class="list-item row"><span class="badge ${l.result === 'granted' ? 'approved' : 'rejected'}">${l.result === 'granted' ? '허용' : '거부'}</span>
+        <span class="grow">${esc(l.name || '-')} <span class="muted">${esc(l.student_no || '')} ${l.reason ? '· ' + esc(l.reason) : ''}</span></span>
+        <span class="muted">${fmt(l.at)}</span></div>`).join('') : '기록이 없습니다.';
+    } else if (adminView === 'devices') {
+      const { devices } = await api('/api/admin/devices');
+      const { rooms: rs } = await api('/api/rooms');
+      el.innerHTML = devices.map((d) => `<div class="list-item"><b>${esc(d.name)}</b> <span class="muted">${esc(d.room_name)} · 마지막 접속 ${d.last_seen_at ? fmt(d.last_seen_at) : '없음'}</span></div>`).join('')
+        + `<div class="list-item"><label>새 단말 이름</label><input id="devName" value="실습실 출입문">
+           <label>실습실</label><select id="devRoom">${rs.map((r) => `<option value="${r.id}">${esc(r.name)}</option>`).join('')}</select>
+           <button class="small" style="margin-top:8px" onclick="addDevice()">단말 등록</button><p id="devKey" class="muted"></p></div>`;
+    }
+  } catch (e) { el.textContent = e.message; }
+}
+async function saveRoom(id) {
+  const box = document.querySelector(`[data-room="${id}"]`), b = {};
+  box.querySelectorAll('[data-f]').forEach((i) => b[i.dataset.f] = i.type === 'checkbox' ? (i.checked ? 1 : 0) : i.value);
+  try { await api(`/api/admin/rooms/${id}`, { method:'PATCH', body:b }); toast('저장했습니다.'); } catch (e) { toast(e.message); }
+}
+async function addDevice() {
+  try {
+    const { key } = await api('/api/admin/devices', { method:'POST', body:{ name:$('#devName').value, room_id:Number($('#devRoom').value) } });
+    $('#devKey').innerHTML = `단말 키 (지금 한 번만 표시됩니다. 펌웨어 설정에 입력하세요):<br><code style="word-break:break-all">${esc(key)}</code>`;
+  } catch (e) { toast(e.message); }
+}
+
+// ---------- 시작 ----------
+async function boot() {
+  try { ({ user: me } = await api('/api/me')); } catch { me = null; }
+  $('#authView').classList.toggle('hidden', !!me);
+  $('#appView').classList.toggle('hidden', !me);
+  $('#logoutBtn').classList.toggle('hidden', !me);
+  if (!me) return;
+  $('#adminTabBtn').classList.toggle('hidden', me.role !== 'admin');
+  ({ rooms } = await api('/api/rooms'));
+  $('#room').innerHTML = rooms.map((r) => `<option value="${r.id}">${esc(r.name)}</option>`).join('');
+  $('#date').value = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
+  renderRoomRule();
+  loadMy();
+}
+boot();
+</script>
+</body>
+</html>

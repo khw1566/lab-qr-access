@@ -1,0 +1,48 @@
+menu "Lab Door Config"
+
+    menu "Wi-Fi / Server"
+        config LAB_WIFI_SSID
+            string "Wi-Fi SSID (실습실 Wi-Fi 이름)"
+            default "LAB-WIFI"
+        config LAB_WIFI_PASSWORD
+            string "Wi-Fi password (개방형이면 비워 두기)"
+            default ""
+        config LAB_SERVER_URL
+            string "Server base URL (끝에 / 없이)"
+            default "https://lab-access.example.workers.dev"
+        config LAB_DEVICE_KEY
+            string "Device key (관리자 화면 > 단말 등록에서 발급)"
+            default ""
+    endmenu
+
+    menu "Board pins (JC1060P470C)"
+        config LAB_I2C_SDA
+            int "Shared I2C SDA (touch / camera / 4P I2C)"
+            default 7
+        config LAB_I2C_SCL
+            int "Shared I2C SCL"
+            default 8
+        config LAB_CAM_RESET_GPIO
+            int "Camera reset GPIO (-1 = none)"
+            default -1
+        config LAB_CAM_PWDN_GPIO
+            int "Camera power-down GPIO (-1 = none)"
+            default -1
+    endmenu
+
+    menu "Door relay"
+        config LAB_RELAY_GPIO
+            int "Relay control GPIO (헤더의 빈 핀: 1,2,3,4,20,32,33,45,46,47)"
+            default 32
+        config LAB_RELAY_ACTIVE_HIGH
+            bool "Relay is active-high"
+            default y
+
+        config LAB_DOOR_MAX_OPEN_MS
+            int "Max door open pulse (ms)"
+            default 10000
+        config LAB_BUZZER_GPIO
+            int "Status buzzer/LED GPIO (-1 = 사용 안 함)"
+            default -1
+    endmenu
+endmenu

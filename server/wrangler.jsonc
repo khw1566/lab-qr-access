@@ -1,0 +1,16 @@
+{
+  "name": "lab-access",
+  "main": "src/index.js",
+  "compatibility_date": "2025-09-01",
+  "assets": { "directory": "./public", "binding": "ASSETS", "run_worker_first": ["/api/*"] },
+  "d1_databases": [
+    { "binding": "DB", "database_name": "lab-access", "database_id": "<wrangler d1 create 후 나오는 ID>" }
+  ],
+  "vars": {
+    "REQUIRE_USER_APPROVAL": "true",
+    "DOOR_OPEN_MS": "3000"
+  }
+  // 비밀값은 vars가 아니라 secret으로 등록:
+  //   npx wrangler secret put SESSION_SECRET
+  //   npx wrangler secret put QR_SECRET
+}

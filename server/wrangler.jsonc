@@ -12,7 +12,7 @@
   "routes": [{ "pattern": "lab.audreaming.com", "custom_domain": true }],
   "workers_dev": true,
   "d1_databases": [
-    { "binding": "DB", "database_name": "lab-access", "database_id": "<wrangler d1 create 후 나오는 ID>" }
+    { "binding": "DB", "database_name": "lab-access", "database_id": "c2076680-7ed6-4728-9c2e-e5df5f657f94" }
   ],
   "vars": {
     "REQUIRE_USER_APPROVAL": "true",

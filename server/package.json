@@ -8,5 +8,8 @@
     "db:migrate:local": "wrangler d1 migrations apply lab-access --local",
     "db:migrate": "wrangler d1 migrations apply lab-access --remote"
   },
-  "devDependencies": { "wrangler": "^4.0.0" }
+  "devDependencies": {
+    "qrcode-generator": "^1.4.4",
+    "wrangler": "^4.0.0"
+  }
 }

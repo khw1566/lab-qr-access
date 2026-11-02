@@ -14,12 +14,27 @@
 [출입문 카메라] --QR 인식--> [JC1060P470] --허용--> [릴레이] --> [도어락]
 ```
 
-1. 학생이 학번/이름/비밀번호로 가입하면 관리자가 가입을 승인합니다 (`REQUIRE_USER_APPROVAL=false`로 끌 수 있음).
+주소: **https://lab.audreaming.com** (학생/관리자 웹앱과 보드 API를 같은 Worker가 서비스)
+
+1. 학생이 학번/이름/비밀번호로 가입하면 관리자가 가입을 승인합니다 (관리자 > 기능 설정에서 끌 수 있음).
 2. 학생이 실습실, 날짜, 시간, 목적을 적어 이용을 신청합니다.
 3. 관리자가 승인/반려합니다. 실습실별 **자동 승인 규칙**(허용 시간대, 최대 이용 시간, 동시 정원)을 켜 두면 규칙에 맞는 신청은 즉시 승인됩니다.
 4. 승인된 예약은 시작 N분 전부터 종료 시각까지 폰에서 **동적 QR**을 볼 수 있습니다.
 5. 보드가 QR을 읽어 서버에 보내고, 서버가 허용하면 릴레이를 몇 초간 켜서 문을 엽니다.
 6. 모든 시도(허용/거부와 사유)는 출입 기록에 남습니다.
+
+## 화면 구성
+
+- **학생** (하단 탭): 출입증(지금 입장 가능한 예약과 QR 열기), 이용 신청(날짜 칩, 30분 단위 시간, 자동 승인 가능 여부 미리 표시), 신청 내역(취소 가능)
+- **관리자** (`#admin`, 상단의 "관리자" 버튼): 현황, 신청 승인, 사용자(가입 승인/정지/관리자 지정), 마스터 QR, 실습실·자동 승인, 출입 단말(키 발급/폐기), 출입 기록, 기능 설정
+- **기능 설정**: 긴급 잠금(학생 QR 전부 거부), 마스터 QR 사용, 문 열림 시간, 이용 신청 받기, 신청 가능 기간, 새 가입 받기, 가입 승인 필요, 서비스 이름, 공지
+
+## 마스터 QR
+
+- 형식 `LA1.M<마스터ID>.<스텝>.<서명16자>`. 펌웨어는 `LA1.`로 시작하는 QR을 그대로 서버에 보내므로 **펌웨어 수정 없이** 동작합니다. 응답 형식도 학생 QR과 같습니다.
+- **화면용**: 관리자 폰에서 30초마다 바뀌는 QR. 유효 기간 최대 30일.
+- **인쇄용 고정**: 비상용. 유효 기간 최대 1년. "재발급"하면 nonce가 바뀌어 예전 인쇄본이 즉시 무효가 되고, "폐기"하면 영구히 막힙니다.
+- 실습실을 지정하거나 모든 실습실용으로 발급할 수 있고, 사용 횟수와 마지막 사용 시각이 기록됩니다. 긴급 잠금 중에도 마스터 QR은 통과합니다.
 
 ## 보안 설계 요점
 
@@ -36,8 +51,10 @@
 server/                       Cloudflare Worker (API + 정적 웹앱)
   src/index.js                API 전체
   src/crypto.js               해시/서명 유틸
-  public/index.html           학생 + 관리자 모바일 웹앱 (한 페이지)
+  public/index.html           학생 + 관리자 웹앱 (한 페이지, 해시 라우팅)
+  public/vendor/qrcode.js     QR 생성 라이브러리 (MIT, CDN 장애 대비 로컬 포함)
   migrations/0001_init.sql    D1 스키마
+  migrations/0002_*.sql       기능 설정, 마스터 QR, 실습실 운영/단말 폐기
 firmware/                     ESP-IDF 5.5 프로젝트
   main/main.c                 QR 인식 → 서버 검증 → 문 열기
   main/camera_qr.c            esp_video(V4L2)로 카메라 캡처 + quirc 디코딩
@@ -56,8 +73,11 @@ firmware/                     ESP-IDF 5.5 프로젝트
 | `GET /api/reservations/:id/qr` | 현재 30초 구간 QR 토큰 |
 | `GET /api/admin/reservations`, `POST .../:id/approve·reject` | 승인 대기 목록, 승인/반려 |
 | `GET /api/admin/users`, `POST .../:id/activate·block` | 가입 승인 |
-| `PATCH /api/admin/rooms/:id` | 자동 승인 규칙 |
-| `GET/POST /api/admin/devices`, `GET /api/admin/logs` | 단말 등록(키 발급), 출입 기록 |
+| `POST /api/admin/rooms`, `PATCH /api/admin/rooms/:id` | 실습실 추가, 운영 여부와 자동 승인 규칙 |
+| `GET/POST /api/admin/devices`, `POST .../:id/revoke`, `GET /api/admin/logs` | 단말 등록(키 발급)/폐기, 출입 기록 |
+| `GET/PATCH /api/admin/settings`, `GET /api/admin/overview` | 기능 설정, 현황 |
+| `GET/POST /api/admin/masters`, `POST .../:id/revoke·reissue`, `GET .../:id/qr` | 마스터 QR |
+| `GET /api/config` | 로그인 화면용 공개 설정 |
 | `POST /api/device/verify`, `/api/device/ping` | 보드 전용 |
 
 ## 서버 배포
@@ -70,15 +90,13 @@ npx wrangler d1 create lab-access          # 출력된 database_id를 wrangler.j
 npm run db:migrate                         # 원격 D1에 스키마 적용
 npx wrangler secret put SESSION_SECRET     # 긴 랜덤 문자열 (openssl rand -hex 32)
 npx wrangler secret put QR_SECRET          # 다른 긴 랜덤 문자열
-npm run deploy
+npx wrangler secret put ADMIN_SETUP_CODE   # 첫 관리자 가입용 코드
+npm run deploy                             # lab.audreaming.com 도메인과 인증서는 Cloudflare가 자동 연결
 ```
 
-첫 관리자 만들기: 웹앱에서 관리자용 계정으로 가입한 뒤 아래 명령을 실행합니다.
+`wrangler.jsonc`의 `routes`에 `lab.audreaming.com`이 custom domain으로 들어 있어, audreaming.com이 같은 Cloudflare 계정에 있으면 배포만으로 DNS 레코드와 인증서가 생깁니다.
 
-```bash
-npx wrangler d1 execute lab-access --remote \
-  --command "UPDATE users SET role='admin', status='active' WHERE student_no='관리자학번'"
-```
+첫 관리자 만들기: 웹앱 가입 화면에서 "관리자 계정 만들기"를 누르고 `ADMIN_SETUP_CODE` 값을 넣어 가입하면 바로 관리자 계정이 됩니다. 이후 다른 관리자는 관리자 > 사용자에서 지정합니다.
 
 로컬 테스트: `npm run db:migrate:local && npm run dev` (비밀값은 `.dev.vars`, 운영에서는 쓰지 마세요).
 
@@ -112,11 +130,12 @@ npx wrangler d1 execute lab-access --remote \
 
 ## 검증 상태
 
-- 서버: 로컬 `wrangler dev`에서 가입 → 가입 승인 → 신청 → 관리자 승인 → QR 발급 → 단말 검증(허용) → 같은 QR 재사용 거부 → 위조 QR 거부 → 잘못된 단말 키 거부 → 자동 승인까지 통과했습니다.
+- 서버 (관리자 기능 확장 후): 로컬 `wrangler dev`에서 관리자 코드 가입, 기능 설정 변경, 긴급 잠금 시 학생 QR 거부, 화면용 마스터 QR 통과, 인쇄용 마스터 QR 통과 → 재발급 후 예전 QR 거부 → 폐기 후 거부, 위조 마스터 QR 거부, 마스터 QR 기능 끄면 거부, 단말 키 폐기 후 거부, 운영 중지 실습실 숨김까지 통과했습니다.
+- 서버 (초기): 로컬 `wrangler dev`에서 가입 → 가입 승인 → 신청 → 관리자 승인 → QR 발급 → 단말 검증(허용) → 같은 QR 재사용 거부 → 위조 QR 거부 → 잘못된 단말 키 거부 → 자동 승인까지 통과했습니다.
 - 펌웨어: ESP-IDF v5.5에서 `idf.py build` 성공 (esp32p4, 우리 코드 경고 없음). 실제 보드에서의 카메라 인식, Wi-Fi 접속, 릴레이 동작은 아직 확인 전입니다.
 
 ## 다음 단계 후보
 
 - 보드 LCD에 결과 표시 (LVGL: "홍길동님 환영합니다" / 거부 사유)
-- 관리자 원격 개방, 문 열림 센서(리드 스위치) 연동
+- 관리자 원격 개방(보드 폴링 주기 단축 필요), 문 열림 센서(리드 스위치) 연동
 - 학교 SSO/이메일 인증 연동

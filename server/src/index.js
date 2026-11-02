@@ -30,6 +30,43 @@ async function body(req) {
   }
 }
 
+// ---------- 운영 설정 (관리자 화면에서 변경) ----------
+const SETTING_DEFS = {
+  site_name: { type: 'str', max: 30, def: () => '실습실 출입' },
+  notice: { type: 'str', max: 300, def: () => '' },
+  registration_open: { type: 'bool', def: () => true },
+  require_user_approval: { type: 'bool', def: (env) => env.REQUIRE_USER_APPROVAL !== 'false' },
+  reservations_open: { type: 'bool', def: () => true },
+  max_days_ahead: { type: 'int', min: 1, max: 90, def: () => 30 },
+  lockdown: { type: 'bool', def: () => false },
+  master_qr_enabled: { type: 'bool', def: () => true },
+  door_open_ms: { type: 'int', min: 1000, max: 15000, def: (env) => Number(env.DOOR_OPEN_MS || 3000) },
+};
+
+async function getSettings(env) {
+  const out = {};
+  for (const [k, d] of Object.entries(SETTING_DEFS)) out[k] = d.def(env);
+  const { results } = await env.DB.prepare('SELECT key, value FROM settings').all();
+  for (const { key, value } of results) {
+    const d = SETTING_DEFS[key];
+    if (!d) continue;
+    out[key] = d.type === 'bool' ? value === '1' : d.type === 'int' ? Number(value) : value;
+  }
+  return out;
+}
+
+function normalizeSetting(key, v) {
+  const d = SETTING_DEFS[key];
+  if (!d) throw new HttpError(400, `알 수 없는 설정: ${key}`);
+  if (d.type === 'bool') return v === true || v === 1 || v === '1' || v === 'true' ? '1' : '0';
+  if (d.type === 'int') {
+    const n = Math.round(Number(v));
+    if (!Number.isFinite(n) || n < d.min || n > d.max) throw new HttpError(400, `${key} 값은 ${d.min}~${d.max} 사이여야 합니다.`);
+    return String(n);
+  }
+  return String(v ?? '').trim().slice(0, d.max);
+}
+
 const kstHour = (ms) => new Date(ms + KST_OFFSET_MS).getUTCHours() + new Date(ms + KST_OFFSET_MS).getUTCMinutes() / 60;
 const kstDay = (ms) => new Date(ms + KST_OFFSET_MS).toISOString().slice(0, 10);
 
@@ -64,14 +101,23 @@ async function makeQrToken(env, resId, step) {
   return `${payload}.${await hmac(env.QR_SECRET, payload, 12)}`;
 }
 
-async function parseQrToken(env, token) {
+// 마스터 QR: LA1.M<마스터ID>.<스텝>.<서명16자>  (펌웨어는 "LA1."로 시작하는 문자열을 그대로 서버로 보내므로 수정 불필요)
+//   dynamic 은 30초 스텝, static(인쇄용) 은 스텝 0. 서명에 nonce를 섞어 재발급 시 예전 QR을 무효화한다.
+async function makeMasterToken(env, mk, step) {
+  const payload = `LA1.M${mk.id}.${step}`;
+  return `${payload}.${await hmac(env.QR_SECRET, `${payload}.${mk.nonce}`, 12)}`;
+}
+
+function parseQrParts(token) {
   const parts = String(token || '').trim().split('.');
   if (parts.length !== 4 || parts[0] !== 'LA1') return null;
-  const [, resId, step, sig] = parts;
-  if (!/^\d+$/.test(resId) || !/^\d+$/.test(step)) return null;
-  const expect = await hmac(env.QR_SECRET, `LA1.${resId}.${step}`, 12);
-  if (!safeEqual(sig, expect)) return null;
-  return { resId: Number(resId), step: Number(step) };
+  const [, id, step, sig] = parts;
+  if (!/^M?\d+$/.test(id) || !/^\d+$/.test(step) || !sig) return null;
+  return { master: id[0] === 'M', id: Number(id.replace('M', '')), step: Number(step), sig };
+}
+
+async function verifyReservationSig(env, p) {
+  return safeEqual(p.sig, await hmac(env.QR_SECRET, `LA1.${p.id}.${p.step}`, 12));
 }
 
 // ---------- 자동 승인 규칙 ----------
@@ -107,6 +153,8 @@ export default {
   },
 };
 
+const id = (v) => Number(v);
+
 async function route(req, env, url) {
   const path = url.pathname;
   const method = req.method;
@@ -119,24 +167,41 @@ async function route(req, env, url) {
     return json({ ok: true, device: dev.name, server_time: Date.now() });
   }
 
+  // ===== 로그인 전 화면용 공개 설정 =====
+  if (path === '/api/config' && method === 'GET') {
+    const s = await getSettings(env);
+    return json({
+      site_name: s.site_name,
+      notice: s.notice,
+      registration_open: s.registration_open,
+      require_user_approval: s.require_user_approval,
+    });
+  }
+
   // ===== 인증 =====
   if (path === '/api/auth/register' && method === 'POST') {
-    const { student_no, name, password } = await body(req);
-    if (!/^[0-9A-Za-z]{4,20}$/.test(student_no || '')) throw new HttpError(400, '학번 형식이 올바르지 않습니다.');
-    if (!name || String(name).length > 30) throw new HttpError(400, '이름을 확인해 주세요.');
+    const { student_no, name, password, setup_code } = await body(req);
+    const s = await getSettings(env);
+    // 첫 관리자 만들기: 비밀값 ADMIN_SETUP_CODE를 가입 화면의 "관리자 코드"에 넣으면 바로 관리자가 된다
+    const isAdmin = !!(env.ADMIN_SETUP_CODE && setup_code && safeEqual(String(setup_code), env.ADMIN_SETUP_CODE));
+    if (setup_code && !isAdmin) throw new HttpError(403, '관리자 코드가 올바르지 않습니다.');
+    if (!s.registration_open && !isAdmin) throw new HttpError(403, '지금은 가입을 받지 않습니다.');
+    if (!/^[0-9A-Za-z]{4,20}$/.test(student_no || '')) throw new HttpError(400, '학번은 영문/숫자 4~20자입니다.');
+    if (!name || String(name).trim().length > 30) throw new HttpError(400, '이름을 확인해 주세요.');
     if (!password || password.length < 8) throw new HttpError(400, '비밀번호는 8자 이상이어야 합니다.');
     const salt = randomHex(16);
-    const status = env.REQUIRE_USER_APPROVAL === 'false' ? 'active' : 'pending';
+    const status = isAdmin || !s.require_user_approval ? 'active' : 'pending';
     try {
       await env.DB.prepare(
-        'INSERT INTO users (student_no, name, pw_hash, pw_salt, status, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+        'INSERT INTO users (student_no, name, pw_hash, pw_salt, role, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
       )
-        .bind(student_no, String(name).trim(), await hashPassword(password, salt), salt, status, Date.now())
+        .bind(student_no, String(name).trim(), await hashPassword(password, salt), salt, isAdmin ? 'admin' : 'student',
+          status, Date.now())
         .run();
     } catch {
       throw new HttpError(409, '이미 가입된 학번입니다.');
     }
-    return json({ ok: true, status });
+    return json({ ok: true, status, role: isAdmin ? 'admin' : 'student' });
   }
 
   if (path === '/api/auth/login' && method === 'POST') {
@@ -145,7 +210,7 @@ async function route(req, env, url) {
     if (!u || !safeEqual(u.pw_hash, await hashPassword(password || '', u.pw_salt)))
       throw new HttpError(401, '학번 또는 비밀번호가 틀렸습니다.');
     if (u.status === 'pending') throw new HttpError(403, '관리자의 가입 승인을 기다리는 중입니다.');
-    if (u.status !== 'active') throw new HttpError(403, '사용이 정지된 계정입니다.');
+    if (u.status !== 'active') throw new HttpError(403, '사용이 정지된 계정입니다. 관리자에게 문의하세요.');
     const sid = await makeSession(env, u.id);
     return json(
       { ok: true, user: { id: u.id, student_no: u.student_no, name: u.name, role: u.role } },
@@ -161,24 +226,41 @@ async function route(req, env, url) {
   const user = await currentUser(req, env);
   if (!user) throw new HttpError(401, '로그인이 필요합니다.');
 
-  if (path === '/api/me' && method === 'GET') return json({ user });
+  if (path === '/api/me' && method === 'GET') {
+    const s = await getSettings(env);
+    return json({
+      user,
+      settings: {
+        site_name: s.site_name,
+        notice: s.notice,
+        reservations_open: s.reservations_open,
+        max_days_ahead: s.max_days_ahead,
+        lockdown: s.lockdown,
+      },
+    });
+  }
 
   if (path === '/api/rooms' && method === 'GET') {
-    const { results } = await env.DB.prepare('SELECT * FROM rooms ORDER BY id').all();
+    const all = user.role === 'admin' && url.searchParams.get('all') === '1';
+    const { results } = await env.DB.prepare(`SELECT * FROM rooms ${all ? '' : 'WHERE enabled = 1'} ORDER BY id`).all();
     return json({ rooms: results });
   }
 
-  // --- 학생: 예약 신청 ---
+  // --- 학생: 실습실 이용 신청 ---
   if (path === '/api/reservations' && method === 'POST') {
+    const s = await getSettings(env);
+    if (!s.reservations_open) throw new HttpError(403, '지금은 이용 신청을 받지 않습니다.');
     const { room_id, start_at, end_at, purpose } = await body(req);
     const start = Number(start_at);
     const end = Number(end_at);
     if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start)
-      throw new HttpError(400, '이용 시간을 확인해 주세요.');
+      throw new HttpError(400, '종료 시각이 시작 시각보다 늦어야 합니다.');
     if (end < Date.now()) throw new HttpError(400, '이미 지난 시간입니다.');
-    if (start - Date.now() > 30 * 86400_000) throw new HttpError(400, '30일 이내로만 신청할 수 있습니다.');
-    const room = await env.DB.prepare('SELECT * FROM rooms WHERE id = ?').bind(Number(room_id)).first();
-    if (!room) throw new HttpError(404, '실습실을 찾을 수 없습니다.');
+    if (start - Date.now() > s.max_days_ahead * 86400_000)
+      throw new HttpError(400, `${s.max_days_ahead}일 이내로만 신청할 수 있습니다.`);
+    if (!String(purpose || '').trim()) throw new HttpError(400, '사용 목적을 적어 주세요.');
+    const room = await env.DB.prepare('SELECT * FROM rooms WHERE id = ? AND enabled = 1').bind(id(room_id)).first();
+    if (!room) throw new HttpError(404, '신청할 수 있는 실습실이 아닙니다.');
     const dup = await env.DB.prepare(
       `SELECT id FROM reservations WHERE user_id = ? AND status IN ('pending','approved')
        AND start_at < ? AND end_at > ?`,
@@ -193,7 +275,7 @@ async function route(req, env, url) {
       `INSERT INTO reservations (user_id, room_id, start_at, end_at, purpose, status, decided_at, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     )
-      .bind(user.id, room.id, start, end, String(purpose || '').slice(0, 200), auto.ok ? 'approved' : 'pending',
+      .bind(user.id, room.id, start, end, String(purpose).trim().slice(0, 200), auto.ok ? 'approved' : 'pending',
         auto.ok ? now : null, now)
       .run();
     return json({ ok: true, id: r.meta.last_row_id, status: auto.ok ? 'approved' : 'pending', note: auto.why || null });
@@ -201,34 +283,37 @@ async function route(req, env, url) {
 
   if (path === '/api/reservations' && method === 'GET') {
     const { results } = await env.DB.prepare(
-      `SELECT r.*, rm.name AS room_name FROM reservations r JOIN rooms rm ON rm.id = r.room_id
-       WHERE r.user_id = ? AND r.end_at > ? ORDER BY r.start_at LIMIT 50`,
+      `SELECT r.*, rm.name AS room_name, rm.early_minutes FROM reservations r JOIN rooms rm ON rm.id = r.room_id
+       WHERE r.user_id = ? AND r.end_at > ? ORDER BY r.start_at DESC LIMIT 50`,
     )
-      .bind(user.id, Date.now() - 7 * 86400_000)
+      .bind(user.id, Date.now() - 14 * 86400_000)
       .all();
-    return json({ reservations: results });
+    return json({ reservations: results, server_time: Date.now() });
   }
 
   if ((m = path.match(/^\/api\/reservations\/(\d+)\/cancel$/)) && method === 'POST') {
     const r = await env.DB.prepare(
       `UPDATE reservations SET status = 'cancelled' WHERE id = ? AND user_id = ? AND status IN ('pending','approved')`,
     )
-      .bind(Number(m[1]), user.id)
+      .bind(id(m[1]), user.id)
       .run();
     if (!r.meta.changes) throw new HttpError(404, '취소할 수 있는 신청이 없습니다.');
     return json({ ok: true });
   }
 
-  // --- 학생: 한시적 QR 발급 (30초마다 바뀌는 동적 QR) ---
+  // --- 학생: 인증 QR 발급 (30초마다 바뀌는 동적 QR, 한 번만 통과) ---
   if ((m = path.match(/^\/api\/reservations\/(\d+)\/qr$/)) && method === 'GET') {
+    const s = await getSettings(env);
+    if (s.lockdown) throw new HttpError(423, '실습실이 임시로 잠겨 있습니다. 관리자에게 문의하세요.');
     const r = await env.DB.prepare(
-      `SELECT r.*, rm.early_minutes FROM reservations r JOIN rooms rm ON rm.id = r.room_id
+      `SELECT r.*, rm.early_minutes, rm.enabled FROM reservations r JOIN rooms rm ON rm.id = r.room_id
        WHERE r.id = ? AND r.user_id = ?`,
     )
-      .bind(Number(m[1]), user.id)
+      .bind(id(m[1]), user.id)
       .first();
     if (!r) throw new HttpError(404, '신청 내역을 찾을 수 없습니다.');
     if (r.status !== 'approved') throw new HttpError(403, '승인된 신청만 QR을 받을 수 있습니다.');
+    if (!r.enabled) throw new HttpError(403, '이 실습실은 현재 운영하지 않습니다.');
     const now = Date.now();
     if (now < r.start_at - r.early_minutes * 60000)
       throw new HttpError(403, `입장 ${r.early_minutes}분 전부터 QR이 열립니다.`);
@@ -237,6 +322,7 @@ async function route(req, env, url) {
     return json({
       token: await makeQrToken(env, r.id, step),
       refresh_in_ms: (step + 1) * QR_STEP_MS - now,
+      step_ms: QR_STEP_MS,
       end_at: r.end_at,
     });
   }
@@ -252,6 +338,47 @@ async function route(req, env, url) {
 
 async function adminRoute(req, env, path, method, admin, url) {
   let m;
+  const now = Date.now();
+
+  // --- 현황 요약 ---
+  if (path === '/api/admin/overview' && method === 'GET') {
+    const dayStart = new Date(kstDay(now) + 'T00:00:00+09:00').getTime();
+    const one = (sql, ...b) => env.DB.prepare(sql).bind(...b).first();
+    const [pr, pu, g, d, inside, devs, s] = await Promise.all([
+      one(`SELECT COUNT(*) n FROM reservations WHERE status = 'pending' AND end_at > ?`, now),
+      one(`SELECT COUNT(*) n FROM users WHERE status = 'pending'`),
+      one(`SELECT COUNT(*) n FROM access_logs WHERE result = 'granted' AND at >= ?`, dayStart),
+      one(`SELECT COUNT(*) n FROM access_logs WHERE result = 'denied' AND at >= ?`, dayStart),
+      one(`SELECT COUNT(*) n FROM reservations WHERE status = 'approved' AND start_at <= ? AND end_at > ?`, now, now),
+      env.DB.prepare('SELECT d.id, d.name, d.last_seen_at, rm.name room_name FROM devices d JOIN rooms rm ON rm.id = d.room_id WHERE d.active = 1').all(),
+      getSettings(env),
+    ]);
+    return json({
+      pending_reservations: pr.n,
+      pending_users: pu.n,
+      granted_today: g.n,
+      denied_today: d.n,
+      active_now: inside.n,
+      devices: devs.results.map((x) => ({ ...x, online: !!x.last_seen_at && now - x.last_seen_at < 3 * 60_000 })),
+      lockdown: s.lockdown,
+      server_time: now,
+    });
+  }
+
+  // --- 기능·운영 설정 ---
+  if (path === '/api/admin/settings' && method === 'GET') return json({ settings: await getSettings(env) });
+  if (path === '/api/admin/settings' && method === 'PATCH') {
+    const b = await body(req);
+    const stmts = Object.entries(b).map(([k, v]) =>
+      env.DB.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
+        .bind(k, normalizeSetting(k, v)),
+    );
+    if (!stmts.length) throw new HttpError(400, '변경할 항목이 없습니다.');
+    await env.DB.batch(stmts);
+    return json({ ok: true, settings: await getSettings(env) });
+  }
+
+  // --- 이용 신청 승인 ---
   if (path === '/api/admin/reservations' && method === 'GET') {
     const status = url.searchParams.get('status') || 'pending';
     const { results } = await env.DB.prepare(
@@ -259,24 +386,25 @@ async function adminRoute(req, env, path, method, admin, url) {
        FROM reservations r JOIN users u ON u.id = r.user_id JOIN rooms rm ON rm.id = r.room_id
        WHERE r.status = ? AND r.end_at > ? ORDER BY r.start_at LIMIT 200`,
     )
-      .bind(status, Date.now() - 86400_000)
+      .bind(status, now - 86400_000)
       .all();
     return json({ reservations: results });
   }
 
   if ((m = path.match(/^\/api\/admin\/reservations\/(\d+)\/(approve|reject)$/)) && method === 'POST') {
-      const { reason } = await req.json().catch(() => ({}));
+    const { reason } = await req.json().catch(() => ({}));
     const status = m[2] === 'approve' ? 'approved' : 'rejected';
     const r = await env.DB.prepare(
       `UPDATE reservations SET status = ?, decided_by = ?, decided_at = ?, reject_reason = ?
        WHERE id = ? AND status IN ('pending','approved')`,
     )
-      .bind(status, admin.id, Date.now(), status === 'rejected' ? String(reason || '').slice(0, 200) : null, Number(m[1]))
+      .bind(status, admin.id, now, status === 'rejected' ? String(reason || '').slice(0, 200) : null, id(m[1]))
       .run();
     if (!r.meta.changes) throw new HttpError(404, '처리할 수 있는 신청이 없습니다.');
     return json({ ok: true });
   }
 
+  // --- 사용자 ---
   if (path === '/api/admin/users' && method === 'GET') {
     const status = url.searchParams.get('status') || 'pending';
     const { results } = await env.DB.prepare(
@@ -287,57 +415,153 @@ async function adminRoute(req, env, path, method, admin, url) {
     return json({ users: results });
   }
 
-  if ((m = path.match(/^\/api\/admin\/users\/(\d+)\/(activate|block)$/)) && method === 'POST') {
-    await env.DB.prepare('UPDATE users SET status = ? WHERE id = ?')
-      .bind(m[2] === 'activate' ? 'active' : 'blocked', Number(m[1]))
-      .run();
+  if ((m = path.match(/^\/api\/admin\/users\/(\d+)\/(activate|block|make-admin|make-student)$/)) && method === 'POST') {
+    const target = id(m[1]);
+    if (target === admin.id && m[2] !== 'activate') throw new HttpError(400, '자기 계정의 권한이나 상태는 바꿀 수 없습니다.');
+    const sql = {
+      activate: "UPDATE users SET status = 'active' WHERE id = ?",
+      block: "UPDATE users SET status = 'blocked' WHERE id = ?",
+      'make-admin': "UPDATE users SET role = 'admin' WHERE id = ? AND status = 'active'",
+      'make-student': "UPDATE users SET role = 'student' WHERE id = ?",
+    }[m[2]];
+    const r = await env.DB.prepare(sql).bind(target).run();
+    if (!r.meta.changes) throw new HttpError(404, '바꿀 수 있는 사용자가 없습니다.');
     return json({ ok: true });
   }
 
+  // --- 실습실 ---
+  const ROOM_FIELDS = ['name', 'enabled', 'auto_approve', 'open_hour', 'close_hour', 'max_minutes', 'capacity', 'early_minutes'];
+  const roomVal = (f, v) => {
+    if (f === 'name') {
+      const n = String(v || '').trim().slice(0, 40);
+      if (!n) throw new HttpError(400, '실습실 이름을 적어 주세요.');
+      return n;
+    }
+    const n = Math.round(Number(v));
+    if (!Number.isFinite(n) || n < 0) throw new HttpError(400, `${f} 값을 확인해 주세요.`);
+    return n;
+  };
+  if (path === '/api/admin/rooms' && method === 'POST') {
+    const { name } = await body(req);
+    const r = await env.DB.prepare('INSERT INTO rooms (name) VALUES (?)').bind(roomVal('name', name)).run();
+    return json({ ok: true, id: r.meta.last_row_id });
+  }
   if ((m = path.match(/^\/api\/admin\/rooms\/(\d+)$/)) && method === 'PATCH') {
     const b = await body(req);
-    const fields = ['name', 'auto_approve', 'open_hour', 'close_hour', 'max_minutes', 'capacity', 'early_minutes'];
     const sets = [];
     const vals = [];
-    for (const f of fields)
+    for (const f of ROOM_FIELDS)
       if (f in b) {
         sets.push(`${f} = ?`);
-        vals.push(f === 'name' ? String(b[f]) : Number(b[f]));
+        vals.push(roomVal(f, b[f]));
       }
     if (!sets.length) throw new HttpError(400, '변경할 항목이 없습니다.');
-    await env.DB.prepare(`UPDATE rooms SET ${sets.join(', ')} WHERE id = ?`).bind(...vals, Number(m[1])).run();
+    const o = 'open_hour' in b ? Number(b.open_hour) : null;
+    const c = 'close_hour' in b ? Number(b.close_hour) : null;
+    if ((o !== null && o > 23) || (c !== null && (c < 1 || c > 24)) || (o !== null && c !== null && o >= c))
+      throw new HttpError(400, '자동 승인 시간대를 확인해 주세요 (시작 0~23시, 종료 1~24시, 시작 < 종료).');
+    await env.DB.prepare(`UPDATE rooms SET ${sets.join(', ')} WHERE id = ?`).bind(...vals, id(m[1])).run();
     return json({ ok: true });
   }
 
+  // --- 출입 기록 ---
   if (path === '/api/admin/logs' && method === 'GET') {
     const { results } = await env.DB.prepare(
-      `SELECT l.*, u.student_no, u.name, d.name AS device_name FROM access_logs l
+      `SELECT l.*, u.student_no, u.name, d.name AS device_name, mk.label AS master_label FROM access_logs l
        LEFT JOIN users u ON u.id = l.user_id LEFT JOIN devices d ON d.id = l.device_id
+       LEFT JOIN master_keys mk ON mk.id = l.master_id
        ORDER BY l.at DESC LIMIT 200`,
     ).all();
     return json({ logs: results });
   }
 
+  // --- 출입 단말 ---
   if (path === '/api/admin/devices' && method === 'GET') {
     const { results } = await env.DB.prepare(
-      'SELECT d.id, d.name, d.room_id, d.last_seen_at, rm.name AS room_name FROM devices d JOIN rooms rm ON rm.id = d.room_id',
+      `SELECT d.id, d.name, d.room_id, d.last_seen_at, d.active, rm.name AS room_name
+       FROM devices d JOIN rooms rm ON rm.id = d.room_id ORDER BY d.active DESC, d.id`,
     ).all();
-    return json({ devices: results });
+    return json({ devices: results, server_time: now });
   }
 
-  // 새 출입 단말 등록: 응답의 key를 펌웨어 설정에 넣는다 (한 번만 보여줌)
+  // 새 출입 단말 등록: 응답의 key를 펌웨어 설정(menuconfig)에 넣는다 (한 번만 보여줌)
   if (path === '/api/admin/devices' && method === 'POST') {
     const { name, room_id } = await body(req);
+    const room = await env.DB.prepare('SELECT id FROM rooms WHERE id = ?').bind(id(room_id)).first();
+    if (!room) throw new HttpError(404, '실습실을 찾을 수 없습니다.');
     const key = randomHex(24);
     await env.DB.prepare('INSERT INTO devices (room_id, name, key_hash) VALUES (?, ?, ?)')
-      .bind(Number(room_id), String(name || '출입문'), await sha256Hex(key))
+      .bind(room.id, String(name || '출입문').slice(0, 40), await sha256Hex(key))
       .run();
     return json({ ok: true, key });
   }
 
-  if ((m = path.match(/^\/api\/admin\/remote-open\/(\d+)$/)) && method === 'POST') {
-    // 원격 개방 요청은 다음 단계(보드 폴링/웹소켓)에서 구현 예정
-    throw new HttpError(501, '원격 개방은 아직 구현되지 않았습니다.');
+  if ((m = path.match(/^\/api\/admin\/devices\/(\d+)\/revoke$/)) && method === 'POST') {
+    // 키 해시를 무작위 값으로 덮어 예전 키를 영구히 무효화 (기록은 남김)
+    await env.DB.prepare('UPDATE devices SET active = 0, key_hash = ? WHERE id = ?')
+      .bind('revoked:' + randomHex(16), id(m[1]))
+      .run();
+    return json({ ok: true });
+  }
+
+  // --- 마스터 QR ---
+  if (path === '/api/admin/masters' && method === 'GET') {
+    const { results } = await env.DB.prepare(
+      `SELECT mk.id, mk.label, mk.room_id, mk.mode, mk.expires_at, mk.revoked, mk.created_at, mk.last_used_at,
+              mk.use_count, rm.name AS room_name, u.name AS created_by_name
+       FROM master_keys mk LEFT JOIN rooms rm ON rm.id = mk.room_id LEFT JOIN users u ON u.id = mk.created_by
+       ORDER BY mk.revoked, mk.id DESC LIMIT 100`,
+    ).all();
+    return json({ masters: results, server_time: now });
+  }
+
+  if (path === '/api/admin/masters' && method === 'POST') {
+    const { label, room_id, mode, valid_hours } = await body(req);
+    if (!['dynamic', 'static'].includes(mode)) throw new HttpError(400, 'QR 종류를 골라 주세요.');
+    const name = String(label || '').trim().slice(0, 40);
+    if (!name) throw new HttpError(400, '마스터 QR 이름(누가 쓰는지)을 적어 주세요.');
+    const hours = Math.round(Number(valid_hours));
+    const maxH = mode === 'static' ? 24 * 365 : 24 * 30;
+    if (!Number.isFinite(hours) || hours < 1 || hours > maxH)
+      throw new HttpError(400, `유효 기간은 1시간~${maxH / 24}일 사이로 정해 주세요.`);
+    let room = null;
+    if (room_id) {
+      room = await env.DB.prepare('SELECT id FROM rooms WHERE id = ?').bind(id(room_id)).first();
+      if (!room) throw new HttpError(404, '실습실을 찾을 수 없습니다.');
+    }
+    const r = await env.DB.prepare(
+      `INSERT INTO master_keys (label, room_id, mode, nonce, expires_at, created_by, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    )
+      .bind(name, room ? room.id : null, mode, randomHex(12), now + hours * 3600_000, admin.id, now)
+      .run();
+    return json({ ok: true, id: r.meta.last_row_id });
+  }
+
+  if ((m = path.match(/^\/api\/admin\/masters\/(\d+)\/(revoke|reissue)$/)) && method === 'POST') {
+    const sql = m[2] === 'revoke'
+      ? 'UPDATE master_keys SET revoked = 1 WHERE id = ?'
+      : 'UPDATE master_keys SET nonce = ?, revoked = 0 WHERE id = ? AND expires_at > ' + now;
+    const st = env.DB.prepare(sql);
+    const r = await (m[2] === 'revoke' ? st.bind(id(m[1])) : st.bind(randomHex(12), id(m[1]))).run();
+    if (!r.meta.changes) throw new HttpError(404, '처리할 수 있는 마스터 QR이 없습니다.');
+    return json({ ok: true });
+  }
+
+  if ((m = path.match(/^\/api\/admin\/masters\/(\d+)\/qr$/)) && method === 'GET') {
+    const mk = await env.DB.prepare('SELECT * FROM master_keys WHERE id = ?').bind(id(m[1])).first();
+    if (!mk) throw new HttpError(404, '마스터 QR을 찾을 수 없습니다.');
+    if (mk.revoked) throw new HttpError(403, '폐기된 마스터 QR입니다.');
+    if (mk.expires_at < now) throw new HttpError(403, '기간이 끝난 마스터 QR입니다.');
+    if (mk.mode === 'static') return json({ token: await makeMasterToken(env, mk, 0), mode: 'static', expires_at: mk.expires_at });
+    const step = Math.floor(now / QR_STEP_MS);
+    return json({
+      token: await makeMasterToken(env, mk, step),
+      mode: 'dynamic',
+      refresh_in_ms: (step + 1) * QR_STEP_MS - now,
+      step_ms: QR_STEP_MS,
+      expires_at: mk.expires_at,
+    });
   }
 
   throw new HttpError(404, '없는 경로입니다.');
@@ -348,55 +572,79 @@ async function deviceAuth(req, env) {
   const auth = req.headers.get('authorization') || '';
   const key = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
   if (!key) throw new HttpError(401, 'device key required');
-  const dev = await env.DB.prepare('SELECT * FROM devices WHERE key_hash = ?').bind(await sha256Hex(key)).first();
+  const dev = await env.DB.prepare('SELECT * FROM devices WHERE key_hash = ? AND active = 1').bind(await sha256Hex(key)).first();
   if (!dev) throw new HttpError(401, 'unknown device');
   await env.DB.prepare('UPDATE devices SET last_seen_at = ? WHERE id = ?').bind(Date.now(), dev.id).run();
   return dev;
 }
 
+// 응답 형식은 펌웨어(server.c)가 읽는 그대로 유지: {ok, reason} / {ok, name, open_ms, end_at}
 async function deviceVerify(req, env) {
   const dev = await deviceAuth(req, env);
   const { token } = await body(req);
   const now = Date.now();
+  const s = await getSettings(env);
 
-  const deny = async (reason, resId = null, userId = null) => {
-    await env.DB.prepare(
-      'INSERT INTO access_logs (device_id, reservation_id, user_id, result, reason, at) VALUES (?, ?, ?, ?, ?, ?)',
+  const log = (result, reason, { resId = null, userId = null, masterId = null } = {}) =>
+    env.DB.prepare(
+      'INSERT INTO access_logs (device_id, reservation_id, user_id, master_id, result, reason, at) VALUES (?, ?, ?, ?, ?, ?, ?)',
     )
-      .bind(dev.id, resId, userId, 'denied', reason, now)
+      .bind(dev.id, resId, userId, masterId, result, reason, now)
       .run();
+  const deny = async (reason, ids) => {
+    await log('denied', reason, ids);
     return json({ ok: false, reason });
   };
 
-  const t = await parseQrToken(env, token);
-  if (!t) return deny('invalid_token');
-
+  const p = parseQrParts(token);
+  if (!p) return deny('invalid_token');
+  const room = await env.DB.prepare('SELECT enabled FROM rooms WHERE id = ?').bind(dev.room_id).first();
   const cur = Math.floor(now / QR_STEP_MS);
-  if (t.step > cur + 1 || t.step < cur - QR_ACCEPT_PAST_STEPS) return deny('expired_token', t.resId);
+
+  // --- 마스터 QR ---
+  if (p.master) {
+    const mk = await env.DB.prepare('SELECT * FROM master_keys WHERE id = ?').bind(p.id).first();
+    const ids = { masterId: mk ? mk.id : null };
+    if (!mk || !safeEqual(p.sig, await hmac(env.QR_SECRET, `LA1.M${p.id}.${p.step}.${mk.nonce}`, 12)))
+      return deny('invalid_token', ids);
+    if (!s.master_qr_enabled) return deny('master_disabled', ids);
+    if (mk.revoked) return deny('master_revoked', ids);
+    if (mk.expires_at < now) return deny('master_expired', ids);
+    if (mk.room_id && mk.room_id !== dev.room_id) return deny('wrong_room', ids);
+    if (mk.mode === 'static' ? p.step !== 0 : p.step > cur + 1 || p.step < cur - QR_ACCEPT_PAST_STEPS)
+      return deny('expired_token', ids);
+    await env.DB.prepare('UPDATE master_keys SET last_used_at = ?, use_count = use_count + 1 WHERE id = ?')
+      .bind(now, mk.id)
+      .run();
+    await log('granted', 'master', ids);
+    return json({ ok: true, name: `마스터 ${mk.label}`, open_ms: s.door_open_ms, end_at: mk.expires_at });
+  }
+
+  // --- 학생 예약 QR ---
+  if (!(await verifyReservationSig(env, p))) return deny('invalid_token');
+  if (s.lockdown) return deny('lockdown', { resId: p.id });
+  if (room && !room.enabled) return deny('room_closed', { resId: p.id });
+  if (p.step > cur + 1 || p.step < cur - QR_ACCEPT_PAST_STEPS) return deny('expired_token', { resId: p.id });
 
   const r = await env.DB.prepare(
     `SELECT r.*, u.name, u.status AS user_status, rm.early_minutes FROM reservations r
      JOIN users u ON u.id = r.user_id JOIN rooms rm ON rm.id = r.room_id WHERE r.id = ?`,
   )
-    .bind(t.resId)
+    .bind(p.id)
     .first();
-  if (!r) return deny('no_reservation', t.resId);
-  if (r.status !== 'approved') return deny('not_approved', r.id, r.user_id);
-  if (r.user_status !== 'active') return deny('user_blocked', r.id, r.user_id);
-  if (r.room_id !== dev.room_id) return deny('wrong_room', r.id, r.user_id);
-  if (now < r.start_at - r.early_minutes * 60000 || now > r.end_at) return deny('out_of_time', r.id, r.user_id);
+  if (!r) return deny('no_reservation', { resId: p.id });
+  const ids = { resId: r.id, userId: r.user_id };
+  if (r.status !== 'approved') return deny('not_approved', ids);
+  if (r.user_status !== 'active') return deny('user_blocked', ids);
+  if (r.room_id !== dev.room_id) return deny('wrong_room', ids);
+  if (now < r.start_at - r.early_minutes * 60000 || now > r.end_at) return deny('out_of_time', ids);
 
   // 같은 QR(같은 스텝) 재사용 차단 — 캡처 화면 공유 방지
   const use = await env.DB.prepare('INSERT OR IGNORE INTO token_uses (reservation_id, step, used_at) VALUES (?, ?, ?)')
-    .bind(r.id, t.step, now)
+    .bind(r.id, p.step, now)
     .run();
-  if (!use.meta.changes) return deny('token_reused', r.id, r.user_id);
+  if (!use.meta.changes) return deny('token_reused', ids);
 
-  await env.DB.prepare(
-    'INSERT INTO access_logs (device_id, reservation_id, user_id, result, reason, at) VALUES (?, ?, ?, ?, ?, ?)',
-  )
-    .bind(dev.id, r.id, r.user_id, 'granted', null, now)
-    .run();
-
-  return json({ ok: true, name: r.name, open_ms: Number(env.DOOR_OPEN_MS || 3000), end_at: r.end_at });
+  await log('granted', null, ids);
+  return json({ ok: true, name: r.name, open_ms: s.door_open_ms, end_at: r.end_at });
 }

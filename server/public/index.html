@@ -3,284 +3,1058 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f2f4f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0c121c" media="(prefers-color-scheme: dark)">
 <title>실습실 출입</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<script src="/vendor/qrcode.js"></script>
 <style>
-  :root { --bg:#f5f6f8; --card:#fff; --text:#1d2129; --muted:#6b7280; --line:#e5e7eb; --accent:#2563eb; --ok:#16a34a; --warn:#d97706; --bad:#dc2626; }
-  @media (prefers-color-scheme: dark) { :root { --bg:#111418; --card:#1b1f24; --text:#e8eaed; --muted:#9aa0a6; --line:#2c3138; } }
-  * { box-sizing:border-box; }
-  body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif; background:var(--bg); color:var(--text); }
-  main { max-width:560px; margin:0 auto; padding:16px; }
-  h1 { font-size:20px; margin:8px 0 16px; display:flex; justify-content:space-between; align-items:center; }
-  h2 { font-size:16px; margin:0 0 12px; }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; margin-bottom:12px; }
-  label { display:block; font-size:13px; color:var(--muted); margin:10px 0 4px; }
-  input, select, textarea { width:100%; padding:10px; font-size:16px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); }
-  button { padding:10px 14px; font-size:15px; border:0; border-radius:8px; background:var(--accent); color:#fff; cursor:pointer; }
-  button.ghost { background:transparent; color:var(--accent); border:1px solid var(--line); }
-  button.bad { background:var(--bad); }
-  button.small { padding:6px 10px; font-size:13px; }
-  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-  .grow { flex:1; }
-  .muted { color:var(--muted); font-size:13px; }
-  .badge { font-size:12px; padding:2px 8px; border-radius:99px; color:#fff; }
-  .approved { background:var(--ok); } .pending { background:var(--warn); } .rejected, .cancelled { background:var(--muted); }
-  .tabs { display:flex; gap:6px; margin-bottom:12px; overflow-x:auto; }
-  .tabs button { background:var(--card); color:var(--text); border:1px solid var(--line); white-space:nowrap; }
-  .tabs button.on { background:var(--accent); color:#fff; }
-  #qrbox { text-align:center; }
-  #qrbox img, #qrbox svg { width:min(80vw,320px); height:auto; background:#fff; padding:12px; border-radius:12px; }
-  .bar { height:4px; background:var(--line); border-radius:2px; overflow:hidden; margin:10px auto; width:min(80vw,320px); }
-  .bar > i { display:block; height:100%; background:var(--accent); transition:width 1s linear; }
-  #toast { position:fixed; left:50%; bottom:24px; transform:translateX(-50%); background:#111; color:#fff; padding:10px 16px; border-radius:8px; font-size:14px; display:none; max-width:90vw; }
-  .hidden { display:none !important; }
-  .list-item { border-top:1px solid var(--line); padding:10px 0; }
-  .list-item:first-child { border-top:0; }
+/* 레이아웃: 학생은 한 손 조작용 단일 열 + 하단 탭, 관리자는 넓은 화면에서 좌측 메뉴 + 작업 영역.
+   모티프: 출입 '패스' 카드(학생)와 안전 황색 띠(마스터 QR). */
+:root {
+  --bg: #f2f4f7;          /* 살짝 푸른 회색 바탕 */
+  --surface: #ffffff;
+  --sunken: #e8ecf2;
+  --line: #d7dde6;
+  --fg: #141b26;
+  --muted: #5b6676;
+  --accent: #2148b8;      /* 코발트: 주요 동작 */
+  --accent-fg: #ffffff;
+  --accent-soft: #e3e9fb;
+  --master: #f0a500;      /* 안전 황색: 마스터 QR 전용 */
+  --master-ink: #1b1400;
+  --ok: #138a4b; --ok-soft: #dff3e7;
+  --warn: #b25e00; --warn-soft: #fbeedc;
+  --bad: #c62a2a; --bad-soft: #fbe4e4;
+  --font-sans: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --r: 10px;
+  --shadow: 0 1px 2px rgba(20, 27, 38, .06), 0 6px 20px rgba(20, 27, 38, .06);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0c121c; --surface: #141c29; --sunken: #0f1622; --line: #263244; --fg: #e6ebf2; --muted: #93a0b3;
+    --accent: #6f93ff; --accent-fg: #0a1020; --accent-soft: #1b2849;
+    --master: #ffbb2e; --master-ink: #1b1400;
+    --ok: #3fcf80; --ok-soft: #10301f; --warn: #f0a24a; --warn-soft: #33240f; --bad: #ff6b6b; --bad-soft: #3a1515;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px rgba(0, 0, 0, .25);
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg); color: var(--fg); font: 15px/1.55 var(--font-sans);
+  -webkit-font-smoothing: antialiased; min-height: 100vh;
+}
+button, input, select, textarea { font: inherit; color: inherit; }
+h1, h2, h3 { margin: 0; text-wrap: balance; line-height: 1.3; }
+h2 { font-size: 20px; font-weight: 700; }
+h3 { font-size: 15px; font-weight: 600; }
+p { margin: 0; }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+.eyebrow { font-size: 12px; font-weight: 600; letter-spacing: .06em; color: var(--muted); }
+[hidden] { display: none !important; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ---------- 공통 컴포넌트 ---------- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: 44px; padding: 0 18px; border-radius: var(--r); border: 1px solid transparent;
+  background: var(--accent); color: var(--accent-fg); font-weight: 600; cursor: pointer;
+  transition: filter .15s, background .15s;
+}
+.btn:hover { filter: brightness(1.06); }
+a { color: var(--accent); }
+a.btn { text-decoration: none; }
+.btn:disabled { opacity: .5; cursor: default; }
+.btn.secondary { background: var(--surface); color: var(--fg); border-color: var(--line); }
+.btn.quiet { background: transparent; color: var(--accent); border-color: transparent; padding: 0 10px; }
+.btn.danger { background: var(--bad); color: #fff; }
+.btn.ok { background: var(--ok); color: #fff; }
+.btn.sm { min-height: 34px; padding: 0 12px; font-size: 13px; border-radius: 8px; }
+.btn.block { width: 100%; }
+
+.field { display: grid; gap: 6px; }
+.field > span { font-size: 13px; font-weight: 500; color: var(--muted); }
+.input, select.input, textarea.input {
+  width: 100%; min-height: 46px; padding: 10px 12px; border-radius: var(--r);
+  border: 1px solid var(--line); background: var(--surface); font-size: 16px;
+}
+textarea.input { min-height: 84px; resize: vertical; }
+.input:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px var(--accent-soft); }
+
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; }
+.stack { display: grid; gap: 16px; }
+.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.row > .grow { flex: 1; min-width: 0; }
+
+.pill {
+  display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 9px; border-radius: 99px;
+  font-size: 12px; font-weight: 600; white-space: nowrap;
+}
+.pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.pill.approved, .pill.granted, .pill.on { background: var(--ok-soft); color: var(--ok); }
+.pill.pending { background: var(--warn-soft); color: var(--warn); }
+.pill.rejected, .pill.denied, .pill.blocked { background: var(--bad-soft); color: var(--bad); }
+.pill.cancelled, .pill.off, .pill.expired { background: var(--sunken); color: var(--muted); }
+.pill.master { background: var(--master); color: var(--master-ink); }
+
+.seg { display: inline-flex; padding: 3px; gap: 2px; background: var(--sunken); border-radius: 10px; }
+.seg button { border: 0; background: transparent; padding: 7px 14px; border-radius: 8px; font-size: 14px; font-weight: 500; color: var(--muted); cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--fg); box-shadow: var(--shadow); }
+
+.switch { display: inline-block; position: relative; width: 46px; height: 28px; flex: none; }
+.switch input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; z-index: 1; }
+.switch i { position: absolute; inset: 0; background: var(--line); border-radius: 99px; transition: background .2s; }
+.switch i::after { content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: transform .2s; }
+.switch input:checked + i { background: var(--accent); }
+.switch input:checked + i::after { transform: translateX(18px); }
+.switch input:focus-visible + i { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.empty { padding: 28px 16px; text-align: center; color: var(--muted); font-size: 14px; }
+.banner { padding: 12px 14px; border-radius: var(--r); font-size: 14px; display: flex; gap: 10px; align-items: flex-start; }
+.banner.info { background: var(--accent-soft); color: var(--fg); }
+.banner.alert { background: var(--bad-soft); color: var(--bad); font-weight: 600; }
+
+#toast {
+  position: fixed; left: 50%; bottom: calc(88px + env(safe-area-inset-bottom, 0px)); transform: translate(-50%, 20px);
+  background: var(--fg); color: var(--bg); padding: 11px 18px; border-radius: 10px; font-size: 14px; max-width: calc(100vw - 32px);
+  opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; z-index: 60;
+}
+#toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+/* ---------- 상단 바 ---------- */
+.topbar {
+  position: sticky; top: 0; z-index: 20; background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--line);
+  padding-top: env(safe-area-inset-top, 0px);
+}
+.topbar-in {
+  max-width: 1180px; margin: 0 auto; height: 56px; display: flex; align-items: center; gap: 12px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 16px; min-width: 0; }
+.brand-mark { width: 28px; height: 28px; border-radius: 7px; background: var(--fg); color: var(--bg); display: grid; place-items: center; flex: none; }
+.brand-mark svg { width: 16px; height: 16px; }
+.brand span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.topbar .spacer { flex: 1; }
+.who { font-size: 13px; color: var(--muted); white-space: nowrap; }
+
+.wrap {
+  max-width: 560px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px calc(110px + env(safe-area-inset-bottom, 0px));
+}
+
+/* ---------- 로그인 ---------- */
+.auth { max-width: 420px; margin: 0 auto; padding-block: 8vh 40px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.auth-head { display: grid; gap: 10px; margin-bottom: 24px; }
+.auth-head h1 { font-size: 28px; font-weight: 700; letter-spacing: -.01em; }
+.auth .panel { padding: 22px; }
+.auth .seg { display: flex; }
+.auth .seg button { flex: 1; }
+
+/* ---------- 학생: 출입증 ---------- */
+.pass {
+  position: relative; overflow: hidden; border-radius: 18px; color: #fff;
+  background: linear-gradient(160deg, #1d3c9e 0%, #14245e 100%); box-shadow: var(--shadow);
+}
+.pass-top { padding: 20px 20px 18px; display: grid; gap: 4px; }
+.pass-top .eyebrow { color: rgba(255,255,255,.7); }
+.pass-room { font-size: 24px; font-weight: 700; }
+.pass-time { font-family: var(--font-mono); font-size: 15px; color: rgba(255,255,255,.88); }
+.pass-perf { position: relative; height: 0; border-top: 2px dashed rgba(255,255,255,.28); margin: 0 14px; }
+.pass-perf::before, .pass-perf::after { content: ""; position: absolute; top: -12px; width: 22px; height: 22px; border-radius: 50%; background: var(--bg); }
+.pass-perf::before { left: -26px; } .pass-perf::after { right: -26px; }
+.pass-bottom { padding: 16px 20px 20px; display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.pass-who { font-size: 13px; color: rgba(255,255,255,.75); }
+.pass-who b { color: #fff; font-size: 15px; display: block; }
+.pass .btn { background: #fff; color: #14245e; }
+.pass.idle { background: var(--surface); color: var(--fg); border: 1px dashed var(--line); box-shadow: none; }
+.pass.idle .pass-top .eyebrow { color: var(--muted); }
+.pass.idle .pass-time { color: var(--muted); }
+
+.list { display: grid; }
+.item { display: grid; gap: 4px; padding: 14px 16px; border-top: 1px solid var(--line); }
+.item:first-child { border-top: 0; }
+.item-head { display: flex; align-items: center; gap: 8px; }
+.item-head b { flex: 1; min-width: 0; font-weight: 600; }
+.item-actions { display: flex; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
+.section-title { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+
+.chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
+.chip {
+  flex: none; border: 1px solid var(--line); background: var(--surface); border-radius: 12px; padding: 8px 12px;
+  display: grid; justify-items: center; gap: 0; cursor: pointer; min-width: 58px;
+}
+.chip small { font-size: 12px; color: var(--muted); }
+.chip b { font-size: 17px; font-family: var(--font-mono); font-weight: 600; }
+.chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+.chip[aria-pressed="true"] small { color: inherit; opacity: .8; }
+.rule { font-size: 13px; padding: 10px 12px; border-radius: var(--r); background: var(--sunken); color: var(--muted); }
+.rule b { color: var(--fg); }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+.tabbar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; background: var(--surface); border-top: 1px solid var(--line);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px);
+}
+.tabbar-in { max-width: 560px; margin: 0 auto; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; }
+.tabbar a {
+  display: grid; justify-items: center; gap: 2px; padding: 9px 0 10px; font-size: 12px; font-weight: 500;
+  color: var(--muted); text-decoration: none;
+}
+.tabbar a svg { width: 22px; height: 22px; }
+.tabbar a[aria-current="page"] { color: var(--accent); }
+
+/* ---------- QR 전체 화면 ---------- */
+.qr-sheet {
+  position: fixed; inset: 0; z-index: 50; background: #fff; color: #141b26; overflow-y: auto;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; text-align: center;
+  padding: calc(24px + env(safe-area-inset-top, 0px)) max(20px, env(safe-area-inset-right, 0px)) calc(24px + env(safe-area-inset-bottom, 0px)) max(20px, env(safe-area-inset-left, 0px));
+}
+.qr-sheet h2 { font-size: 22px; }
+.qr-sheet .sub { font-family: var(--font-mono); color: #4a5566; font-size: 14px; }
+.qr-frame { position: relative; width: min(78vw, 46vh, 340px); aspect-ratio: 1; max-width: 100%; }
+.qr-frame svg.code { width: 100%; height: 100%; display: block; }
+.qr-frame .ring { position: absolute; inset: -14px; width: calc(100% + 28px); height: calc(100% + 28px); pointer-events: none; }
+.qr-frame .ring rect { fill: none; stroke-width: 4; }
+.qr-frame .ring .track { stroke: #e3e7ee; }
+.qr-frame .ring .prog { stroke: #2148b8; stroke-linecap: round; transition: stroke-dashoffset 1s linear; }
+.qr-sheet.master { background: #fff; }
+.qr-sheet.master .ring .prog { stroke: #f0a500; }
+.qr-sheet .count { font-family: var(--font-mono); font-size: 13px; color: #4a5566; }
+.qr-sheet .hint { max-width: 32ch; font-size: 14px; color: #4a5566; }
+.qr-sheet .err { color: #c62a2a; font-weight: 600; max-width: 30ch; }
+.qr-sheet .close { min-height: 48px; padding: 0 28px; border-radius: 12px; border: 1px solid #d7dde6; background: #fff; color: #141b26; font-weight: 600; cursor: pointer; }
+.hazard { height: 10px; width: min(78vw, 340px); border-radius: 3px; background: repeating-linear-gradient(-45deg, #f0a500 0 10px, #1b1400 10px 20px); }
+
+/* ---------- 관리자 콘솔 ---------- */
+.admin { max-width: 1180px; margin: 0 auto; display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 28px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 24px 60px; }
+.side { position: sticky; top: 80px; align-self: start; display: grid; gap: 2px; }
+.side a {
+  display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 9px; text-decoration: none;
+  color: var(--muted); font-weight: 500; font-size: 14px;
+}
+.side a svg { width: 18px; height: 18px; flex: none; }
+.side a:hover { background: var(--sunken); color: var(--fg); }
+.side a[aria-current="page"] { background: var(--surface); color: var(--fg); box-shadow: var(--shadow); }
+.side a .count { margin-left: auto; font-family: var(--font-mono); font-size: 12px; background: var(--warn-soft); color: var(--warn); padding: 0 7px; border-radius: 99px; }
+.side .sep { height: 1px; background: var(--line); margin: 10px 4px; }
+.main-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+.main-head p { margin-top: 4px; }
+
+.stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.stat { padding: 16px; display: grid; gap: 4px; text-decoration: none; color: inherit; }
+.stat .n { font-family: var(--font-mono); font-size: 30px; font-weight: 600; line-height: 1.1; }
+.stat .l { font-size: 13px; color: var(--muted); }
+.stat.attn .n { color: var(--warn); }
+
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th { text-align: left; font-size: 12px; font-weight: 600; letter-spacing: .04em; color: var(--muted); padding: 10px 14px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+td { padding: 12px 14px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+tr:last-child td { border-bottom: 0; }
+td.actions { white-space: nowrap; text-align: right; }
+td.actions .btn + .btn { margin-left: 6px; }
+
+.setting { display: flex; gap: 16px; align-items: center; padding: 16px 18px; border-top: 1px solid var(--line); }
+.setting:first-child { border-top: 0; }
+.setting .txt { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.setting .txt b { font-weight: 600; }
+.setting .txt span { font-size: 13px; color: var(--muted); }
+.setting .ctl { flex: none; }
+.setting .ctl .input { width: 120px; }
+.setting.wide { flex-direction: column; align-items: stretch; }
+.setting.wide .ctl .input { width: 100%; }
+.setting.danger b { color: var(--bad); }
+.group-title { margin: 26px 0 10px; }
+.group-title:first-child { margin-top: 0; }
+
+.room-card { padding: 18px; display: grid; gap: 14px; }
+.grid-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; }
+
+.master-card { overflow: hidden; display: grid; }
+.master-card .stripe { height: 8px; background: repeating-linear-gradient(-45deg, var(--master) 0 10px, var(--master-ink) 10px 20px); }
+.master-card .body { padding: 16px 18px; display: grid; gap: 8px; }
+.master-card.dead { opacity: .62; }
+.master-card.dead .stripe { background: var(--line); }
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+
+.keybox { font-family: var(--font-mono); font-size: 14px; word-break: break-all; background: var(--sunken); padding: 12px; border-radius: var(--r); border: 1px dashed var(--line); }
+
+dialog { border: 0; padding: 0; border-radius: 16px; background: var(--surface); color: var(--fg); width: min(440px, calc(100vw - 32px)); box-shadow: 0 20px 60px rgba(0,0,0,.3); }
+dialog::backdrop { background: rgba(10, 14, 22, .5); }
+dialog form { padding: 22px; display: grid; gap: 16px; }
+dialog .row.end { justify-content: flex-end; }
+
+/* 인쇄: 고정 마스터 QR 카드만 출력 */
+#printCard { display: none; }
+@media print {
+  body > *:not(#printCard) { display: none !important; }
+  #printCard { display: grid !important; place-items: center; gap: 8px; padding: 20mm; color: #000; font-family: var(--font-sans); text-align: center; }
+  #printCard img { width: 70mm; height: 70mm; }
+}
+
+@media (max-width: 860px) {
+  .admin { grid-template-columns: minmax(0, 1fr); gap: 16px; padding-block: 12px 60px; }
+  .side { position: static; display: flex; overflow-x: auto; gap: 4px; padding-bottom: 6px; scrollbar-width: none; }
+  .side a { flex: none; padding: 8px 12px; }
+  .side a svg, .side .sep { display: none; }
+  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  /* 좁은 화면에서 표를 카드처럼 */
+  table.resp thead { display: none; }
+  table.resp tr { display: grid; gap: 4px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+  table.resp tr:last-child { border-bottom: 0; }
+  table.resp td { border: 0; padding: 0; }
+  table.resp td.actions { text-align: left; margin-top: 6px; }
+}
+@media (max-width: 520px) { .who { display: none; } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 </style>
 </head>
 <body>
-<main>
-  <h1><span>🔐 실습실 출입</span><button id="logoutBtn" class="ghost small hidden">로그아웃</button></h1>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-door" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v17"/><path d="M3 21h18"/><circle cx="15" cy="12" r="1"/></symbol>
+  <symbol id="i-pass" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 14v.01M14 20h.01M17 20h4v-3"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4M12 12v6M9 15h6"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M9 6h12M9 12h12M9 18h12M4 6h.01M4 12h.01M4 18h.01"/></symbol>
+  <symbol id="i-gauge" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 13a9 9 0 0 1 18 0"/><path d="M12 13l4-4"/><path d="M3 17h18"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M8 12l3 3 5-6"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14.5a6.5 6.5 0 0 1 3.5 5.5"/></symbol>
+  <symbol id="i-key" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="8" cy="15" r="4.5"/><path d="M11.5 11.5L20 3M16 7l3 3M18 5l2 2"/></symbol>
+  <symbol id="i-room" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 21V8l9-5 9 5v13"/><path d="M9 21v-7h6v7"/></symbol>
+  <symbol id="i-chip" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="5" y="5" width="14" height="14" rx="2"/><path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3"/></symbol>
+  <symbol id="i-log" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></symbol>
+</svg>
 
-  <!-- 로그인 / 가입 -->
-  <section id="authView" class="card hidden">
-    <div class="tabs"><button data-auth="login" class="on">로그인</button><button data-auth="register">가입</button></div>
-    <label>학번</label><input id="sno" inputmode="numeric" autocomplete="username">
-    <div id="nameWrap" class="hidden"><label>이름</label><input id="sname" autocomplete="name"></div>
-    <label>비밀번호</label><input id="spw" type="password" autocomplete="current-password">
-    <div style="margin-top:14px"><button id="authBtn" style="width:100%">로그인</button></div>
-  </section>
+<header class="topbar" id="topbar" hidden>
+  <div class="topbar-in">
+    <div class="brand"><div class="brand-mark"><svg><use href="#i-door"/></svg></div><span id="brandName">실습실 출입</span></div>
+    <div class="spacer"></div>
+    <span class="who" id="whoName"></span>
+    <a class="btn secondary sm" id="modeSwitch" href="#admin" hidden>관리자</a>
+    <button class="btn quiet sm" id="logoutBtn" type="button">로그아웃</button>
+  </div>
+</header>
 
-  <section id="appView" class="hidden">
-    <div class="tabs" id="mainTabs">
-      <button data-tab="my" class="on">내 신청</button>
-      <button data-tab="new">이용 신청</button>
-      <button data-tab="admin" class="hidden" id="adminTabBtn">관리자</button>
+<!-- ========== 로그인 / 가입 ========== -->
+<section class="auth" id="authView" hidden>
+  <div class="auth-head">
+    <div class="brand-mark" style="width:40px;height:40px;border-radius:10px"><svg style="width:22px;height:22px"><use href="#i-door"/></svg></div>
+    <h1 id="authTitle">실습실 출입</h1>
+    <p class="muted">이용 신청이 승인되면 이 화면에서 출입 QR을 받을 수 있습니다.</p>
+  </div>
+  <div class="banner info" id="authNotice" hidden></div>
+  <form class="panel stack" id="authForm" style="margin-top:14px" novalidate>
+    <div class="seg" role="group" aria-label="로그인 또는 가입">
+      <button type="button" data-auth="login" aria-pressed="true">로그인</button>
+      <button type="button" data-auth="register" aria-pressed="false">가입하기</button>
     </div>
+    <label class="field"><span>학번</span><input class="input mono" id="sno" autocomplete="username" inputmode="text" placeholder="예: 20231234" required></label>
+    <label class="field" id="nameWrap" hidden><span>이름</span><input class="input" id="sname" autocomplete="name" placeholder="홍길동"></label>
+    <label class="field"><span>비밀번호</span><input class="input" id="spw" type="password" autocomplete="current-password" placeholder="8자 이상" required></label>
+    <div id="adminCodeWrap" hidden>
+      <label class="field"><span>관리자 코드 (관리자 계정을 만들 때만)</span><input class="input mono" id="setupCode" autocomplete="off"></label>
+    </div>
+    <button class="btn block" id="authBtn" type="submit">로그인</button>
+    <button class="btn quiet sm" id="adminCodeToggle" type="button" hidden>관리자 계정 만들기</button>
+    <p class="small muted" id="authHint" hidden>가입 후 관리자가 승인하면 로그인할 수 있습니다.</p>
+  </form>
+</section>
 
-    <!-- 내 신청 -->
-    <div id="tab-my">
-      <div id="qrCard" class="card hidden">
-        <h2 id="qrTitle">입장 QR</h2>
-        <div id="qrbox"></div>
-        <div class="bar"><i id="qrBar"></i></div>
-        <p class="muted" style="text-align:center">출입문 카메라에 화면을 보여주세요. QR은 30초마다 바뀌며 캡처본은 사용할 수 없습니다.</p>
-        <div style="text-align:center"><button class="ghost" id="qrClose">닫기</button></div>
+<!-- ========== 학생 ========== -->
+<main class="wrap" id="studentView" hidden>
+  <div class="stack">
+    <div class="banner alert" id="lockBanner" hidden>실습실이 임시로 잠겨 있습니다. 지금은 QR로 입장할 수 없습니다.</div>
+    <div class="banner info" id="noticeBanner" hidden></div>
+
+    <!-- 출입증 -->
+    <section id="s-pass" class="stack">
+      <div id="passCard"></div>
+      <div>
+        <div class="section-title"><h3>다가오는 이용</h3><a class="btn quiet sm" href="#new">이용 신청</a></div>
+        <div class="panel list" id="upcomingList"><div class="empty">불러오는 중…</div></div>
       </div>
-      <div class="card"><h2>신청 내역</h2><div id="myList" class="muted">불러오는 중…</div></div>
-    </div>
+    </section>
 
     <!-- 이용 신청 -->
-    <div id="tab-new" class="hidden">
-      <div class="card">
-        <h2>실습실 이용 신청</h2>
-        <label>실습실</label><select id="room"></select>
-        <label>날짜</label><input id="date" type="date">
-        <div class="row">
-          <div class="grow"><label>시작</label><input id="start" type="time" step="1800" value="13:00"></div>
-          <div class="grow"><label>종료</label><input id="end" type="time" step="1800" value="15:00"></div>
+    <section id="s-new" class="stack" hidden>
+      <div><h2>실습실 이용 신청</h2><p class="muted small" style="margin-top:4px">승인되면 이용 시작 전부터 출입 QR이 열립니다.</p></div>
+      <form class="panel stack" id="reqForm" style="padding:18px" novalidate>
+        <label class="field"><span>실습실</span><select class="input" id="room"></select></label>
+        <div class="field"><span>날짜</span><div class="chips" id="dateChips" role="group" aria-label="날짜 선택"></div></div>
+        <div class="two">
+          <label class="field"><span>시작</span><select class="input mono" id="startT"></select></label>
+          <label class="field"><span>종료</span><select class="input mono" id="endT"></select></label>
         </div>
-        <label>사용 목적</label><input id="purpose" placeholder="예: 캡스톤 프로젝트 회로 실습">
-        <p class="muted" id="roomRule"></p>
-        <button id="reqBtn" style="width:100%">신청하기</button>
-      </div>
-    </div>
+        <label class="field"><span>사용 목적</span><textarea class="input" id="purpose" maxlength="200" placeholder="예: 캡스톤 프로젝트 회로 납땜"></textarea></label>
+        <div class="rule" id="roomRule"></div>
+        <button class="btn block" id="reqBtn" type="submit">신청하기</button>
+      </form>
+      <div class="banner info" id="reqClosed" hidden>지금은 이용 신청을 받지 않습니다.</div>
+    </section>
 
-    <!-- 관리자 -->
-    <div id="tab-admin" class="hidden">
-      <div class="tabs" id="adminTabs">
-        <button data-a="res" class="on">승인 대기</button>
-        <button data-a="users">가입 승인</button>
-        <button data-a="rooms">자동 승인 설정</button>
-        <button data-a="logs">출입 기록</button>
-        <button data-a="devices">단말</button>
-      </div>
-      <div class="card" id="adminBody">…</div>
-    </div>
-  </section>
+    <!-- 신청 내역 -->
+    <section id="s-history" class="stack" hidden>
+      <h2>신청 내역</h2>
+      <div class="panel list" id="historyList"><div class="empty">불러오는 중…</div></div>
+    </section>
+  </div>
 </main>
-<div id="toast"></div>
+<nav class="tabbar" id="tabbar" hidden>
+  <div class="tabbar-in">
+    <a href="#pass" data-nav="pass"><svg><use href="#i-pass"/></svg>출입증</a>
+    <a href="#new" data-nav="new"><svg><use href="#i-plus"/></svg>이용 신청</a>
+    <a href="#history" data-nav="history"><svg><use href="#i-list"/></svg>신청 내역</a>
+  </div>
+</nav>
+
+<!-- ========== 관리자 ========== -->
+<div class="admin" id="adminView" hidden>
+  <nav class="side" aria-label="관리자 메뉴">
+    <a href="#admin" data-a="overview"><svg><use href="#i-gauge"/></svg>현황</a>
+    <a href="#admin-requests" data-a="requests"><svg><use href="#i-check"/></svg>신청 승인<span class="count" id="cntReq" hidden></span></a>
+    <a href="#admin-users" data-a="users"><svg><use href="#i-users"/></svg>사용자<span class="count" id="cntUsers" hidden></span></a>
+    <a href="#admin-master" data-a="master"><svg><use href="#i-key"/></svg>마스터 QR</a>
+    <div class="sep"></div>
+    <a href="#admin-rooms" data-a="rooms"><svg><use href="#i-room"/></svg>실습실·자동 승인</a>
+    <a href="#admin-devices" data-a="devices"><svg><use href="#i-chip"/></svg>출입 단말</a>
+    <a href="#admin-logs" data-a="logs"><svg><use href="#i-log"/></svg>출입 기록</a>
+    <a href="#admin-features" data-a="features"><svg><use href="#i-gear"/></svg>기능 설정</a>
+  </nav>
+  <section id="adminMain" aria-live="polite"></section>
+</div>
+
+<!-- QR 전체 화면 -->
+<div class="qr-sheet" id="qrSheet" hidden role="dialog" aria-modal="true" aria-labelledby="qrTitle">
+  <div class="hazard" id="qrHazard" hidden></div>
+  <div><h2 id="qrTitle">입장 QR</h2><p class="sub" id="qrSub"></p></div>
+  <div class="qr-frame" id="qrFrame">
+    <svg class="ring" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+      <rect class="track" x="2" y="2" width="96" height="96" rx="6" vector-effect="non-scaling-stroke"/>
+      <rect class="prog" id="qrProg" x="2" y="2" width="96" height="96" rx="6" pathLength="100" stroke-dasharray="100" stroke-dashoffset="0" vector-effect="non-scaling-stroke"/>
+    </svg>
+    <div id="qrCode"></div>
+  </div>
+  <p class="count mono" id="qrCount"></p>
+  <p class="hint" id="qrHint">출입문 카메라에 화면을 비춰 주세요. QR은 30초마다 바뀌고, 한 번 쓴 QR과 캡처한 화면은 통과하지 않습니다.</p>
+  <button class="close" id="qrClose" type="button">닫기</button>
+</div>
+
+<dialog id="dlg"><form method="dialog" id="dlgForm">
+  <h3 id="dlgTitle"></h3>
+  <p class="muted small" id="dlgText"></p>
+  <label class="field" id="dlgInputWrap" hidden><span id="dlgLabel"></span><input class="input" id="dlgInput"></label>
+  <div class="row end"><button class="btn secondary" value="cancel" type="submit" formnovalidate>취소</button><button class="btn" id="dlgOk" value="ok" type="submit">확인</button></div>
+</form></dialog>
+
+<div id="printCard"></div>
+<div id="toast" role="status"></div>
 
 <script>
-const $ = (s) => document.querySelector(s);
+'use strict';
+const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
-const STATUS = { approved:'승인', pending:'대기', rejected:'반려', cancelled:'취소' };
-let me = null, rooms = [], qrTimer = null;
+const STATUS = { approved:'승인', pending:'승인 대기', rejected:'반려', cancelled:'취소' };
+const REASON = {
+  invalid_token:'잘못된 QR', expired_token:'만료된 QR', token_reused:'이미 사용한 QR', no_reservation:'없는 신청',
+  not_approved:'승인 안 됨', user_blocked:'정지된 사용자', wrong_room:'다른 실습실', out_of_time:'이용 시간 아님',
+  lockdown:'긴급 잠금 중', room_closed:'실습실 운영 중지', master:'마스터 QR', master_disabled:'마스터 QR 꺼짐',
+  master_revoked:'폐기된 마스터 QR', master_expired:'기간 끝난 마스터 QR',
+};
+const KST = 9 * 3600e3;
+let me = null, settings = {}, rooms = [], skew = 0;
 
-function toast(msg) { const t = $('#toast'); t.textContent = msg; t.style.display = 'block'; clearTimeout(t._h); t._h = setTimeout(() => t.style.display = 'none', 3000); }
+// ---------- 공통 ----------
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 3200); }
 async function api(path, opts = {}) {
-  const res = await fetch(path, { ...opts, headers: { 'content-type':'application/json' }, body: opts.body ? JSON.stringify(opts.body) : undefined });
+  const res = await fetch(path, { method: opts.method || 'GET', headers: { 'content-type': 'application/json' }, body: opts.body ? JSON.stringify(opts.body) : undefined });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || '요청 실패');
+  if (res.status === 401 && me && !path.startsWith('/api/auth')) { me = null; route(); }
+  if (!res.ok) throw new Error(data.error || '요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.');
   return data;
 }
-const fmt = (ms) => new Date(ms).toLocaleString('ko-KR', { month:'numeric', day:'numeric', weekday:'short', hour:'2-digit', minute:'2-digit', hour12:false });
-const fmtT = (ms) => new Date(ms).toLocaleTimeString('ko-KR', { hour:'2-digit', minute:'2-digit', hour12:false });
+const kd = (ms) => new Date(ms + KST);
+const pad = (n) => String(n).padStart(2, '0');
+const WD = ['일','월','화','수','목','금','토'];
+const fDate = (ms) => { const d = kd(ms); return `${d.getUTCMonth() + 1}/${d.getUTCDate()}(${WD[d.getUTCDay()]})`; };
+const fTime = (ms) => { const d = kd(ms); return `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`; };
+const fDT = (ms) => `${fDate(ms)} ${fTime(ms)}`;
+const fRange = (a, b) => `${fDate(a)} ${fTime(a)}–${fTime(b)}`;
+const ago = (ms) => { const s = (Date.now() - ms) / 1000; if (s < 60) return '방금'; if (s < 3600) return `${Math.floor(s / 60)}분 전`; if (s < 86400) return `${Math.floor(s / 3600)}시간 전`; return fDT(ms); };
 
-// ---------- 인증 ----------
-let authMode = 'login';
-document.querySelectorAll('[data-auth]').forEach((b) => b.onclick = () => {
-  authMode = b.dataset.auth;
-  document.querySelectorAll('[data-auth]').forEach((x) => x.classList.toggle('on', x === b));
-  $('#nameWrap').classList.toggle('hidden', authMode !== 'register');
-  $('#authBtn').textContent = authMode === 'login' ? '로그인' : '가입 신청';
-});
-$('#authBtn').onclick = async () => {
-  const student_no = $('#sno').value.trim(), password = $('#spw').value;
-  try {
-    if (authMode === 'register') {
-      const r = await api('/api/auth/register', { method:'POST', body:{ student_no, name:$('#sname').value.trim(), password } });
-      if (r.status === 'pending') { toast('가입 신청 완료. 관리자 승인 후 로그인할 수 있습니다.'); return; }
-    }
-    await api('/api/auth/login', { method:'POST', body:{ student_no, password } });
-    boot();
-  } catch (e) { toast(e.message); }
-};
-$('#logoutBtn').onclick = async () => { await api('/api/auth/logout', { method:'POST' }); location.reload(); };
-
-// ---------- 탭 ----------
-document.querySelectorAll('[data-tab]').forEach((b) => b.onclick = () => {
-  document.querySelectorAll('[data-tab]').forEach((x) => x.classList.toggle('on', x === b));
-  ['my','new','admin'].forEach((t) => $('#tab-' + t).classList.toggle('hidden', t !== b.dataset.tab));
-  if (b.dataset.tab === 'my') loadMy();
-  if (b.dataset.tab === 'admin') loadAdmin();
-});
-
-// ---------- 내 신청 ----------
-async function loadMy() {
-  const { reservations } = await api('/api/reservations');
-  if (!reservations.length) { $('#myList').textContent = '신청 내역이 없습니다.'; return; }
-  const now = Date.now();
-  $('#myList').innerHTML = reservations.map((r) => {
-    const canQr = r.status === 'approved' && now <= r.end_at;
-    const canCancel = ['pending','approved'].includes(r.status) && now < r.end_at;
-    return `<div class="list-item">
-      <div class="row"><b class="grow">${esc(r.room_name)}</b><span class="badge ${r.status}">${STATUS[r.status]}</span></div>
-      <div class="muted">${fmt(r.start_at)} ~ ${fmtT(r.end_at)} · ${esc(r.purpose)}</div>
-      ${r.reject_reason ? `<div class="muted">반려 사유: ${esc(r.reject_reason)}</div>` : ''}
-      <div class="row" style="margin-top:6px">
-        ${canQr ? `<button class="small" onclick="showQr(${r.id}, '${esc(r.room_name)}')">입장 QR 보기</button>` : ''}
-        ${canCancel ? `<button class="small ghost" onclick="cancelRes(${r.id})">취소</button>` : ''}
-      </div></div>`;
-  }).join('');
+function ask({ title, text = '', label = '', value = '', ok = '확인', danger = false, input = false }) {
+  return new Promise((resolve) => {
+    const d = $('#dlg');
+    $('#dlgTitle').textContent = title; $('#dlgText').textContent = text; $('#dlgText').hidden = !text;
+    $('#dlgInputWrap').hidden = !input; $('#dlgLabel').textContent = label; $('#dlgInput').value = value;
+    const okb = $('#dlgOk'); okb.textContent = ok; okb.className = 'btn' + (danger ? ' danger' : '');
+    d.onclose = () => resolve(d.returnValue === 'ok' ? (input ? $('#dlgInput').value.trim() : true) : null);
+    d.returnValue = ''; d.showModal(); if (input) $('#dlgInput').focus();
+  });
 }
-async function cancelRes(id) { if (!confirm('신청을 취소할까요?')) return; try { await api(`/api/reservations/${id}/cancel`, { method:'POST' }); loadMy(); } catch (e) { toast(e.message); } }
+async function act(fn, okMsg) { try { await fn(); if (okMsg) toast(okMsg); return true; } catch (e) { toast(e.message); return false; } }
 
-async function showQr(id, roomName) {
-  clearTimeout(qrTimer);
-  $('#qrCard').classList.remove('hidden');
-  $('#qrTitle').textContent = roomName + ' 입장 QR';
-  window.scrollTo({ top:0, behavior:'smooth' });
+// ---------- QR 렌더링 ----------
+function qrSvg(text) { const q = qrcode(0, 'M'); q.addData(text); q.make(); return q.createSvgTag({ cellSize: 4, margin: 2, scalable: true }).replace('<svg ', '<svg class="code" role="img" aria-label="QR 코드" '); }
+let qrTimer = null, qrCountTimer = null, wake = null;
+function openQr({ title, sub, master = false, fetcher }) {
+  const sh = $('#qrSheet');
+  sh.hidden = false; sh.classList.toggle('master', master); $('#qrHazard').hidden = !master;
+  $('#qrTitle').textContent = title; $('#qrSub').textContent = sub || '';
+  $('#qrHint').textContent = master
+    ? '마스터 QR입니다. 다른 사람에게 보여 주거나 캡처해서 보내지 마세요. 30초마다 바뀝니다.'
+    : '출입문 카메라에 화면을 비춰 주세요. QR은 30초마다 바뀌고, 한 번 쓴 QR과 캡처한 화면은 통과하지 않습니다.';
+  $('#qrCode').innerHTML = ''; $('#qrCount').textContent = '';
+  document.body.style.overflow = 'hidden';
   const tick = async () => {
+    clearTimeout(qrTimer); clearInterval(qrCountTimer);
     try {
-      const { token, refresh_in_ms } = await api(`/api/reservations/${id}/qr`);
-      const qr = qrcode(0, 'M'); qr.addData(token); qr.make();
-      $('#qrbox').innerHTML = qr.createSvgTag({ cellSize:8, margin:2, scalable:true });
-      const bar = $('#qrBar'); bar.style.transition = 'none'; bar.style.width = (refresh_in_ms / 300) + '%';
-      requestAnimationFrame(() => { bar.style.transition = `width ${refresh_in_ms}ms linear`; bar.style.width = '0%'; });
-      qrTimer = setTimeout(tick, refresh_in_ms + 200);
-    } catch (e) { $('#qrbox').innerHTML = `<p>${esc(e.message)}</p>`; }
+      const r = await fetcher();
+      $('#qrCode').innerHTML = qrSvg(r.token);
+      const total = r.step_ms || 30000, until = Date.now() + r.refresh_in_ms;
+      const prog = $('#qrProg');
+      const upd = () => {
+        const left = Math.max(0, until - Date.now());
+        prog.style.strokeDashoffset = String(100 - (left / total) * 100);
+        $('#qrCount').textContent = `${Math.ceil(left / 1000)}초 후 새 QR`;
+      };
+      prog.style.transition = 'none'; upd(); requestAnimationFrame(() => { prog.style.transition = ''; });
+      qrCountTimer = setInterval(upd, 1000);
+      qrTimer = setTimeout(tick, r.refresh_in_ms + 150);
+    } catch (e) {
+      $('#qrCode').innerHTML = `<p class="err" style="padding-top:40%">${esc(e.message)}</p>`;
+      $('#qrCount').textContent = '';
+    }
   };
   tick();
-  try { await navigator.wakeLock?.request('screen'); } catch {}
+  (async () => { try { wake = await navigator.wakeLock?.request('screen'); } catch {} })();
+  $('#qrClose').focus();
 }
-$('#qrClose').onclick = () => { clearTimeout(qrTimer); $('#qrCard').classList.add('hidden'); };
-document.addEventListener('visibilitychange', () => { if (document.hidden) clearTimeout(qrTimer); });
+function closeQr() {
+  clearTimeout(qrTimer); clearInterval(qrCountTimer); $('#qrSheet').hidden = true; document.body.style.overflow = '';
+  try { wake?.release(); } catch {} wake = null;
+}
+$('#qrClose').onclick = closeQr;
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('#qrSheet').hidden) closeQr(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden && !$('#qrSheet').hidden) closeQr(); });
 
-// ---------- 신청 ----------
-function renderRoomRule() {
-  const r = rooms.find((x) => x.id == $('#room').value); if (!r) return;
-  $('#roomRule').textContent = r.auto_approve
-    ? `자동 승인: ${r.open_hour}시~${r.close_hour}시, 최대 ${r.max_minutes}분 이내 신청은 바로 승인됩니다.`
-    : '관리자 승인 후 QR이 발급됩니다.';
+// ---------- 로그인 / 가입 ----------
+let authMode = 'login', config = {};
+function setAuthMode(mode) {
+  authMode = mode;
+  $$('[data-auth]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.auth === mode)));
+  const reg = mode === 'register';
+  $('#nameWrap').hidden = !reg; $('#adminCodeToggle').hidden = !reg;
+  if (!reg) $('#adminCodeWrap').hidden = true;
+  $('#authHint').hidden = !(reg && config.require_user_approval);
+  $('#authBtn').textContent = reg ? '가입하기' : '로그인';
+  $('#spw').autocomplete = reg ? 'new-password' : 'current-password';
 }
-$('#room').onchange = renderRoomRule;
-$('#reqBtn').onclick = async () => {
-  const d = $('#date').value;
-  const start_at = new Date(`${d}T${$('#start').value}:00+09:00`).getTime();
-  const end_at = new Date(`${d}T${$('#end').value}:00+09:00`).getTime();
+$$('[data-auth]').forEach((b) => b.onclick = () => setAuthMode(b.dataset.auth));
+$('#adminCodeToggle').onclick = () => { $('#adminCodeWrap').hidden = false; $('#adminCodeToggle').hidden = true; $('#setupCode').focus(); };
+$('#authForm').onsubmit = async (e) => {
+  e.preventDefault();
+  const student_no = $('#sno').value.trim(), password = $('#spw').value;
+  const btn = $('#authBtn'); btn.disabled = true;
   try {
-    const r = await api('/api/reservations', { method:'POST', body:{ room_id:Number($('#room').value), start_at, end_at, purpose:$('#purpose').value } });
-    toast(r.status === 'approved' ? '자동 승인되었습니다!' : '신청 완료. 관리자 승인을 기다려 주세요.');
-    document.querySelector('[data-tab=my]').click();
-  } catch (e) { toast(e.message); }
+    if (authMode === 'register') {
+      const setup_code = $('#adminCodeWrap').hidden ? undefined : $('#setupCode').value.trim() || undefined;
+      const r = await api('/api/auth/register', { method: 'POST', body: { student_no, name: $('#sname').value.trim(), password, setup_code } });
+      if (r.status === 'pending') { toast('가입 신청을 보냈습니다. 관리자 승인 후 로그인할 수 있습니다.'); setAuthMode('login'); return; }
+    }
+    await api('/api/auth/login', { method: 'POST', body: { student_no, password } });
+    $('#spw').value = '';
+    await boot();
+  } catch (err) { toast(err.message); } finally { btn.disabled = false; }
+};
+$('#logoutBtn').onclick = async () => { await api('/api/auth/logout', { method: 'POST' }).catch(() => {}); me = null; location.hash = ''; route(); };
+
+// ---------- 라우팅 ----------
+function route() {
+  closeQr();
+  const h = location.hash.slice(1) || 'pass';
+  const isAdmin = h.startsWith('admin');
+  $('#authView').hidden = !!me;
+  $('#topbar').hidden = !me;
+  if (!me) { $('#studentView').hidden = $('#tabbar').hidden = $('#adminView').hidden = true; loadConfig(); return; }
+  const admin = isAdmin && me.role === 'admin';
+  $('#studentView').hidden = $('#tabbar').hidden = admin;
+  $('#adminView').hidden = !admin;
+  $('#modeSwitch').hidden = me.role !== 'admin';
+  $('#modeSwitch').textContent = admin ? '학생 화면' : '관리자';
+  $('#modeSwitch').href = admin ? '#pass' : '#admin';
+  if (admin) return showAdmin(h === 'admin' ? 'overview' : h.slice(6));
+  const tab = ['pass', 'new', 'history'].includes(h) ? h : 'pass';
+  ['pass', 'new', 'history'].forEach((t) => { $('#s-' + t).hidden = t !== tab; });
+  $$('[data-nav]').forEach((a) => { if (a.dataset.nav === tab) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
+  if (tab === 'pass' || tab === 'history') loadMine();
+  if (tab === 'new') initRequestForm();
+  window.scrollTo(0, 0);
+}
+window.addEventListener('hashchange', route);
+
+async function loadConfig() {
+  try {
+    config = await api('/api/config');
+    $('#authTitle').textContent = config.site_name; document.title = config.site_name;
+    $('#authNotice').hidden = !config.notice; $('#authNotice').textContent = config.notice;
+    setAuthMode(authMode);
+  } catch {}
+}
+
+// ---------- 학생: 출입증 + 내역 ----------
+function resItem(r, now) {
+  const live = r.status === 'approved' && now >= r.start_at - r.early_minutes * 60000 && now <= r.end_at;
+  const canCancel = ['pending', 'approved'].includes(r.status) && now < r.end_at;
+  return `<div class="item">
+    <div class="item-head"><b>${esc(r.room_name)}</b><span class="pill ${r.status}">${STATUS[r.status]}</span></div>
+    <div class="mono small">${fRange(r.start_at, r.end_at)}</div>
+    ${r.purpose ? `<div class="small muted">${esc(r.purpose)}</div>` : ''}
+    ${r.reject_reason ? `<div class="small" style="color:var(--bad)">반려 사유: ${esc(r.reject_reason)}</div>` : ''}
+    ${live || canCancel ? `<div class="item-actions">
+      ${live ? `<button class="btn sm" type="button" data-qr="${r.id}">출입 QR 열기</button>` : ''}
+      ${canCancel ? `<button class="btn secondary sm" type="button" data-cancel="${r.id}">신청 취소</button>` : ''}
+    </div>` : ''}
+  </div>`;
+}
+let mine = [];
+async function loadMine() {
+  try {
+    const { reservations, server_time } = await api('/api/reservations');
+    skew = server_time - Date.now(); mine = reservations;
+  } catch (e) { $('#upcomingList').innerHTML = $('#historyList').innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
+  const now = Date.now() + skew;
+  const asc = [...mine].sort((a, b) => a.start_at - b.start_at);
+  const live = asc.find((r) => r.status === 'approved' && now >= r.start_at - r.early_minutes * 60000 && now <= r.end_at);
+  const next = asc.find((r) => r.status === 'approved' && r.start_at > now);
+  const pc = $('#passCard');
+  if (live) {
+    pc.innerHTML = `<article class="pass">
+      <div class="pass-top"><span class="eyebrow">지금 입장 가능</span><div class="pass-room">${esc(live.room_name)}</div><div class="pass-time">${fRange(live.start_at, live.end_at)}</div></div>
+      <div class="pass-perf"></div>
+      <div class="pass-bottom"><div class="pass-who"><b>${esc(me.name)}</b><span class="mono">${esc(me.student_no)}</span></div>
+      <button class="btn" type="button" data-qr="${live.id}">출입 QR 열기</button></div></article>`;
+  } else if (next) {
+    const opens = next.start_at - next.early_minutes * 60000;
+    pc.innerHTML = `<article class="pass idle">
+      <div class="pass-top"><span class="eyebrow">다음 입장</span><div class="pass-room">${esc(next.room_name)}</div><div class="pass-time">${fRange(next.start_at, next.end_at)}</div></div>
+      <div class="pass-perf"></div>
+      <div class="pass-bottom"><p class="small muted">QR은 <b class="mono" style="color:var(--fg)">${fDT(opens)}</b>부터 열립니다.</p></div></article>`;
+  } else {
+    pc.innerHTML = `<article class="pass idle">
+      <div class="pass-top"><span class="eyebrow">출입증</span><div class="pass-room">승인된 이용이 없습니다</div><div class="pass-time">이용을 신청하고 승인을 받으면 여기에 출입 QR이 나타납니다.</div></div>
+      <div class="pass-perf"></div>
+      <div class="pass-bottom"><a class="btn" href="#new" style="background:var(--accent);color:var(--accent-fg)">이용 신청하기</a></div></article>`;
+  }
+  const upcoming = asc.filter((r) => ['pending', 'approved'].includes(r.status) && r.end_at > now && r !== live);
+  $('#upcomingList').innerHTML = upcoming.length ? upcoming.map((r) => resItem(r, now)).join('') : '<div class="empty">예정된 이용이 없습니다.</div>';
+  $('#historyList').innerHTML = mine.length ? mine.map((r) => resItem(r, now)).join('') : '<div class="empty">최근 2주간 신청 내역이 없습니다.</div>';
+}
+document.addEventListener('click', async (e) => {
+  const q = e.target.closest('[data-qr]'), c = e.target.closest('[data-cancel]');
+  if (q) {
+    const r = mine.find((x) => x.id == q.dataset.qr);
+    openQr({ title: `${r.room_name} 입장`, sub: `${me.name} · ${fRange(r.start_at, r.end_at)}`, fetcher: () => api(`/api/reservations/${r.id}/qr`) });
+  }
+  if (c) {
+    if (!(await ask({ title: '이 신청을 취소할까요?', text: '취소하면 출입 QR도 함께 사라집니다.', ok: '신청 취소', danger: true }))) return;
+    if (await act(() => api(`/api/reservations/${c.dataset.cancel}/cancel`, { method: 'POST' }), '신청을 취소했습니다.')) loadMine();
+  }
+});
+
+// ---------- 학생: 이용 신청 ----------
+let pickedDay = null;
+function dayStartKst(offsetDays) { const d = kd(Date.now() + skew); d.setUTCHours(0, 0, 0, 0); return d.getTime() - KST + offsetDays * 86400e3; }
+function initRequestForm() {
+  const open = settings.reservations_open;
+  $('#reqForm').hidden = !open; $('#reqClosed').hidden = open;
+  if (!rooms.length) { $('#reqForm').innerHTML = '<div class="empty">신청할 수 있는 실습실이 없습니다.</div>'; return; }
+  const days = Math.min(settings.max_days_ahead || 14, 14);
+  const chips = [];
+  for (let i = 0; i < days; i++) {
+    const ms = dayStartKst(i), d = kd(ms);
+    chips.push(`<button type="button" class="chip" data-day="${ms}" aria-pressed="false"><small>${i === 0 ? '오늘' : i === 1 ? '내일' : WD[d.getUTCDay()]}</small><b>${d.getUTCDate()}</b></button>`);
+  }
+  $('#dateChips').innerHTML = chips.join('');
+  if (!pickedDay || pickedDay < dayStartKst(0)) pickedDay = dayStartKst(0);
+  $$('[data-day]').forEach((b) => { b.setAttribute('aria-pressed', String(Number(b.dataset.day) === pickedDay)); b.onclick = () => { pickedDay = Number(b.dataset.day); $$('[data-day]').forEach((x) => x.setAttribute('aria-pressed', String(x === b))); fillTimes(); }; });
+  fillTimes();
+  renderRule();
+}
+function fillTimes() {
+  const now = Date.now() + skew, opts = [];
+  for (let m = 0; m <= 24 * 60; m += 30) opts.push(m);
+  const label = (m) => `${pad(Math.floor(m / 60))}:${pad(m % 60)}`;
+  const prevS = $('#startT').value, prevE = $('#endT').value;
+  const startOpts = opts.filter((m) => m < 24 * 60 && pickedDay + (m + 30) * 60000 > now);
+  $('#startT').innerHTML = startOpts.map((m) => `<option value="${m}">${label(m)}</option>`).join('') || '<option value="">오늘은 신청 가능한 시간이 없습니다</option>';
+  if (startOpts.includes(Number(prevS))) $('#startT').value = prevS;
+  else { const def = startOpts.find((m) => m >= 13 * 60) ?? startOpts[0]; if (def !== undefined) $('#startT').value = def; }
+  const fillEnd = () => {
+    const s = Number($('#startT').value);
+    const endOpts = opts.filter((m) => m > s);
+    $('#endT').innerHTML = endOpts.map((m) => `<option value="${m}">${m === 1440 ? '24:00' : label(m)}</option>`).join('');
+    if (endOpts.includes(Number(prevE)) && Number(prevE) > s) $('#endT').value = prevE; else $('#endT').value = Math.min(s + 120, 1440);
+    renderRule();
+  };
+  $('#startT').onchange = fillEnd; $('#endT').onchange = renderRule;
+  fillEnd();
+}
+function renderRule() {
+  const r = rooms.find((x) => x.id == $('#room').value); if (!r) return;
+  const s = Number($('#startT').value), e = Number($('#endT').value), mins = e - s;
+  const dur = `${Math.floor(mins / 60) ? Math.floor(mins / 60) + '시간 ' : ''}${mins % 60 ? (mins % 60) + '분' : ''}`.trim();
+  if (!r.auto_approve) { $('#roomRule').innerHTML = `<b>${esc(dur)}</b> 이용 · 관리자가 승인하면 QR이 발급됩니다.`; return; }
+  const fits = s >= r.open_hour * 60 && e <= r.close_hour * 60 && mins <= r.max_minutes;
+  $('#roomRule').innerHTML = `<b>${esc(dur)}</b> 이용 · ${fits ? '<b style="color:var(--ok)">바로 자동 승인</b>될 수 있는 신청입니다' : '자동 승인 기준 밖이라 관리자 승인이 필요합니다'}<br>자동 승인 기준: ${r.open_hour}시–${r.close_hour}시, 최대 ${r.max_minutes}분, 동시 ${r.capacity}명`;
+}
+$('#room').onchange = renderRule;
+$('#reqForm').onsubmit = async (e) => {
+  e.preventDefault();
+  if ($('#startT').value === '') return toast('신청할 수 있는 시간이 없습니다. 다른 날짜를 골라 주세요.');
+  const start_at = pickedDay + Number($('#startT').value) * 60000, end_at = pickedDay + Number($('#endT').value) * 60000;
+  const purpose = $('#purpose').value.trim();
+  if (!purpose) { $('#purpose').focus(); return toast('사용 목적을 적어 주세요.'); }
+  const btn = $('#reqBtn'); btn.disabled = true;
+  try {
+    const r = await api('/api/reservations', { method: 'POST', body: { room_id: Number($('#room').value), start_at, end_at, purpose } });
+    toast(r.status === 'approved' ? '자동 승인되었습니다. 출입증에서 확인하세요.' : '신청했습니다. 관리자 승인을 기다려 주세요.');
+    $('#purpose').value = '';
+    location.hash = 'pass';
+  } catch (err) { toast(err.message); } finally { btn.disabled = false; }
 };
 
 // ---------- 관리자 ----------
-let adminView = 'res';
-document.querySelectorAll('[data-a]').forEach((b) => b.onclick = () => {
-  adminView = b.dataset.a;
-  document.querySelectorAll('[data-a]').forEach((x) => x.classList.toggle('on', x === b));
-  loadAdmin();
-});
-async function adminAct(path, body) { try { await api(path, { method:'POST', body }); loadAdmin(); } catch (e) { toast(e.message); } }
-async function loadAdmin() {
-  const el = $('#adminBody'); el.textContent = '불러오는 중…';
-  try {
-    if (adminView === 'res') {
-      const { reservations } = await api('/api/admin/reservations?status=pending');
-      el.innerHTML = reservations.length ? reservations.map((r) => `<div class="list-item">
-        <b>${esc(r.name)}</b> <span class="muted">${esc(r.student_no)}</span>
-        <div class="muted">${esc(r.room_name)} · ${fmt(r.start_at)} ~ ${fmtT(r.end_at)}</div>
-        <div class="muted">${esc(r.purpose)}</div>
-        <div class="row" style="margin-top:6px"><button class="small" onclick="adminAct('/api/admin/reservations/${r.id}/approve')">승인</button>
-        <button class="small bad" onclick="adminAct('/api/admin/reservations/${r.id}/reject', { reason: prompt('반려 사유') || '' })">반려</button></div></div>`).join('') : '승인 대기 중인 신청이 없습니다.';
-    } else if (adminView === 'users') {
-      const { users } = await api('/api/admin/users?status=pending');
-      el.innerHTML = users.length ? users.map((u) => `<div class="list-item row"><span class="grow"><b>${esc(u.name)}</b> <span class="muted">${esc(u.student_no)}</span></span>
-        <button class="small" onclick="adminAct('/api/admin/users/${u.id}/activate')">승인</button>
-        <button class="small bad" onclick="adminAct('/api/admin/users/${u.id}/block')">거절</button></div>`).join('') : '가입 대기 중인 학생이 없습니다.';
-    } else if (adminView === 'rooms') {
-      const { rooms: rs } = await api('/api/rooms');
-      el.innerHTML = rs.map((r) => `<div class="list-item" data-room="${r.id}">
-        <label>이름</label><input data-f="name" value="${esc(r.name)}">
-        <label><input type="checkbox" data-f="auto_approve" ${r.auto_approve ? 'checked' : ''} style="width:auto"> 규칙에 맞으면 자동 승인</label>
-        <div class="row"><div class="grow"><label>허용 시작(시)</label><input type="number" data-f="open_hour" value="${r.open_hour}"></div>
-        <div class="grow"><label>허용 종료(시)</label><input type="number" data-f="close_hour" value="${r.close_hour}"></div></div>
-        <div class="row"><div class="grow"><label>최대 이용(분)</label><input type="number" data-f="max_minutes" value="${r.max_minutes}"></div>
-        <div class="grow"><label>동시 정원</label><input type="number" data-f="capacity" value="${r.capacity}"></div>
-        <div class="grow"><label>조기 입장(분)</label><input type="number" data-f="early_minutes" value="${r.early_minutes}"></div></div>
-        <button class="small" style="margin-top:8px" onclick="saveRoom(${r.id})">저장</button></div>`).join('');
-    } else if (adminView === 'logs') {
-      const { logs } = await api('/api/admin/logs');
-      el.innerHTML = logs.length ? logs.map((l) => `<div class="list-item row"><span class="badge ${l.result === 'granted' ? 'approved' : 'rejected'}">${l.result === 'granted' ? '허용' : '거부'}</span>
-        <span class="grow">${esc(l.name || '-')} <span class="muted">${esc(l.student_no || '')} ${l.reason ? '· ' + esc(l.reason) : ''}</span></span>
-        <span class="muted">${fmt(l.at)}</span></div>`).join('') : '기록이 없습니다.';
-    } else if (adminView === 'devices') {
-      const { devices } = await api('/api/admin/devices');
-      const { rooms: rs } = await api('/api/rooms');
-      el.innerHTML = devices.map((d) => `<div class="list-item"><b>${esc(d.name)}</b> <span class="muted">${esc(d.room_name)} · 마지막 접속 ${d.last_seen_at ? fmt(d.last_seen_at) : '없음'}</span></div>`).join('')
-        + `<div class="list-item"><label>새 단말 이름</label><input id="devName" value="실습실 출입문">
-           <label>실습실</label><select id="devRoom">${rs.map((r) => `<option value="${r.id}">${esc(r.name)}</option>`).join('')}</select>
-           <button class="small" style="margin-top:8px" onclick="addDevice()">단말 등록</button><p id="devKey" class="muted"></p></div>`;
-    }
-  } catch (e) { el.textContent = e.message; }
+const A = {};
+let adminSection = 'overview';
+function showAdmin(sec) {
+  if (!A[sec]) sec = 'overview';
+  adminSection = sec;
+  $$('[data-a]').forEach((a) => { if (a.dataset.a === sec) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
+  $('#adminMain').innerHTML = '<div class="empty">불러오는 중…</div>';
+  A[sec]().catch((e) => { $('#adminMain').innerHTML = `<div class="empty">${esc(e.message)}</div>`; });
+  refreshCounts();
 }
-async function saveRoom(id) {
-  const box = document.querySelector(`[data-room="${id}"]`), b = {};
-  box.querySelectorAll('[data-f]').forEach((i) => b[i.dataset.f] = i.type === 'checkbox' ? (i.checked ? 1 : 0) : i.value);
-  try { await api(`/api/admin/rooms/${id}`, { method:'PATCH', body:b }); toast('저장했습니다.'); } catch (e) { toast(e.message); }
-}
-async function addDevice() {
+const reload = () => showAdmin(adminSection);
+async function refreshCounts() {
   try {
-    const { key } = await api('/api/admin/devices', { method:'POST', body:{ name:$('#devName').value, room_id:Number($('#devRoom').value) } });
-    $('#devKey').innerHTML = `단말 키 (지금 한 번만 표시됩니다. 펌웨어 설정에 입력하세요):<br><code style="word-break:break-all">${esc(key)}</code>`;
+    const o = await api('/api/admin/overview');
+    const set = (el, n) => { el.hidden = !n; el.textContent = n; };
+    set($('#cntReq'), o.pending_reservations); set($('#cntUsers'), o.pending_users);
+    return o;
+  } catch { return null; }
+}
+const head = (title, desc, extra = '') => `<div class="main-head"><div><h2>${title}</h2>${desc ? `<p class="muted small">${desc}</p>` : ''}</div>${extra}</div>`;
+
+A.overview = async () => {
+  const o = await api('/api/admin/overview');
+  const devs = o.devices.length ? o.devices.map((d) => `<tr><td><b>${esc(d.name)}</b><div class="small muted">${esc(d.room_name)}</div></td>
+    <td><span class="pill ${d.online ? 'on' : 'off'}">${d.online ? '연결됨' : '연결 끊김'}</span></td>
+    <td class="small muted">${d.last_seen_at ? '마지막 신호 ' + ago(d.last_seen_at) : '아직 연결된 적 없음'}</td></tr>`).join('')
+    : `<tr><td colspan="3"><div class="empty">등록된 출입 단말이 없습니다. <a href="#admin-devices">단말 등록</a></div></td></tr>`;
+  $('#adminMain').innerHTML = head('현황', `${fDT(o.server_time)} 기준`) + `
+    ${o.lockdown ? `<div class="banner alert" style="margin-bottom:14px">긴급 잠금이 켜져 있어 학생 QR이 모두 거부됩니다. <a href="#admin-features" style="color:inherit">기능 설정</a>에서 해제하세요.</div>` : ''}
+    <div class="stats">
+      <a class="panel stat ${o.pending_reservations ? 'attn' : ''}" href="#admin-requests"><span class="n">${o.pending_reservations}</span><span class="l">승인 대기 신청</span></a>
+      <a class="panel stat ${o.pending_users ? 'attn' : ''}" href="#admin-users"><span class="n">${o.pending_users}</span><span class="l">가입 대기</span></a>
+      <div class="panel stat"><span class="n">${o.active_now}</span><span class="l">지금 이용 중인 예약</span></div>
+      <a class="panel stat" href="#admin-logs"><span class="n">${o.granted_today}<span class="muted" style="font-size:16px"> / ${o.denied_today}</span></span><span class="l">오늘 출입 허용 / 거부</span></a>
+    </div>
+    <h3 class="group-title" style="margin-top:26px">출입 단말</h3>
+    <div class="panel table-wrap"><table class="resp"><tbody>${devs}</tbody></table></div>`;
+};
+
+let reqFilter = 'pending';
+A.requests = async () => {
+  const { reservations } = await api('/api/admin/reservations?status=' + reqFilter);
+  const seg = `<div class="seg" role="group">${[['pending', '승인 대기'], ['approved', '승인됨'], ['rejected', '반려']].map(([k, l]) => `<button type="button" data-rf="${k}" aria-pressed="${k === reqFilter}">${l}</button>`).join('')}</div>`;
+  const rows = reservations.map((r) => `<tr>
+    <td><b>${esc(r.name)}</b> <span class="mono small muted">${esc(r.student_no)}</span></td>
+    <td>${esc(r.room_name)}</td>
+    <td class="mono small">${fRange(r.start_at, r.end_at)}</td>
+    <td class="small">${esc(r.purpose)}${r.reject_reason ? `<div style="color:var(--bad)">사유: ${esc(r.reject_reason)}</div>` : ''}${r.status === 'approved' && !r.decided_by ? '<div class="muted">자동 승인</div>' : ''}</td>
+    <td class="actions">
+      ${r.status === 'pending' ? `<button class="btn ok sm" type="button" data-approve="${r.id}">승인</button>` : ''}
+      ${r.status !== 'rejected' ? `<button class="btn secondary sm" type="button" data-reject="${r.id}">${r.status === 'approved' ? '승인 취소' : '반려'}</button>` : ''}
+    </td></tr>`).join('');
+  $('#adminMain').innerHTML = head('이용 신청 승인', '승인하면 학생 화면에 출입 QR이 열립니다.', seg) +
+    `<div class="panel table-wrap">${rows ? `<table class="resp"><thead><tr><th>신청자</th><th>실습실</th><th>이용 시간</th><th>목적</th><th></th></tr></thead><tbody>${rows}</tbody></table>` : '<div class="empty">해당하는 신청이 없습니다.</div>'}</div>`;
+  $$('[data-rf]').forEach((b) => b.onclick = () => { reqFilter = b.dataset.rf; reload(); });
+  $$('[data-approve]').forEach((b) => b.onclick = async () => { if (await act(() => api(`/api/admin/reservations/${b.dataset.approve}/approve`, { method: 'POST' }), '승인했습니다.')) reload(); });
+  $$('[data-reject]').forEach((b) => b.onclick = async () => {
+    const reason = await ask({ title: '신청을 반려할까요?', text: '학생에게 반려 사유가 표시됩니다.', input: true, label: '반려 사유', ok: '반려', danger: true });
+    if (reason === null) return;
+    if (await act(() => api(`/api/admin/reservations/${b.dataset.reject}/reject`, { method: 'POST', body: { reason } }), '반려했습니다.')) reload();
+  });
+};
+
+let userFilter = 'pending';
+A.users = async () => {
+  const { users } = await api('/api/admin/users?status=' + userFilter);
+  const seg = `<div class="seg" role="group">${[['pending', '가입 대기'], ['active', '사용 중'], ['blocked', '정지']].map(([k, l]) => `<button type="button" data-uf="${k}" aria-pressed="${k === userFilter}">${l}</button>`).join('')}</div>`;
+  const rows = users.map((u) => {
+    const self = u.id === me.id;
+    const btns = [];
+    if (u.status !== 'active') btns.push(`<button class="btn ok sm" type="button" data-u="${u.id}" data-op="activate">${u.status === 'pending' ? '가입 승인' : '정지 해제'}</button>`);
+    if (u.status === 'active' && !self) btns.push(u.role === 'admin'
+      ? `<button class="btn secondary sm" type="button" data-u="${u.id}" data-op="make-student">관리자 해제</button>`
+      : `<button class="btn secondary sm" type="button" data-u="${u.id}" data-op="make-admin">관리자로 지정</button>`);
+    if (u.status !== 'blocked' && !self) btns.push(`<button class="btn secondary sm" type="button" data-u="${u.id}" data-op="block">${u.status === 'pending' ? '거절' : '정지'}</button>`);
+    return `<tr><td><b>${esc(u.name)}</b>${self ? ' <span class="small muted">(나)</span>' : ''}</td><td class="mono">${esc(u.student_no)}</td>
+      <td>${u.role === 'admin' ? '<span class="pill master">관리자</span>' : '<span class="small muted">학생</span>'}</td>
+      <td class="small muted">${fDate(u.created_at)} 가입</td><td class="actions">${btns.join('')}</td></tr>`;
+  }).join('');
+  $('#adminMain').innerHTML = head('사용자', '가입 승인, 정지, 관리자 지정을 합니다.', seg) +
+    `<div class="panel table-wrap">${rows ? `<table class="resp"><thead><tr><th>이름</th><th>학번</th><th>권한</th><th>가입일</th><th></th></tr></thead><tbody>${rows}</tbody></table>` : '<div class="empty">해당하는 사용자가 없습니다.</div>'}</div>`;
+  $$('[data-uf]').forEach((b) => b.onclick = () => { userFilter = b.dataset.uf; reload(); });
+  $$('[data-u]').forEach((b) => b.onclick = async () => {
+    const op = b.dataset.op;
+    if (op === 'block' && !(await ask({ title: '이 사용자를 정지할까요?', text: '정지하면 로그인과 출입 QR이 모두 막힙니다.', ok: '정지', danger: true }))) return;
+    if (op === 'make-admin' && !(await ask({ title: '관리자로 지정할까요?', text: '관리자는 모든 설정을 바꾸고 마스터 QR을 발급할 수 있습니다.', ok: '지정' }))) return;
+    if (await act(() => api(`/api/admin/users/${b.dataset.u}/${op}`, { method: 'POST' }), '변경했습니다.')) reload();
+  });
+};
+
+let masters = [];
+A.master = async () => {
+  const [{ masters: ms, server_time }, { rooms: rs }] = await Promise.all([api('/api/admin/masters'), api('/api/rooms?all=1')]);
+  masters = ms;
+  const card = (m) => {
+    const dead = m.revoked || m.expires_at < server_time;
+    return `<article class="panel master-card ${dead ? 'dead' : ''}"><div class="stripe"></div><div class="body">
+      <div class="item-head"><b>${esc(m.label)}</b>${m.revoked ? '<span class="pill denied">폐기</span>' : m.expires_at < server_time ? '<span class="pill expired">기간 끝</span>' : `<span class="pill master">${m.mode === 'static' ? '인쇄용 고정' : '화면용 30초'}</span>`}</div>
+      <div class="small muted">${m.room_name ? esc(m.room_name) : '모든 실습실'} · <span class="mono">${fDT(m.expires_at)}</span>까지</div>
+      <div class="small muted">사용 ${m.use_count}회${m.last_used_at ? ' · 마지막 ' + ago(m.last_used_at) : ''} · 발급 ${esc(m.created_by_name || '-')}</div>
+      ${dead ? '' : `<div class="item-actions">
+        <button class="btn sm" type="button" data-mshow="${m.id}">QR 보기</button>
+        ${m.mode === 'static' ? `<button class="btn secondary sm" type="button" data-mreissue="${m.id}">재발급</button>` : ''}
+        <button class="btn secondary sm" type="button" data-mrevoke="${m.id}">폐기</button></div>`}
+    </div></article>`;
+  };
+  $('#adminMain').innerHTML = head('마스터 QR', '예약 없이 출입문을 여는 관리자용 QR입니다. 출입 단말 펌웨어 변경 없이 바로 쓸 수 있습니다.') + `
+    ${settings.master_qr_enabled === false ? '<div class="banner alert" style="margin-bottom:14px">기능 설정에서 마스터 QR이 꺼져 있어 지금은 문이 열리지 않습니다.</div>' : ''}
+    <form class="panel" id="mForm" style="padding:18px;display:grid;gap:14px;margin-bottom:22px" novalidate>
+      <h3>새 마스터 QR 발급</h3>
+      <div class="grid-fields">
+        <label class="field"><span>이름 (사용자/용도)</span><input class="input" id="mLabel" placeholder="예: 조교 김OO" maxlength="40"></label>
+        <label class="field"><span>실습실</span><select class="input" id="mRoom"><option value="">모든 실습실</option>${rs.map((r) => `<option value="${r.id}">${esc(r.name)}</option>`).join('')}</select></label>
+        <label class="field"><span>종류</span><select class="input" id="mMode"><option value="dynamic">화면용 30초 QR (권장)</option><option value="static">인쇄용 고정 QR</option></select></label>
+        <label class="field"><span>유효 기간</span><select class="input" id="mHours"></select></label>
+      </div>
+      <p class="small muted" id="mModeHint"></p>
+      <div><button class="btn" type="submit">발급하기</button></div>
+    </form>
+    <div class="cards">${ms.length ? ms.map(card).join('') : '<div class="empty panel">발급한 마스터 QR이 없습니다.</div>'}</div>`;
+  const hoursFor = (mode) => (mode === 'static'
+    ? [[24 * 7, '7일'], [24 * 30, '30일'], [24 * 90, '90일'], [24 * 180, '180일'], [24 * 365, '1년']]
+    : [[1, '1시간'], [8, '8시간'], [24, '1일'], [24 * 7, '7일'], [24 * 30, '30일']]);
+  const syncMode = () => {
+    const mode = $('#mMode').value;
+    $('#mHours').innerHTML = hoursFor(mode).map(([h, l], i) => `<option value="${h}" ${i === (mode === 'static' ? 1 : 2) ? 'selected' : ''}>${l}</option>`).join('');
+    $('#mModeHint').textContent = mode === 'static'
+      ? '인쇄용 고정 QR은 사진을 찍으면 누구나 쓸 수 있습니다. 비상용으로 금고 등에 보관하고, 분실하면 바로 재발급하거나 폐기하세요.'
+      : '관리자 폰 화면에 띄워 쓰는 QR입니다. 30초마다 바뀌어 캡처본이 금방 무효가 됩니다.';
+  };
+  $('#mMode').onchange = syncMode; syncMode();
+  $('#mForm').onsubmit = async (e) => {
+    e.preventDefault();
+    const body = { label: $('#mLabel').value, room_id: $('#mRoom').value ? Number($('#mRoom').value) : null, mode: $('#mMode').value, valid_hours: Number($('#mHours').value) };
+    try { const r = await api('/api/admin/masters', { method: 'POST', body }); toast('마스터 QR을 발급했습니다.'); await reload(); setTimeout(() => showMaster(r.id), 300); } catch (err) { toast(err.message); }
+  };
+  $$('[data-mshow]').forEach((b) => b.onclick = () => showMaster(Number(b.dataset.mshow)));
+  $$('[data-mrevoke]').forEach((b) => b.onclick = async () => {
+    if (!(await ask({ title: '이 마스터 QR을 폐기할까요?', text: '폐기하면 이 QR로는 더 이상 문이 열리지 않습니다. 되돌릴 수 없습니다.', ok: '폐기', danger: true }))) return;
+    if (await act(() => api(`/api/admin/masters/${b.dataset.mrevoke}/revoke`, { method: 'POST' }), '폐기했습니다.')) reload();
+  });
+  $$('[data-mreissue]').forEach((b) => b.onclick = async () => {
+    if (!(await ask({ title: 'QR을 재발급할까요?', text: '예전에 인쇄한 QR은 즉시 무효가 되고 새 QR이 만들어집니다.', ok: '재발급' }))) return;
+    if (await act(() => api(`/api/admin/masters/${b.dataset.mreissue}/reissue`, { method: 'POST' }), '재발급했습니다.')) { await reload(); showMaster(Number(b.dataset.mreissue)); }
+  });
+};
+async function showMaster(id) {
+  const m = masters.find((x) => x.id === id); if (!m) return;
+  const sub = `${m.room_name || '모든 실습실'} · ${fDT(m.expires_at)}까지`;
+  if (m.mode === 'dynamic') return openQr({ title: `마스터 · ${m.label}`, sub, master: true, fetcher: () => api(`/api/admin/masters/${id}/qr`) });
+  try {
+    const { token } = await api(`/api/admin/masters/${id}/qr`);
+    const png = qrPng(token);
+    const d = $('#dlg');
+    $('#dlgTitle').textContent = `인쇄용 마스터 QR · ${m.label}`;
+    $('#dlgText').hidden = false; $('#dlgText').textContent = sub;
+    $('#dlgInputWrap').hidden = true;
+    const box = document.createElement('div'); box.id = 'staticBox'; box.style.cssText = 'display:grid;gap:12px;justify-items:center';
+    box.innerHTML = `<img src="${png}" alt="마스터 QR" style="width:220px;height:220px;background:#fff;padding:8px;border-radius:8px">
+      <div class="row"><a class="btn secondary sm" download="master-qr-${id}.png" href="${png}">이미지 저장</a><button class="btn secondary sm" type="button" id="printBtn">인쇄</button></div>`;
+    $('#dlgForm').insertBefore(box, $('#dlgForm .row.end'));
+    $('#dlgOk').textContent = '닫기'; $('#dlgOk').className = 'btn';
+    $('#dlgForm .row.end .secondary').hidden = true;
+    $('#printBtn').onclick = () => {
+      $('#printCard').innerHTML = `<img src="${png}" alt=""><b style="font-size:16pt">${esc(m.label)}</b><span>${esc(sub)}</span><small>실습실 마스터 출입 QR · 분실 시 관리자에게 알려 주세요</small>`;
+      window.print();
+    };
+    d.onclose = () => { box.remove(); $('#dlgForm .row.end .secondary').hidden = false; };
+    d.returnValue = ''; d.showModal();
   } catch (e) { toast(e.message); }
 }
+function qrPng(text) {
+  const q = qrcode(0, 'M'); q.addData(text); q.make();
+  const n = q.getModuleCount(), cell = 12, margin = 4, size = (n + margin * 2) * cell;
+  const c = document.createElement('canvas'); c.width = c.height = size;
+  const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, size, size); g.fillStyle = '#000';
+  for (let r = 0; r < n; r++) for (let k = 0; k < n; k++) if (q.isDark(r, k)) g.fillRect((k + margin) * cell, (r + margin) * cell, cell, cell);
+  return c.toDataURL('image/png');
+}
+
+A.rooms = async () => {
+  const { rooms: rs } = await api('/api/rooms?all=1');
+  const card = (r) => `<form class="panel room-card" data-room="${r.id}" novalidate>
+    <div class="row"><label class="field grow"><span>실습실 이름</span><input class="input" data-f="name" value="${esc(r.name)}" maxlength="40"></label>
+      <label class="row small" style="padding-top:22px"><span class="switch"><input type="checkbox" data-f="enabled" ${r.enabled ? 'checked' : ''}><i></i></span>운영 중</label></div>
+    <div class="setting" style="padding:0;border:0"><div class="txt"><b>자동 승인</b><span>아래 기준에 맞는 신청은 관리자 확인 없이 바로 승인합니다.</span></div>
+      <div class="ctl"><span class="switch"><input type="checkbox" data-f="auto_approve" aria-label="자동 승인" ${r.auto_approve ? 'checked' : ''}><i></i></span></div></div>
+    <div class="grid-fields">
+      <label class="field"><span>허용 시작 (시)</span><input class="input mono" type="number" min="0" max="23" data-f="open_hour" value="${r.open_hour}"></label>
+      <label class="field"><span>허용 종료 (시)</span><input class="input mono" type="number" min="1" max="24" data-f="close_hour" value="${r.close_hour}"></label>
+      <label class="field"><span>1회 최대 (분)</span><input class="input mono" type="number" min="30" step="30" data-f="max_minutes" value="${r.max_minutes}"></label>
+      <label class="field"><span>동시 정원 (명)</span><input class="input mono" type="number" min="1" data-f="capacity" value="${r.capacity}"></label>
+      <label class="field"><span>조기 입장 (분 전)</span><input class="input mono" type="number" min="0" max="120" data-f="early_minutes" value="${r.early_minutes}"></label>
+    </div>
+    <div><button class="btn sm" type="submit">저장</button></div></form>`;
+  $('#adminMain').innerHTML = head('실습실·자동 승인', '실습실별 운영 여부와 자동 승인 기준을 정합니다.', '<button class="btn secondary sm" type="button" id="addRoom">실습실 추가</button>') +
+    `<div class="stack">${rs.map(card).join('')}</div>`;
+  $$('[data-room]').forEach((f) => f.onsubmit = async (e) => {
+    e.preventDefault();
+    const b = {}; $$('[data-f]', f).forEach((i) => { b[i.dataset.f] = i.type === 'checkbox' ? (i.checked ? 1 : 0) : i.value; });
+    await act(() => api(`/api/admin/rooms/${f.dataset.room}`, { method: 'PATCH', body: b }), '저장했습니다.');
+    rooms = (await api('/api/rooms')).rooms; fillRooms();
+  });
+  $('#addRoom').onclick = async () => {
+    const name = await ask({ title: '실습실 추가', input: true, label: '실습실 이름', value: `실습실 ${rs.length + 1}`, ok: '추가' });
+    if (!name) return;
+    if (await act(() => api('/api/admin/rooms', { method: 'POST', body: { name } }), '추가했습니다.')) { rooms = (await api('/api/rooms')).rooms; fillRooms(); reload(); }
+  };
+};
+
+A.devices = async () => {
+  const [{ devices, server_time }, { rooms: rs }] = await Promise.all([api('/api/admin/devices'), api('/api/rooms?all=1')]);
+  const rows = devices.map((d) => {
+    const online = d.active && d.last_seen_at && server_time - d.last_seen_at < 180000;
+    return `<tr><td><b>${esc(d.name)}</b></td><td>${esc(d.room_name)}</td>
+      <td>${d.active ? `<span class="pill ${online ? 'on' : 'off'}">${online ? '연결됨' : '연결 끊김'}</span>` : '<span class="pill denied">키 폐기</span>'}</td>
+      <td class="small muted">${d.last_seen_at ? ago(d.last_seen_at) : '연결된 적 없음'}</td>
+      <td class="actions">${d.active ? `<button class="btn secondary sm" type="button" data-drevoke="${d.id}">키 폐기</button>` : ''}</td></tr>`;
+  }).join('');
+  $('#adminMain').innerHTML = head('출입 단말', '출입문 보드(JC1060P470)를 등록하고 단말 키를 발급합니다. 보드는 1분마다 신호를 보냅니다.') + `
+    <div class="panel table-wrap" style="margin-bottom:22px">${rows ? `<table class="resp"><thead><tr><th>이름</th><th>실습실</th><th>상태</th><th>마지막 신호</th><th></th></tr></thead><tbody>${rows}</tbody></table>` : '<div class="empty">등록된 단말이 없습니다.</div>'}</div>
+    <form class="panel" id="devForm" style="padding:18px;display:grid;gap:14px" novalidate>
+      <h3>새 단말 등록</h3>
+      <div class="grid-fields">
+        <label class="field"><span>단말 이름</span><input class="input" id="devName" value="실습실 출입문" maxlength="40"></label>
+        <label class="field"><span>실습실</span><select class="input" id="devRoom">${rs.map((r) => `<option value="${r.id}">${esc(r.name)}</option>`).join('')}</select></label>
+      </div>
+      <div><button class="btn" type="submit">등록하고 키 받기</button></div>
+      <div id="devKey" hidden></div>
+    </form>`;
+  $('#devForm').onsubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const { key } = await api('/api/admin/devices', { method: 'POST', body: { name: $('#devName').value, room_id: Number($('#devRoom').value) } });
+      const el = $('#devKey'); el.hidden = false;
+      el.innerHTML = `<div class="stack" style="gap:8px"><p class="small"><b>단말 키는 지금 한 번만 보입니다.</b> menuconfig의 Lab Door Config &gt; Device key에 넣으세요. 서버 주소는 <span class="mono">${esc(location.origin)}</span> 입니다.</p>
+        <div class="keybox" id="keyText">${esc(key)}</div><div><button class="btn secondary sm" type="button" id="copyKey">키 복사</button></div></div>`;
+      $('#copyKey').onclick = async () => { try { await navigator.clipboard.writeText(key); toast('복사했습니다.'); } catch { const s = getSelection(); s.selectAllChildren($('#keyText')); toast('키를 선택했습니다. 직접 복사하세요.'); } };
+    } catch (err) { toast(err.message); }
+  };
+  $$('[data-drevoke]').forEach((b) => b.onclick = async () => {
+    if (!(await ask({ title: '단말 키를 폐기할까요?', text: '이 보드는 더 이상 서버에 접속할 수 없습니다. 다시 쓰려면 새로 등록해 키를 넣어야 합니다.', ok: '키 폐기', danger: true }))) return;
+    if (await act(() => api(`/api/admin/devices/${b.dataset.drevoke}/revoke`, { method: 'POST' }), '폐기했습니다.')) reload();
+  });
+};
+
+A.logs = async () => {
+  const { logs } = await api('/api/admin/logs');
+  const rows = logs.map((l) => `<tr>
+    <td class="mono small">${fDT(l.at)}</td>
+    <td><span class="pill ${l.result}">${l.result === 'granted' ? '허용' : '거부'}</span></td>
+    <td>${l.master_id ? `<span class="pill master">마스터</span> ${esc(l.master_label || '')}` : l.name ? `<b>${esc(l.name)}</b> <span class="mono small muted">${esc(l.student_no)}</span>` : '<span class="muted">-</span>'}</td>
+    <td class="small">${l.reason && l.reason !== 'master' ? esc(REASON[l.reason] || l.reason) : ''}</td>
+    <td class="small muted">${esc(l.device_name || '')}</td></tr>`).join('');
+  $('#adminMain').innerHTML = head('출입 기록', '최근 200건') +
+    `<div class="panel table-wrap">${rows ? `<table class="resp"><thead><tr><th>시각</th><th>결과</th><th>대상</th><th>사유</th><th>단말</th></tr></thead><tbody>${rows}</tbody></table>` : '<div class="empty">아직 출입 기록이 없습니다.</div>'}</div>`;
+};
+
+A.features = async () => {
+  const { settings: s } = await api('/api/admin/settings');
+  const sw = (k, title, desc, cls = '') => `<div class="setting ${cls}"><div class="txt"><b>${title}</b><span>${desc}</span></div>
+    <div class="ctl"><span class="switch"><input type="checkbox" data-s="${k}" aria-label="${title}" ${s[k] ? 'checked' : ''}><i></i></span></div></div>`;
+  const num = (k, title, desc, unit, min, max, step = 1) => `<div class="setting"><div class="txt"><b>${title}</b><span>${desc}</span></div>
+    <div class="ctl row" style="gap:6px"><input class="input mono" type="number" data-s="${k}" value="${s[k]}" min="${min}" max="${max}" step="${step}" aria-label="${title}"><span class="small muted">${unit}</span></div></div>`;
+  $('#adminMain').innerHTML = head('기능 설정', '바꾸는 즉시 학생 화면과 출입 단말에 적용됩니다.') + `
+    <h3 class="group-title">출입</h3>
+    <div class="panel">
+      ${sw('lockdown', '긴급 잠금', '켜면 모든 학생 QR이 거부됩니다. 마스터 QR은 계속 쓸 수 있습니다.', 'danger')}
+      ${sw('master_qr_enabled', '마스터 QR 사용', '끄면 발급된 마스터 QR로도 문이 열리지 않습니다.')}
+      ${num('door_open_ms', '문 열림 시간', '출입 허용 시 릴레이를 켜 두는 시간', 'ms', 1000, 15000, 500)}
+    </div>
+    <h3 class="group-title">신청과 가입</h3>
+    <div class="panel">
+      ${sw('reservations_open', '이용 신청 받기', '끄면 학생이 새 이용 신청을 할 수 없습니다. 이미 승인된 예약은 그대로입니다.')}
+      ${num('max_days_ahead', '신청 가능 기간', '오늘부터 며칠 뒤까지 신청을 받을지', '일', 1, 90)}
+      ${sw('registration_open', '새 가입 받기', '끄면 가입 화면에서 새 계정을 만들 수 없습니다.')}
+      ${sw('require_user_approval', '가입 승인 필요', '켜면 관리자가 승인해야 새 계정으로 로그인할 수 있습니다.')}
+    </div>
+    <h3 class="group-title">화면</h3>
+    <div class="panel">
+      <div class="setting wide"><div class="txt"><b>서비스 이름</b><span>로그인 화면과 상단에 표시됩니다.</span></div><div class="ctl"><input class="input" data-s="site_name" value="${esc(s.site_name)}" maxlength="30"></div></div>
+      <div class="setting wide"><div class="txt"><b>공지</b><span>로그인 화면과 학생 화면 위쪽에 보입니다. 비우면 숨깁니다.</span></div><div class="ctl"><textarea class="input" data-s="notice" maxlength="300" placeholder="예: 11/10(월)은 장비 점검으로 실습실을 운영하지 않습니다.">${esc(s.notice)}</textarea></div></div>
+      <div class="setting"><div class="txt"><span>서비스 이름과 공지는 저장 버튼을 눌러야 반영됩니다.</span></div><div class="ctl"><button class="btn sm" type="button" id="saveText">저장</button></div></div>
+    </div>`;
+  const save = async (patch) => {
+    try { const r = await api('/api/admin/settings', { method: 'PATCH', body: patch }); Object.assign(settings, r.settings); applyChrome(); toast('저장했습니다.'); return true; }
+    catch (e) { toast(e.message); return false; }
+  };
+  $$('input[type=checkbox][data-s]').forEach((i) => i.onchange = async () => {
+    if (i.dataset.s === 'lockdown' && i.checked && !(await ask({ title: '긴급 잠금을 켤까요?', text: '모든 학생 QR이 즉시 거부됩니다. 마스터 QR만 문을 열 수 있습니다.', ok: '잠금 켜기', danger: true }))) { i.checked = false; return; }
+    if (!(await save({ [i.dataset.s]: i.checked }))) i.checked = !i.checked;
+  });
+  $$('input[type=number][data-s]').forEach((i) => i.onchange = () => save({ [i.dataset.s]: Number(i.value) }));
+  $('#saveText').onclick = () => save({ site_name: $('[data-s=site_name]').value, notice: $('[data-s=notice]').value });
+};
 
 // ---------- 시작 ----------
-async function boot() {
-  try { ({ user: me } = await api('/api/me')); } catch { me = null; }
-  $('#authView').classList.toggle('hidden', !!me);
-  $('#appView').classList.toggle('hidden', !me);
-  $('#logoutBtn').classList.toggle('hidden', !me);
-  if (!me) return;
-  $('#adminTabBtn').classList.toggle('hidden', me.role !== 'admin');
-  ({ rooms } = await api('/api/rooms'));
+function fillRooms() {
+  const prev = $('#room').value;
   $('#room').innerHTML = rooms.map((r) => `<option value="${r.id}">${esc(r.name)}</option>`).join('');
-  $('#date').value = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
-  renderRoomRule();
-  loadMy();
+  if (rooms.some((r) => r.id == prev)) $('#room').value = prev;
+}
+function applyChrome() {
+  $('#brandName').textContent = settings.site_name; document.title = settings.site_name;
+  $('#noticeBanner').hidden = !settings.notice; $('#noticeBanner').textContent = settings.notice || '';
+  $('#lockBanner').hidden = !settings.lockdown;
+}
+async function boot() {
+  try { const r = await api('/api/me'); me = r.user; settings = r.settings; } catch { me = null; }
+  if (me) {
+    $('#whoName').textContent = `${me.name} · ${me.student_no}`;
+    applyChrome();
+    rooms = (await api('/api/rooms')).rooms; fillRooms();
+    if (me.role === 'admin') settings = { ...settings, ...(await api('/api/admin/settings')).settings };
+  }
+  route();
 }
 boot();
 </script>

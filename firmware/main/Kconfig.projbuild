@@ -9,7 +9,7 @@ menu "Lab Door Config"
             default ""
         config LAB_SERVER_URL
             string "Server base URL (끝에 / 없이)"
-            default "https://lab-access.example.workers.dev"
+            default "https://lab.audreaming.com"
         config LAB_DEVICE_KEY
             string "Device key (관리자 화면 > 단말 등록에서 발급)"
             default ""

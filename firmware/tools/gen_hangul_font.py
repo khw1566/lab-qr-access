@@ -1,7 +1,8 @@
 """화면에 표시하는 소스의 문자열에 쓰인 글자만 모아 한글 글꼴 main/lab_font.c를 만든다.
 
 나눔고딕(SIL OFL 1.1)을 4배로 그린 뒤 줄여 4bpp 비트맵으로 저장한다.
-영문, 숫자, 공백은 lv_font_montserrat로 대체(fallback)한다.
+본문 24px는 Regular, 버튼과 제목은 실제 Bold 원본을 사용한다.
+영문과 숫자도 같은 원본에서 생성해 QR 및 시계까지 굵기를 통일한다.
 화면 문구를 바꾼 뒤 실행한다: python tools/gen_hangul_font.py
 """
 import re
@@ -10,19 +11,20 @@ from PIL import Image, ImageDraw, ImageFont
 
 ROOT = Path(__file__).resolve().parents[1]
 TTF = ROOT / 'third_party/nanum-gothic/NanumGothic-Regular.ttf'
+BOLD_TTF = ROOT / 'third_party/nanum-gothic/NanumGothic-Bold.ttf'
 SOURCES = ('ui.c', 'ui_settings.c', 'ui_theme.h', 'main.c', 'wifi.c')  # 문구를 고치면 다시 실행한다
-SIZES = (24, 40, 48)
+SIZES = (24, 28, 40, 48, 56, 64)
 SCALE = 4
 
 
 def characters():
     text = ''.join((ROOT / 'main' / name).read_text(encoding='utf-8') for name in SOURCES)
     strings = ''.join(re.findall(r'"([^"\n]*)"', text))
-    return sorted({c for c in strings if ord(c) > 0x7F})
+    return sorted({c for c in strings if ord(c) > 0x7F} | {chr(c) for c in range(32, 127)})
 
 
 def render(chars, size):
-    font = ImageFont.truetype(str(TTF), size * SCALE)
+    font = ImageFont.truetype(str(TTF if size == 24 else BOLD_TTF), size * SCALE)
     ascent, descent = font.getmetrics()
     pad = size * SCALE
     glyphs = []
@@ -32,7 +34,11 @@ def render(chars, size):
         ImageDraw.Draw(canvas).text((pad, baseline), ch, font=font, fill=255, anchor='ls')
         small = canvas.resize((canvas.width // SCALE, canvas.height // SCALE), Image.LANCZOS)
         advance = font.getlength(ch) / SCALE
-        left, top, right, bottom = small.getbbox()
+        bounds = small.getbbox()
+        if bounds is None:  # 공백은 전진 폭만 있고 비트맵은 없다.
+            glyphs.append((ch, advance, 0, 0, 0, 0, b''))
+            continue
+        left, top, right, bottom = bounds
         pixels = [p >> 4 for p in small.crop((left, top, right, bottom)).tobytes()]
         if len(pixels) % 2:
             pixels.append(0)
@@ -64,7 +70,7 @@ def emit(size, glyphs, ascent, descent):
             '};', f'const lv_font_t lab_font_{size} = {{',
             '    .get_glyph_dsc=lv_font_get_glyph_dsc_fmt_txt, .get_glyph_bitmap=lv_font_get_bitmap_fmt_txt,',
             f'    .line_height={ascent + descent}, .base_line={descent}, .dsc=&description_{size},',
-            f'    .fallback=&lv_font_montserrat_{size},',
+            f'    .fallback=&lv_font_montserrat_{24 if size <= 28 else 40 if size == 40 else 48},',
             '};', '']
     return out
 

@@ -45,21 +45,6 @@ static lv_obj_t *label_create(lv_obj_t *parent, const char *text, const lv_font_
     return label;
 }
 
-static lv_obj_t *button_create(lv_obj_t *parent, const char *text, lv_event_cb_t cb)
-{
-    lv_obj_t *button = lv_button_create(parent);
-    lv_obj_set_size(button, 150, 56);
-    lv_obj_set_style_radius(button, 8, 0);
-    lv_obj_set_style_shadow_width(button, 0, 0);
-    lv_obj_set_style_bg_color(button, UI_SOFT, 0);
-    lv_obj_set_style_bg_color(button, UI_LINE, LV_STATE_PRESSED);
-    lv_obj_set_style_border_width(button, 0, 0);
-    lv_obj_add_event_cb(button, cb, LV_EVENT_CLICKED, NULL);
-    lv_obj_t *label = label_create(button, text, &lab_font_24);
-    lv_obj_center(label);
-    return button;
-}
-
 static void page_show(lv_obj_t *page)
 {
     lv_obj_t *pages[] = {s_pin_page, s_wifi_page, s_pass_page};
@@ -217,16 +202,16 @@ static void keypad_style(lv_obj_t *matrix)
 static void page_header(lv_obj_t *page, const char *title)
 {
     ui_header(page, title);
-    lv_obj_t *close = button_create(page, "닫기", on_close);
-    lv_obj_set_pos(close, 838, 18);
+    lv_obj_t *close = ui_icon_button(page, UI_ICON_CLOSE, "", 916, 12, 72, 68, false, on_close, 0);
+    lv_obj_set_style_text_color(lv_obj_get_child(close, -1), lv_color_white(), 0);
 }
 
 static void pin_page_build(void)
 {
     s_pin_page = page_create();
     page_header(s_pin_page, "관리자 설정");
-    lv_obj_set_pos(label_create(s_pin_page, "관리자 비밀번호", &lab_font_40), 64, 156);
-    ui_text(s_pin_page, "관리자 PIN을 입력해 주세요.", &lab_font_24, 64, 228, 480, UI_MUTED);
+    ui_icon(s_pin_page, UI_ICON_SETTINGS, 64, 132, 64, UI_BLUE);
+    lv_obj_set_pos(label_create(s_pin_page, "관리자 PIN", &lab_font_40), 64, 228);
     s_pin_input = input_create(s_pin_page, 360);
     lv_textarea_set_max_length(s_pin_input, 16);
     lv_textarea_set_placeholder_text(s_pin_input, "");
@@ -242,10 +227,9 @@ static void pin_page_build(void)
     lv_obj_set_size(matrix, 360, 320);
     lv_obj_set_pos(matrix, 600, 148);
     keypad_style(matrix);
-    lv_obj_set_style_text_font(matrix, &lab_font_24, 0);
+    lv_obj_set_style_text_font(matrix, &lab_font_28, 0);
     lv_obj_add_event_cb(matrix, on_pin_key, LV_EVENT_VALUE_CHANGED, NULL);
 
-    ui_text(s_pin_page, "네트워크 설정은 관리자만 변경할 수 있습니다", &lab_font_24, 64, 536, 900, UI_MUTED);
 }
 
 static void wifi_page_build(void)
@@ -257,7 +241,10 @@ static void wifi_page_build(void)
     lv_obj_set_width(s_wifi_current, 760);
     lv_label_set_long_mode(s_wifi_current, LV_LABEL_LONG_DOT);
     lv_obj_set_style_text_color(s_wifi_current, UI_MUTED, 0);
-    lv_obj_set_pos(button_create(s_wifi_page, "다시 검색", on_rescan), 672, 18);
+    lv_obj_t *rescan = ui_icon_button(s_wifi_page, UI_ICON_WIFI, "검색", 740, 18, 150, 56, false, on_rescan, 0);
+    for (unsigned i = 0; i < lv_obj_get_child_count(rescan); i++) {
+        lv_obj_set_style_text_color(lv_obj_get_child(rescan, i), lv_color_white(), 0);
+    }
 
     s_ap_list = lv_list_create(s_wifi_page);
     lv_obj_set_size(s_ap_list, LCD_H_RES - 72, 398);

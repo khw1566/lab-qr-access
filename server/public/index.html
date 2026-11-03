@@ -139,7 +139,7 @@ textarea.input { min-height: 84px; resize: vertical; }
   max-width: 1180px; margin: 0 auto; height: 56px; display: flex; align-items: center; gap: 12px;
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
 }
-.brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 16px; min-width: 0; }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 16px; min-width: 0; color: inherit; text-decoration: none; }
 .brand-mark { width: 28px; height: 28px; border-radius: 7px; background: var(--fg); color: var(--bg); display: grid; place-items: center; flex: none; }
 .brand-mark svg { width: 16px; height: 16px; }
 .brand span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -198,6 +198,35 @@ textarea.input { min-height: 84px; resize: vertical; }
 .chip b { font-size: 17px; font-family: var(--font-mono); font-weight: 600; }
 .chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
 .chip[aria-pressed="true"] small { color: inherit; opacity: .8; }
+/* ---------- 공개 안내 ---------- */
+.hero { padding: 22px 20px; display: grid; gap: 12px; }
+.hero h1 { font-size: 26px; font-weight: 700; letter-spacing: -.01em; }
+.hero .row { margin-top: 4px; }
+.fleet-sum { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-bottom: 1px solid var(--line); }
+.fleet-sum div { padding: 14px 16px; display: grid; gap: 2px; border-left: 1px solid var(--line); }
+.fleet-sum div:first-child { border-left: 0; }
+.fleet-sum b { font-family: var(--font-mono); font-size: 24px; font-weight: 600; line-height: 1.15; }
+.fleet-sum span { font-size: 12px; color: var(--muted); }
+.fleet { padding: 16px; display: grid; gap: 8px; }
+.fleet-row { display: grid; grid-template-columns: 46px minmax(0, 1fr) 30px; gap: 8px; align-items: center; }
+.fleet-row > span { font-size: 12px; color: var(--muted); }
+.fleet-row > span:last-child { text-align: right; font-family: var(--font-mono); }
+.fleet-units { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.unit { height: 42px; border-radius: 7px; border: 1px solid var(--line); background: var(--accent-soft); color: var(--fg); display: grid; place-items: center; font-family: var(--font-mono); font-size: 12px; font-weight: 500; }
+.unit.big { grid-column: 1 / -1; height: 64px; background: var(--fg); color: var(--bg); border-color: var(--fg); font-size: 15px; font-weight: 600; }
+.fleet-gap { height: 1px; background: var(--line); margin: 6px 0; }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--muted); padding: 0 16px 14px; }
+.legend i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; border: 1px solid var(--line); background: var(--accent-soft); }
+.legend i.big { background: var(--fg); border-color: var(--fg); }
+.rules { counter-reset: r; margin: 0; padding: 0; list-style: none; }
+.rules li { counter-increment: r; display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 2px 8px; padding: 14px 16px; border-top: 1px solid var(--line); }
+.rules li:first-child { border-top: 0; }
+.rules li::before { content: counter(r); grid-row: span 2; width: 26px; height: 26px; border-radius: 50%; background: var(--accent); color: var(--accent-fg); display: grid; place-items: center; font-family: var(--font-mono); font-size: 13px; font-weight: 600; }
+.rules b { font-weight: 600; }
+.rules span { font-size: 13px; color: var(--muted); }
+.check { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; cursor: pointer; }
+.check input { width: 20px; height: 20px; margin: 1px 0 0; flex: none; accent-color: var(--accent); }
+
 .rule { font-size: 13px; padding: 10px 12px; border-radius: var(--r); background: var(--sunken); color: var(--muted); }
 .rule b { color: var(--fg); }
 .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -341,10 +370,11 @@ dialog .row.end { justify-content: flex-end; }
 
 <header class="topbar" id="topbar" hidden>
   <div class="topbar-in">
-    <div class="brand"><div class="brand-mark"><svg><use href="#i-door"/></svg></div><span id="brandName">실습실 출입</span></div>
+    <a class="brand" href="#home"><div class="brand-mark"><svg><use href="#i-door"/></svg></div><span id="brandName">실습실 출입</span></a>
     <div class="spacer"></div>
     <span class="who" id="whoName"></span>
     <a class="btn secondary sm" id="modeSwitch" href="#admin" hidden>관리자</a>
+    <a class="btn secondary sm" id="loginLink" href="#login" hidden>로그인</a>
     <button class="btn quiet sm" id="logoutBtn" type="button">로그아웃</button>
   </div>
 </header>
@@ -354,7 +384,7 @@ dialog .row.end { justify-content: flex-end; }
   <div class="auth-head">
     <div class="brand-mark" style="width:40px;height:40px;border-radius:10px"><svg style="width:22px;height:22px"><use href="#i-door"/></svg></div>
     <h1 id="authTitle">실습실 출입</h1>
-    <p class="muted">이용 신청이 승인되면 이 화면에서 출입 QR을 받을 수 있습니다.</p>
+    <p class="muted">로그인하면 이용 신청과 출입 QR 발급을 쓸 수 있습니다.</p>
   </div>
   <div class="banner info" id="authNotice" hidden></div>
   <form class="panel stack" id="authForm" style="margin-top:14px" novalidate>
@@ -380,6 +410,33 @@ dialog .row.end { justify-content: flex-end; }
     <div class="banner alert" id="lockBanner" hidden>실습실이 임시로 잠겨 있습니다. 지금은 QR로 입장할 수 없습니다.</div>
     <div class="banner info" id="noticeBanner" hidden></div>
 
+    <!-- 공개 안내: 로그인 없이 볼 수 있다 -->
+    <section id="s-home" class="stack" hidden>
+      <div class="panel hero">
+        <span class="eyebrow">3D 프린터 실습실</span>
+        <h1 id="homeTitle">실습실 출입</h1>
+        <p class="muted">오늘 출력 가능 시간 <b class="mono" id="homeHours" style="color:var(--fg)"></b></p>
+        <div class="row"><a class="btn" href="#new">이용 신청</a><a class="btn secondary" id="homeSecond" href="#pass">출입증</a></div>
+      </div>
+      <div>
+        <div class="section-title"><h3>보유 장비</h3></div>
+        <div class="panel" id="fleet"></div>
+      </div>
+      <div>
+        <div class="section-title"><h3>이용 규정</h3></div>
+        <ol class="panel rules" id="rules"></ol>
+      </div>
+      <div>
+        <div class="section-title"><h3>이용 절차</h3></div>
+        <ol class="panel rules">
+          <li><b>로그인</b><span>학번으로 가입하고 로그인합니다.</span></li>
+          <li><b>이용 신청</b><span>지도교수 서명을 받은 뒤 날짜와 시간을 골라 신청합니다.</span></li>
+          <li><b>승인 확인</b><span>승인되면 출입증 화면에 출입 QR이 열립니다.</span></li>
+          <li><b>입장</b><span>출입문 카메라에 QR을 비추면 문이 열립니다.</span></li>
+        </ol>
+      </div>
+    </section>
+
     <!-- 출입증 -->
     <section id="s-pass" class="stack">
       <div id="passCard"></div>
@@ -399,7 +456,9 @@ dialog .row.end { justify-content: flex-end; }
           <label class="field"><span>시작</span><select class="input mono" id="startT"></select></label>
           <label class="field"><span>종료</span><select class="input mono" id="endT"></select></label>
         </div>
-        <label class="field"><span>사용 목적</span><textarea class="input" id="purpose" maxlength="200" placeholder="예: 캡스톤 프로젝트 회로 납땜"></textarea></label>
+        <label class="field"><span>사용 목적</span><textarea class="input" id="purpose" maxlength="200" placeholder="예: 캡스톤 프로젝트 시제품 출력"></textarea></label>
+        <label class="field"><span>지도교수</span><input class="input" id="advisor" maxlength="30" autocomplete="off" placeholder="지도교수 이름"></label>
+        <label class="check"><input type="checkbox" id="advisorSigned"><span>지도교수 서명을 받았습니다.</span></label>
         <div class="rule" id="roomRule"></div>
         <button class="btn block" id="reqBtn" type="submit">신청하기</button>
       </form>
@@ -415,6 +474,7 @@ dialog .row.end { justify-content: flex-end; }
 </main>
 <nav class="tabbar" id="tabbar" hidden>
   <div class="tabbar-in">
+    <a href="#home" data-nav="home"><svg><use href="#i-room"/></svg>안내</a>
     <a href="#pass" data-nav="pass"><svg><use href="#i-pass"/></svg>출입증</a>
     <a href="#new" data-nav="new"><svg><use href="#i-plus"/></svg>이용 신청</a>
     <a href="#history" data-nav="history"><svg><use href="#i-list"/></svg>신청 내역</a>
@@ -578,29 +638,39 @@ $('#authForm').onsubmit = async (e) => {
     }
     await api('/api/auth/login', { method: 'POST', body: { student_no, password } });
     $('#spw').value = '';
+    if (location.hash === '#login') location.hash = 'pass';
     await boot();
   } catch (err) { toast(err.message); } finally { btn.disabled = false; }
 };
-$('#logoutBtn').onclick = async () => { await api('/api/auth/logout', { method: 'POST' }).catch(() => {}); me = null; location.hash = ''; route(); };
+$('#logoutBtn').onclick = async () => { await api('/api/auth/logout', { method: 'POST' }).catch(() => {}); me = null; location.hash = 'home'; route(); };
 
 // ---------- 라우팅 ----------
 function route() {
   closeQr();
-  const h = location.hash.slice(1) || 'pass';
+  const h = location.hash.slice(1) || 'home';
   const isAdmin = h.startsWith('admin');
-  $('#authView').hidden = !!me;
-  $('#topbar').hidden = !me;
-  if (!me) { $('#studentView').hidden = $('#tabbar').hidden = $('#adminView').hidden = true; loadConfig(); return; }
-  const admin = isAdmin && me.role === 'admin';
-  $('#studentView').hidden = $('#tabbar').hidden = admin;
+  const needAuth = !me && h !== 'home';
+  $('#authView').hidden = !needAuth;
+  $('#loginLink').hidden = !!me || needAuth;
+  $('#logoutBtn').hidden = !me; $('#whoName').hidden = !me;
+  const admin = !!me && isAdmin && me.role === 'admin';
+  $('#studentView').hidden = $('#tabbar').hidden = admin || needAuth;
   $('#adminView').hidden = !admin;
+  if (needAuth) { window.scrollTo(0, 0); return; }
+  if (!me) {
+    $('#modeSwitch').hidden = true;
+    return showTab('home');
+  }
   $('#modeSwitch').hidden = me.role !== 'admin';
   $('#modeSwitch').textContent = admin ? '학생 화면' : '관리자';
   $('#modeSwitch').href = admin ? '#pass' : '#admin';
   if (admin) return showAdmin(h === 'admin' ? 'overview' : h.slice(6));
-  const tab = ['pass', 'new', 'history'].includes(h) ? h : 'pass';
-  ['pass', 'new', 'history'].forEach((t) => { $('#s-' + t).hidden = t !== tab; });
+  showTab(['home', 'pass', 'new', 'history'].includes(h) ? h : 'home');
+}
+function showTab(tab) {
+  ['home', 'pass', 'new', 'history'].forEach((t) => { $('#s-' + t).hidden = t !== tab; });
   $$('[data-nav]').forEach((a) => { if (a.dataset.nav === tab) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
+  if (tab === 'home') renderHome();
   if (tab === 'pass' || tab === 'history') loadMine();
   if (tab === 'new') initRequestForm();
   window.scrollTo(0, 0);
@@ -614,6 +684,33 @@ async function loadConfig() {
     $('#authNotice').hidden = !config.notice; $('#authNotice').textContent = config.notice;
     setAuthMode(authMode);
   } catch {}
+}
+
+// ---------- 공개 안내 ----------
+// 배열별 장비 수. 실제 자리 배치가 아니라 배열 구성을 나타낸다.
+const FLEET = { rows: [4, 4, 4, 3, 3, 2], name: 'Replicator+', single: 'Z18' };
+function renderHome() {
+  const a = config.print_start_hour ?? 9, b = config.print_end_hour ?? 16;
+  $('#homeTitle').textContent = config.site_name || '실습실 출입';
+  $('#homeHours').textContent = `${pad(a)}:00–${pad(b)}:00`;
+  $('#homeSecond').hidden = !me;
+  const total = FLEET.rows.reduce((x, y) => x + y, 0);
+  let no = 0;
+  $('#fleet').innerHTML = `<div class="fleet-sum">
+      <div><b>${total + 1}</b><span>전체 장비</span></div>
+      <div><b>${total}</b><span>${FLEET.name}</span></div>
+      <div><b>1</b><span>${FLEET.single}</span></div>
+    </div>
+    <div class="fleet" role="img" aria-label="${FLEET.name} ${total}대는 6개 배열에 ${FLEET.rows.join(', ')}대씩, ${FLEET.single} 1대는 단독 배치">
+      ${FLEET.rows.map((n, i) => `<div class="fleet-row"><span>${i + 1}열</span><div class="fleet-units">${Array.from({ length: n }, () => `<div class="unit">${++no}</div>`).join('')}</div><span>${n}</span></div>`).join('')}
+      <div class="fleet-gap"></div>
+      <div class="fleet-row"><span>단독</span><div class="fleet-units"><div class="unit big">${FLEET.single}</div></div><span>1</span></div>
+    </div>
+    <div class="legend"><span><i></i>${FLEET.name}</span><span><i class="big"></i>${FLEET.single}</span></div>`;
+  $('#rules').innerHTML = `
+    <li><b>필라멘트를 가져오지 않아도 됩니다</b><span>출력에 쓸 필라멘트를 따로 준비할 필요가 없습니다.</span></li>
+    <li><b>출력 가능 시간은 ${a}시부터 ${b}시까지입니다</b><span>오전과 오후 구분 없이 이 시간 안에서 출력할 수 있습니다.</span></li>
+    <li><b>지도교수 서명이 필요합니다</b><span>이용을 신청하기 전에 지도교수 서명을 받아 주세요.</span></li>`;
 }
 
 // ---------- 학생: 출입증 + 내역 ----------
@@ -697,10 +794,11 @@ function initRequestForm() {
 }
 function fillTimes() {
   const now = Date.now() + skew, opts = [];
-  for (let m = 0; m <= 24 * 60; m += 30) opts.push(m);
+  const lo = (config.print_start_hour ?? 9) * 60, hi = (config.print_end_hour ?? 16) * 60;
+  for (let m = lo; m <= hi; m += 30) opts.push(m);
   const label = (m) => `${pad(Math.floor(m / 60))}:${pad(m % 60)}`;
   const prevS = $('#startT').value, prevE = $('#endT').value;
-  const startOpts = opts.filter((m) => m < 24 * 60 && pickedDay + (m + 30) * 60000 > now);
+  const startOpts = opts.filter((m) => m < hi && pickedDay + (m + 30) * 60000 > now);
   $('#startT').innerHTML = startOpts.map((m) => `<option value="${m}">${label(m)}</option>`).join('') || '<option value="">오늘은 신청 가능한 시간이 없습니다</option>';
   if (startOpts.includes(Number(prevS))) $('#startT').value = prevS;
   else { const def = startOpts.find((m) => m >= 13 * 60) ?? startOpts[0]; if (def !== undefined) $('#startT').value = def; }
@@ -708,7 +806,7 @@ function fillTimes() {
     const s = Number($('#startT').value);
     const endOpts = opts.filter((m) => m > s);
     $('#endT').innerHTML = endOpts.map((m) => `<option value="${m}">${m === 1440 ? '24:00' : label(m)}</option>`).join('');
-    if (endOpts.includes(Number(prevE)) && Number(prevE) > s) $('#endT').value = prevE; else $('#endT').value = Math.min(s + 120, 1440);
+    if (endOpts.includes(Number(prevE)) && Number(prevE) > s) $('#endT').value = prevE; else $('#endT').value = Math.min(s + 120, hi);
     renderRule();
   };
   $('#startT').onchange = fillEnd; $('#endT').onchange = renderRule;
@@ -729,11 +827,14 @@ $('#reqForm').onsubmit = async (e) => {
   const start_at = pickedDay + Number($('#startT').value) * 60000, end_at = pickedDay + Number($('#endT').value) * 60000;
   const purpose = $('#purpose').value.trim();
   if (!purpose) { $('#purpose').focus(); return toast('사용 목적을 적어 주세요.'); }
+  const advisor = $('#advisor').value.trim();
+  if (!advisor) { $('#advisor').focus(); return toast('지도교수 이름을 적어 주세요.'); }
+  if (!$('#advisorSigned').checked) { $('#advisorSigned').focus(); return toast('지도교수 서명을 받은 뒤 신청해 주세요.'); }
   const btn = $('#reqBtn'); btn.disabled = true;
   try {
-    const r = await api('/api/reservations', { method: 'POST', body: { room_id: Number($('#room').value), start_at, end_at, purpose } });
+    const r = await api('/api/reservations', { method: 'POST', body: { room_id: Number($('#room').value), start_at, end_at, purpose, advisor, advisor_signed: true } });
     toast(r.status === 'approved' ? '자동 승인되었습니다. 출입증에서 확인하세요.' : '신청했습니다. 관리자 승인을 기다려 주세요.');
-    $('#purpose').value = '';
+    $('#purpose').value = ''; $('#advisor').value = ''; $('#advisorSigned').checked = false;
     location.hash = 'pass';
   } catch (err) { toast(err.message); } finally { btn.disabled = false; }
 };
@@ -786,7 +887,7 @@ A.requests = async () => {
     <td><b>${esc(r.name)}</b> <span class="mono small muted">${esc(r.student_no)}</span></td>
     <td>${esc(r.room_name)}</td>
     <td class="mono small">${fRange(r.start_at, r.end_at)}</td>
-    <td class="small">${esc(r.purpose)}${r.reject_reason ? `<div style="color:var(--bad)">사유: ${esc(r.reject_reason)}</div>` : ''}${r.status === 'approved' && !r.decided_by ? '<div class="muted">자동 승인</div>' : ''}</td>
+    <td class="small">${esc(r.purpose)}${r.advisor ? `<div class="muted">지도교수 ${esc(r.advisor)} · ${r.advisor_signed ? '서명 확인함' : '서명 미확인'}</div>` : ''}${r.reject_reason ? `<div style="color:var(--bad)">사유: ${esc(r.reject_reason)}</div>` : ''}${r.status === 'approved' && !r.decided_by ? '<div class="muted">자동 승인</div>' : ''}</td>
     <td class="actions">
       ${r.status === 'pending' ? `<button class="btn ok sm" type="button" data-approve="${r.id}">승인</button>` : ''}
       ${r.status !== 'rejected' ? `<button class="btn secondary sm" type="button" data-reject="${r.id}">${r.status === 'approved' ? '승인 취소' : '반려'}</button>` : ''}
@@ -1013,6 +1114,8 @@ A.features = async () => {
     <h3 class="group-title">신청과 가입</h3>
     <div class="panel">
       ${sw('reservations_open', '이용 신청 받기', '끄면 학생이 새 이용 신청을 할 수 없습니다. 이미 승인된 예약은 그대로입니다.')}
+      ${num('print_start_hour', '출력 시작 시각', '이용 신청과 안내 화면에 적용', '시', 0, 23)}
+      ${num('print_end_hour', '출력 종료 시각', '이용 신청과 안내 화면에 적용', '시', 1, 24)}
       ${num('max_days_ahead', '신청 가능 기간', '오늘부터 며칠 뒤까지 신청을 받을지', '일', 1, 90)}
       ${sw('registration_open', '새 가입 받기', '끄면 가입 화면에서 새 계정을 만들 수 없습니다.')}
       ${sw('require_user_approval', '가입 승인 필요', '켜면 관리자가 승인해야 새 계정으로 로그인할 수 있습니다.')}
@@ -1024,7 +1127,7 @@ A.features = async () => {
       <div class="setting"><div class="txt"><span>서비스 이름과 공지는 저장 버튼을 눌러야 반영됩니다.</span></div><div class="ctl"><button class="btn sm" type="button" id="saveText">저장</button></div></div>
     </div>`;
   const save = async (patch) => {
-    try { const r = await api('/api/admin/settings', { method: 'PATCH', body: patch }); Object.assign(settings, r.settings); applyChrome(); toast('저장했습니다.'); return true; }
+    try { const r = await api('/api/admin/settings', { method: 'PATCH', body: patch }); Object.assign(settings, r.settings); Object.assign(config, r.settings); applyChrome(); toast('저장했습니다.'); return true; }
     catch (e) { toast(e.message); return false; }
   };
   $$('input[type=checkbox][data-s]').forEach((i) => i.onchange = async () => {
@@ -1042,15 +1145,17 @@ function fillRooms() {
   if (rooms.some((r) => r.id == prev)) $('#room').value = prev;
 }
 function applyChrome() {
-  $('#brandName').textContent = settings.site_name; document.title = settings.site_name;
-  $('#noticeBanner').hidden = !settings.notice; $('#noticeBanner').textContent = settings.notice || '';
+  const name = settings.site_name || config.site_name || '실습실 출입', notice = settings.notice ?? config.notice;
+  $('#brandName').textContent = name; document.title = name;
+  $('#noticeBanner').hidden = !notice; $('#noticeBanner').textContent = notice || '';
   $('#lockBanner').hidden = !settings.lockdown;
 }
 async function boot() {
-  try { const r = await api('/api/me'); me = r.user; settings = r.settings; } catch { me = null; }
+  await loadConfig();
+  try { const r = await api('/api/me'); me = r.user; settings = r.settings; } catch { me = null; settings = {}; }
+  applyChrome();
   if (me) {
     $('#whoName').textContent = `${me.name} · ${me.student_no}`;
-    applyChrome();
     rooms = (await api('/api/rooms')).rooms; fillRooms();
     if (me.role === 'admin') settings = { ...settings, ...(await api('/api/admin/settings')).settings };
   }

@@ -41,6 +41,8 @@ const SETTING_DEFS = {
   lockdown: { type: 'bool', def: () => false },
   master_qr_enabled: { type: 'bool', def: () => true },
   door_open_ms: { type: 'int', min: 1000, max: 15000, def: (env) => Number(env.DOOR_OPEN_MS || 3000) },
+  print_start_hour: { type: 'int', min: 0, max: 23, def: () => 9 },
+  print_end_hour: { type: 'int', min: 1, max: 24, def: () => 16 },
 };
 
 async function getSettings(env) {
@@ -175,6 +177,8 @@ async function route(req, env, url) {
       notice: s.notice,
       registration_open: s.registration_open,
       require_user_approval: s.require_user_approval,
+      print_start_hour: s.print_start_hour,
+      print_end_hour: s.print_end_hour,
     });
   }
 
@@ -250,7 +254,7 @@ async function route(req, env, url) {
   if (path === '/api/reservations' && method === 'POST') {
     const s = await getSettings(env);
     if (!s.reservations_open) throw new HttpError(403, '지금은 이용 신청을 받지 않습니다.');
-    const { room_id, start_at, end_at, purpose } = await body(req);
+    const { room_id, start_at, end_at, purpose, advisor, advisor_signed } = await body(req);
     const start = Number(start_at);
     const end = Number(end_at);
     if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start)
@@ -258,7 +262,13 @@ async function route(req, env, url) {
     if (end < Date.now()) throw new HttpError(400, '이미 지난 시간입니다.');
     if (start - Date.now() > s.max_days_ahead * 86400_000)
       throw new HttpError(400, `${s.max_days_ahead}일 이내로만 신청할 수 있습니다.`);
+    const startH = kstHour(start);
+    if (kstDay(start) !== kstDay(end - 1) || startH < s.print_start_hour || startH + (end - start) / 3600_000 > s.print_end_hour)
+      throw new HttpError(400, `출력 가능 시간은 ${s.print_start_hour}시~${s.print_end_hour}시입니다.`);
     if (!String(purpose || '').trim()) throw new HttpError(400, '사용 목적을 적어 주세요.');
+    const advisorName = String(advisor || '').trim().slice(0, 30);
+    if (!advisorName) throw new HttpError(400, '지도교수 이름을 적어 주세요.');
+    if (advisor_signed !== true) throw new HttpError(400, '지도교수 서명을 받은 뒤 신청해 주세요.');
     const room = await env.DB.prepare('SELECT * FROM rooms WHERE id = ? AND enabled = 1').bind(id(room_id)).first();
     if (!room) throw new HttpError(404, '신청할 수 있는 실습실이 아닙니다.');
     const dup = await env.DB.prepare(
@@ -272,10 +282,10 @@ async function route(req, env, url) {
     const auto = await autoApproveDecision(env, room, user.id, start, end);
     const now = Date.now();
     const r = await env.DB.prepare(
-      `INSERT INTO reservations (user_id, room_id, start_at, end_at, purpose, status, decided_at, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO reservations (user_id, room_id, start_at, end_at, purpose, advisor, advisor_signed, status, decided_at, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
     )
-      .bind(user.id, room.id, start, end, String(purpose).trim().slice(0, 200), auto.ok ? 'approved' : 'pending',
+      .bind(user.id, room.id, start, end, String(purpose).trim().slice(0, 200), advisorName, auto.ok ? 'approved' : 'pending',
         auto.ok ? now : null, now)
       .run();
     return json({ ok: true, id: r.meta.last_row_id, status: auto.ok ? 'approved' : 'pending', note: auto.why || null });
@@ -374,6 +384,9 @@ async function adminRoute(req, env, path, method, admin, url) {
         .bind(k, normalizeSetting(k, v)),
     );
     if (!stmts.length) throw new HttpError(400, '변경할 항목이 없습니다.');
+    const cur = await getSettings(env);
+    if (Number(b.print_start_hour ?? cur.print_start_hour) >= Number(b.print_end_hour ?? cur.print_end_hour))
+      throw new HttpError(400, '출력 시작 시각은 종료 시각보다 빨라야 합니다.');
     await env.DB.batch(stmts);
     return json({ ok: true, settings: await getSettings(env) });
   }

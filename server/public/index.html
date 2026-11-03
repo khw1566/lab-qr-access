@@ -187,7 +187,8 @@ textarea.input { min-height: 84px; resize: vertical; }
 .item-head { display: flex; align-items: center; gap: 8px; }
 .item-head b { flex: 1; min-width: 0; font-weight: 600; }
 .item-actions { display: flex; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
-.section-title { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.section-title { display: flex; align-items: center; justify-content: space-between; gap: 8px 12px; margin-bottom: 10px; flex-wrap: wrap; }
+.section-title > h2, .section-title > h3 { white-space: nowrap; }
 
 .chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
 .chip {
@@ -324,13 +325,13 @@ dialog .row.end { justify-content: flex-end; }
 .spec { padding: 14px 16px; display: grid; gap: 8px; }
 .spec dl { margin: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 12px; font-size: 13px; }
 .spec dt { color: var(--muted); }
-.spec dd { margin: 0; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.spec dd { margin: 0; font-variant-numeric: tabular-nums; }
 .cautions { margin: 0; padding: 6px 18px 14px 36px; display: grid; gap: 6px; font-size: 14px; }
 .cautions li::marker { color: var(--warn); }
 
 /* 장비 배치도: 실습실 평면 위 프린터 타일 */
 .floor {
-  padding: 18px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 18px 22px; align-items: start;
+  padding: 22px 18px 18px; display: grid; grid-template-columns: max-content max-content; justify-content: space-evenly; gap: 18px 48px; align-items: start;
   background-color: var(--surface);
   background-image: linear-gradient(var(--sunken) 1px, transparent 1px), linear-gradient(90deg, var(--sunken) 1px, transparent 1px);
   background-size: 22px 22px; background-position: -1px -1px;
@@ -389,7 +390,7 @@ button.pr:hover { border-color: var(--accent); }
 
 @media (max-width: 760px) {
   .home-grid { grid-template-columns: minmax(0, 1fr); }
-  .floor { grid-template-columns: minmax(0, 1fr); }
+  .floor { grid-template-columns: minmax(0, 1fr); justify-content: stretch; }
   .fp-side { justify-items: start; grid-template-columns: auto 1fr; align-items: center; }
 }
 @media (max-width: 860px) {
@@ -473,6 +474,7 @@ button.pr:hover { border-color: var(--accent); }
     <h1 id="homeTitle">실습실 출입</h1>
     <p class="lead" id="homeIntro"></p>
     <p class="small muted" id="homeMeta"></p>
+    <p class="small" id="homeLinks"></p>
     <div class="status-chip" id="printStatus"><span class="dot"></span><span>불러오는 중…</span></div>
     <div class="row"><a class="btn" href="#new">이용 신청하기</a><a class="btn secondary" href="#pass">내 출입증</a></div>
   </section>
@@ -787,6 +789,7 @@ function renderHome() {
   $('#homeTitle').textContent = info.site_name;
   $('#homeIntro').textContent = info.intro || '';
   $('#homeMeta').textContent = [info.location && `위치 ${info.location}`, info.contact && `문의 ${info.contact}`].filter(Boolean).join(' · ');
+  $('#homeLinks').innerHTML = [info.manual_url && `<a href="${esc(info.manual_url)}" target="_blank" rel="noopener">프린터 사용 설명서</a>`, info.feedback_url && `<a href="${esc(info.feedback_url)}" target="_blank" rel="noopener">건의사항 보내기</a>`].filter(Boolean).join(' · ');
   $('#homeNotice').hidden = !info.notice; $('#homeNotice').textContent = info.notice || '';
   const w = printWindow();
   $('#printStatus').className = 'status-chip' + (w.open ? ' open' : '');
@@ -1270,6 +1273,7 @@ A.features = async () => {
       <div class="setting wide"><div class="txt"><b>공지</b><span>로그인 화면과 학생 화면 위쪽에 보입니다. 비우면 숨깁니다.</span></div><div class="ctl"><textarea class="input" data-s="notice" maxlength="300" placeholder="예: 11/10(월)은 장비 점검으로 실습실을 운영하지 않습니다.">${esc(s.notice)}</textarea></div></div>
       <div class="setting wide"><div class="txt"><b>소개 문구</b><span>첫 화면 제목 아래에 보입니다.</span></div><div class="ctl"><textarea class="input" data-s="intro" maxlength="300">${esc(s.intro)}</textarea></div></div>
       <div class="setting wide"><div class="txt"><b>위치 · 문의</b><span>첫 화면에 함께 표시됩니다.</span></div><div class="ctl two"><input class="input" data-s="location" value="${esc(s.location)}" maxlength="60" aria-label="위치"><input class="input" data-s="contact" value="${esc(s.contact)}" maxlength="80" aria-label="문의"></div></div>
+      <div class="setting wide"><div class="txt"><b>설명서 · 건의사항 링크</b><span>https:// 로 시작하는 주소만 표시됩니다.</span></div><div class="ctl two"><input class="input" data-s="manual_url" value="${esc(s.manual_url)}" maxlength="300" aria-label="설명서 링크"><input class="input" data-s="feedback_url" value="${esc(s.feedback_url)}" maxlength="300" aria-label="건의사항 링크"></div></div>
       <div class="setting wide"><div class="txt"><b>이용 규정</b><span>한 줄에 하나씩 적습니다. 첫 화면에 번호를 붙여 보여 줍니다.</span></div><div class="ctl"><textarea class="input" data-s="rules" maxlength="2000" style="min-height:120px">${esc(s.rules)}</textarea></div></div>
       <div class="setting wide"><div class="txt"><b>주의사항</b><span>한 줄에 하나씩 적습니다.</span></div><div class="ctl"><textarea class="input" data-s="cautions" maxlength="2000" style="min-height:160px">${esc(s.cautions)}</textarea></div></div>
       <div class="setting"><div class="txt"><span>글자로 된 항목은 저장 버튼을 눌러야 반영됩니다.</span></div><div class="ctl"><button class="btn sm" type="button" id="saveText">저장</button></div></div>
@@ -1284,7 +1288,7 @@ A.features = async () => {
   });
   $$('input[type=number][data-s]').forEach((i) => i.onchange = () => save({ [i.dataset.s]: Number(i.value) }));
   $('#saveText').onclick = async () => {
-    const keys = ['site_name', 'notice', 'intro', 'location', 'contact', 'rules', 'cautions'];
+    const keys = ['site_name', 'notice', 'intro', 'location', 'contact', 'manual_url', 'feedback_url', 'rules', 'cautions'];
     if (await save(Object.fromEntries(keys.map((k) => [k, $(`[data-s=${k}]`).value])))) info = await api('/api/config');
   };
 };

@@ -69,6 +69,8 @@ const SETTING_DEFS = {
   location: { type: 'str', max: 60, def: () => 'E2-207호' },
   contact: { type: 'str', max: 80, def: () => '학부사무실 052-279-3101' },
   cautions: { type: 'str', max: 2000, def: () => DEFAULT_CAUTIONS },
+  manual_url: { type: 'str', max: 300, def: () => 'https://drive.google.com/file/d/1307Ac6LOjH0T_fboYQe4uepAe5MfJSyx/view?usp=sharing' },
+  feedback_url: { type: 'str', max: 300, def: () => 'https://docs.google.com/forms/d/e/1FAIpQLSc1q96Q9BOxN9XxtQuu0qSdLgfmXZokfb1Ggsf7oR15xQHcpQ/viewform' },
   notice: { type: 'str', max: 300, def: () => '' },
   registration_open: { type: 'bool', def: () => true },
   require_user_approval: { type: 'bool', def: (env) => env.REQUIRE_USER_APPROVAL !== 'false' },
@@ -127,6 +129,8 @@ function publicInfo(s) {
     rules: s.rules.split('\n').map((x) => x.trim()).filter(Boolean),
     cautions: s.cautions.split('\n').map((x) => x.trim()).filter(Boolean),
     printer_specs: PRINTER_SPECS,
+    manual_url: /^https:\/\//.test(s.manual_url) ? s.manual_url : '',
+    feedback_url: /^https:\/\//.test(s.feedback_url) ? s.feedback_url : '',
     print_open_hour: s.print_open_hour,
     print_close_hour: s.print_close_hour,
     reservations_open: s.reservations_open,
@@ -330,7 +334,7 @@ async function route(req, env, url) {
     if (!PRINTER_TYPES[printer_type]) throw new HttpError(400, '사용할 장비를 골라 주세요.');
     const down = new Set(s.printer_down);
     if (!PRINTERS.some((p) => p.type === printer_type && !down.has(p.id)))
-      throw new HttpError(409, `${PRINTER_TYPES[printer_type]}는 모두 점검 중입니다.`);
+      throw new HttpError(409, `${PRINTER_TYPES[printer_type]} 장비가 모두 점검 중입니다.`);
     const advisor = String(advisor_name || '').trim().slice(0, 30);
     if (!advisor) throw new HttpError(400, '지도교수 성명을 적어 주세요.');
     if (typeof advisor_sig !== 'string' || !advisor_sig.startsWith('data:image/png;base64,') || advisor_sig.length < 200)

@@ -203,7 +203,7 @@ static void page_header(lv_obj_t *page, const char *title)
 {
     ui_header(page, title);
     lv_obj_t *close = ui_icon_button(page, UI_ICON_CLOSE, "", 916, 12, 72, 68, false, on_close, 0);
-    lv_obj_set_style_text_color(lv_obj_get_child(close, -1), lv_color_white(), 0);
+    ui_icon_color(lv_obj_get_child(close, -1), lv_color_white());
 }
 
 static void pin_page_build(void)
@@ -243,7 +243,9 @@ static void wifi_page_build(void)
     lv_obj_set_style_text_color(s_wifi_current, UI_MUTED, 0);
     lv_obj_t *rescan = ui_icon_button(s_wifi_page, UI_ICON_WIFI, "검색", 740, 18, 150, 56, false, on_rescan, 0);
     for (unsigned i = 0; i < lv_obj_get_child_count(rescan); i++) {
-        lv_obj_set_style_text_color(lv_obj_get_child(rescan, i), lv_color_white(), 0);
+        lv_obj_t *child = lv_obj_get_child(rescan, i);
+        if (lv_obj_check_type(child, &lv_image_class)) ui_icon_color(child, lv_color_white());
+        else lv_obj_set_style_text_color(child, lv_color_white(), 0);
     }
 
     s_ap_list = lv_list_create(s_wifi_page);

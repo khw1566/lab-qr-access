@@ -4,7 +4,8 @@
 #include "ui_icons.h"
 
 // C안: 파란 안내 바, 흰 바탕, 남색 글자. 크기는 1024×600 기준이다.
-#define UI_BLUE       lv_color_hex(0x2447db)
+#define UI_BLUE       lv_color_hex(0x0070c0)
+#define UI_GRAY       lv_color_hex(0xadadad)
 #define UI_INK        lv_color_hex(0x142979)
 #define UI_MUTED      lv_color_hex(0x4e6080)
 #define UI_SOFT       lv_color_hex(0xedf1ff)
@@ -91,7 +92,7 @@ static inline void ui_header(lv_obj_t *parent, const char *title)
     lv_obj_set_style_bg_color(bar, UI_BLUE, 0);
     lv_obj_set_style_bg_opa(bar, LV_OPA_COVER, 0);
     for (int i = 0; i < 4; i++) {
-        lv_obj_t *tile = ui_panel(bar, 36 + (i % 2) * 18, 29 + (i / 2) * 18, 14, 14);
+        lv_obj_t *tile = ui_panel(bar, 16 + (i % 2) * 26, 22 + (i / 2) * 26, 20, 20);
         lv_obj_set_style_bg_color(tile, lv_color_white(), 0);
         lv_obj_set_style_bg_opa(tile, i == 3 ? LV_OPA_50 : LV_OPA_COVER, 0);
         lv_obj_set_style_radius(tile, 3, 0);

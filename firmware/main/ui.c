@@ -8,6 +8,7 @@
 #include "sdkconfig.h"
 #include "app.h"
 #include "ui_theme.h"
+#include "ui_art.h"
 
 static const char *TAG = "ui";
 #define BODY_H         (LCD_V_RES - UI_BAR_H)
@@ -76,21 +77,41 @@ static void footer(lv_obj_t *page, bool home)
 
 static void bar_build(lv_obj_t *screen)
 {
-    ui_header(screen, "실습실 출입");
-    s_status = ui_icon(screen, UI_ICON_WIFI_OFF, 936, 24, 44, lv_color_white());
+    ui_header(screen, "");
+    ui_text(screen, "실습실 출입단말", &lab_font_40, 82, 22, 490, lv_color_white());
+    s_clock = ui_text(screen, "--:--", &lab_font_64, 588, 7, 196, lv_color_black());
+    lv_obj_set_style_text_align(s_clock, LV_TEXT_ALIGN_CENTER, 0);
+    s_date = ui_text(screen, "", &lab_font_28, 792, 50, 224, lv_color_black());
+    s_status = ui_icon(screen, UI_ICON_WIFI_OFF, 992, 10, 20, lv_color_black());
 }
 
 static void home_build(lv_obj_t *screen)
 {
     s_home = page_create(screen);
-    ui_text(s_home, "출입증을\n준비해 주세요", &lab_font_56, 48, 64, 550, UI_INK);
-    s_clock = ui_text(s_home, "--:--", &lab_font_64, 660, 64, 280, UI_INK);
-    lv_obj_set_style_text_align(s_clock, LV_TEXT_ALIGN_CENTER, 0);
-    s_date = ui_text(s_home, "", &lab_font_24, 618, 156, 358, UI_MUTED);
-    lv_obj_set_style_text_align(s_date, LV_TEXT_ALIGN_CENTER, 0);
-    ui_icon_button(s_home, UI_ICON_QR, "QR 출입", 48, 326, 380, 88, true, on_tab, TAB_SCAN);
-    ui_icon(s_home, UI_ICON_QR, 736, 252, 128, UI_BLUE);
-    footer(s_home, true);
+    ui_art_create(s_home, 684, 76, 332);
+    ui_text(s_home, "모바일 QR출입증을\n준비해주세요", &lab_font_64, 36, 40, 640, lv_color_black());
+
+    lv_obj_t *entry = ui_button(s_home, "", 36, 226, 640, 148, true, on_tab, TAB_SCAN);
+    lv_obj_set_style_radius(entry, 0, 0);
+    lv_obj_set_style_pad_all(entry, 0, 0);
+    ui_icon(entry, UI_ICON_FINGERPRINT, 32, 34, 80, lv_color_white());
+    lv_obj_t *entry_label = ui_text(entry, "QR 출입", &lab_font_64, 146, 0, 464, lv_color_white());
+    lv_obj_align(entry_label, LV_ALIGN_LEFT_MID, 146, 0);
+
+    lv_obj_t *guide = ui_button(s_home, "", 36, 396, 480, 88, false, on_tab, TAB_GUIDE);
+    lv_obj_set_style_radius(guide, 0, 0);
+    lv_obj_set_style_pad_all(guide, 0, 0);
+    lv_obj_set_style_bg_color(guide, UI_GRAY, 0);
+    lv_obj_set_style_bg_color(guide, UI_MUTED, LV_STATE_PRESSED);
+    ui_icon(guide, UI_ICON_INFO, 20, 16, 56, lv_color_white());
+    lv_obj_t *guide_label = ui_text(guide, "처음 이용하시나요?", &lab_font_40, 96, 0, 364, lv_color_white());
+    lv_obj_align(guide_label, LV_ALIGN_LEFT_MID, 96, 0);
+
+    lv_obj_t *settings = ui_icon_button(s_home, UI_ICON_SETTINGS, "", 928, 414, 80, 80, false, on_settings, 0);
+    lv_obj_t *settings_icon = lv_obj_get_child(settings, 0);
+    lv_obj_set_size(settings_icon, 64, 64);
+    lv_obj_center(settings_icon);
+    ui_icon_color(settings_icon, lv_color_black());
 }
 
 static void corner(lv_obj_t *frame, lv_align_t align)
@@ -221,6 +242,11 @@ static void on_tick(lv_timer_t *timer)
     if (s_tab != TAB_HOME) show_tab(TAB_HOME);
 }
 
+static void on_art_tick(lv_timer_t *timer)
+{
+    if (s_tab == TAB_HOME && !s_preview_paused && !s_overlay_shown) ui_art_step();
+}
+
 void ui_build(void)
 {
     for (int i = 0; i < 2; i++) {
@@ -245,6 +271,7 @@ void ui_build(void)
     result_build(screen);
     show_tab(TAB_HOME);
     lv_timer_create(on_tick, 1000, NULL);
+    lv_timer_create(on_art_tick, 50, NULL);
     if (!s_buffers[0] || !s_buffers[1]) {
         ESP_LOGE(TAG, "미리보기 메모리 부족");
         lv_label_set_text(s_hint, "미리보기 오류");
@@ -255,7 +282,7 @@ void ui_status(const char *text)
 {
     if (!s_status || !display_lock(LOCK_WAIT_MS)) return;
     ui_icon_set(s_status, strncmp(text, "Wi-Fi: ", 7) == 0 ? UI_ICON_WIFI : UI_ICON_WIFI_OFF,
-                 lv_color_white());
+                 lv_color_black());
     display_unlock();
 }
 

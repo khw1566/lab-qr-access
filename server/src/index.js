@@ -66,6 +66,33 @@ const DEFAULT_RULES = [
   '이용 신청에는 지도교수의 서명이 필요합니다.',
 ].join('\n');
 
+// ---------- 공휴일 (신청 불가) ----------
+// 대체공휴일 포함. 임시공휴일이나 휴관일은 관리자 기능 설정의 '휴관일'에 추가한다.
+const HOLIDAYS = {
+  '2026-01-01': '신정', '2026-02-16': '설날 연휴', '2026-02-17': '설날', '2026-02-18': '설날 연휴',
+  '2026-03-01': '삼일절', '2026-03-02': '대체공휴일(삼일절)', '2026-05-05': '어린이날',
+  '2026-05-24': '부처님오신날', '2026-05-25': '대체공휴일(부처님오신날)', '2026-06-03': '전국동시지방선거',
+  '2026-06-06': '현충일', '2026-08-15': '광복절', '2026-08-17': '대체공휴일(광복절)',
+  '2026-09-24': '추석 연휴', '2026-09-25': '추석', '2026-09-26': '추석 연휴', '2026-09-28': '대체공휴일(추석)',
+  '2026-10-03': '개천절', '2026-10-05': '대체공휴일(개천절)', '2026-10-09': '한글날', '2026-12-25': '성탄절',
+  '2027-01-01': '신정', '2027-02-06': '설날 연휴', '2027-02-07': '설날', '2027-02-08': '설날 연휴',
+  '2027-02-09': '대체공휴일(설날)', '2027-03-01': '삼일절', '2027-05-05': '어린이날', '2027-05-13': '부처님오신날',
+  '2027-06-06': '현충일', '2027-08-15': '광복절', '2027-08-16': '대체공휴일(광복절)',
+  '2027-09-14': '추석 연휴', '2027-09-15': '추석', '2027-09-16': '추석 연휴', '2027-10-03': '개천절',
+  '2027-10-04': '대체공휴일(개천절)', '2027-10-09': '한글날', '2027-10-11': '대체공휴일(한글날)',
+  '2027-12-25': '성탄절', '2027-12-27': '대체공휴일(성탄절)',
+};
+
+// '2026-11-20 장비 점검' 처럼 한 줄에 하나
+function closedDays(s) {
+  const out = { ...HOLIDAYS };
+  for (const line of s.closed_dates.split('\n')) {
+    const m = line.trim().match(/^(\d{4}-\d{2}-\d{2})\s*(.*)$/);
+    if (m) out[m[1]] = m[2].trim() || '휴관일';
+  }
+  return out;
+}
+
 // ---------- 운영 설정 (관리자 화면에서 변경) ----------
 const SETTING_DEFS = {
   site_name: { type: 'str', max: 30, def: () => '3D 스마트 창작실' },
@@ -83,6 +110,8 @@ const SETTING_DEFS = {
   lockdown: { type: 'bool', def: () => false },
   master_qr_enabled: { type: 'bool', def: () => true },
   door_open_ms: { type: 'int', min: 1000, max: 15000, def: (env) => Number(env.DOOR_OPEN_MS || 3000) },
+  closed_dates: { type: 'str', max: 2000, def: () => '' },
+  weekend_open: { type: 'bool', def: () => false },
   print_open_hour: { type: 'int', min: 0, max: 23, def: () => 9 },
   print_close_hour: { type: 'int', min: 1, max: 24, def: () => 16 },
   rules: { type: 'str', max: 2000, def: () => DEFAULT_RULES },
@@ -133,6 +162,8 @@ function publicInfo(s) {
     rules: s.rules.split('\n').map((x) => x.trim()).filter(Boolean),
     cautions: s.cautions.split('\n').map((x) => x.trim()).filter(Boolean),
     printer_specs: PRINTER_SPECS,
+    closed_days: closedDays(s),
+    weekend_open: s.weekend_open,
     manual_url: /^https:\/\//.test(s.manual_url) ? s.manual_url : '',
     feedback_url: /^https:\/\//.test(s.feedback_url) ? s.feedback_url : '',
     print_open_hour: s.print_open_hour,
@@ -148,7 +179,7 @@ function publicInfo(s) {
 
 // 신청 목록에서는 큰 서명 이미지를 빼고 보낸다
 const RES_COLS = `r.id, r.user_id, r.room_id, r.start_at, r.end_at, r.purpose, r.status, r.decided_by, r.decided_at,
-  r.reject_reason, r.created_at, r.printer_type, r.advisor_name, (r.advisor_sig IS NOT NULL) AS has_sig`;
+  r.reject_reason, r.created_at, r.printer_type, r.advisor_name, r.phone, r.department, (r.advisor_sig IS NOT NULL) AS has_sig`;
 
 const kstHour = (ms) => new Date(ms + KST_OFFSET_MS).getUTCHours() + new Date(ms + KST_OFFSET_MS).getUTCMinutes() / 60;
 const kstDay = (ms) => new Date(ms + KST_OFFSET_MS).toISOString().slice(0, 10);
@@ -167,7 +198,7 @@ async function currentUser(req, env) {
   const [uid, exp, sig] = m[1].split('.');
   if (!uid || !exp || !sig || Number(exp) < Date.now()) return null;
   if (!safeEqual(sig, await hmac(env.SESSION_SECRET, `${uid}.${exp}`))) return null;
-  const user = await env.DB.prepare('SELECT id, student_no, name, role, status FROM users WHERE id = ?')
+  const user = await env.DB.prepare('SELECT id, student_no, name, role, status, phone, department FROM users WHERE id = ?')
     .bind(Number(uid))
     .first();
   return user && user.status === 'active' ? user : null;
@@ -321,7 +352,7 @@ async function route(req, env, url) {
   if (path === '/api/reservations' && method === 'POST') {
     const s = await getSettings(env);
     if (!s.reservations_open) throw new HttpError(403, '지금은 이용 신청을 받지 않습니다.');
-    const { room_id, start_at, end_at, purpose, printer_type, advisor_name, advisor_sig } = await body(req);
+    const { room_id, start_at, end_at, purpose, printer_type, advisor_name, advisor_sig, phone, department } = await body(req);
     const start = Number(start_at);
     const end = Number(end_at);
     if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start)
@@ -330,6 +361,17 @@ async function route(req, env, url) {
     if (start - Date.now() > s.max_days_ahead * 86400_000)
       throw new HttpError(400, `${s.max_days_ahead}일 이내로만 신청할 수 있습니다.`);
     if (!String(purpose || '').trim()) throw new HttpError(400, '사용 목적을 적어 주세요.');
+    const dept = String(department || '').trim().slice(0, 40);
+    if (!dept) throw new HttpError(400, '학부(과)를 적어 주세요.');
+    const tel = String(phone || '').replace(/[^0-9]/g, '');
+    if (!/^0\d{8,10}$/.test(tel)) throw new HttpError(400, '전화번호를 확인해 주세요. 예: 010-1234-5678');
+    const telFmt = tel.length === 11 ? `${tel.slice(0, 3)}-${tel.slice(3, 7)}-${tel.slice(7)}` : tel.length === 10 && tel.startsWith('02') ? `02-${tel.slice(2, 6)}-${tel.slice(6)}` : tel.length === 10 ? `${tel.slice(0, 3)}-${tel.slice(3, 6)}-${tel.slice(6)}` : tel;
+    // 공휴일, 휴관일, 주말
+    const day = kstDay(start);
+    const closed = closedDays(s)[day];
+    if (closed) throw new HttpError(400, `${day}은(는) ${closed}이라 신청할 수 없습니다.`);
+    const wd = new Date(start + KST_OFFSET_MS).getUTCDay();
+    if (!s.weekend_open && (wd === 0 || wd === 6)) throw new HttpError(400, '주말에는 신청할 수 없습니다.');
     // 출력 가능 시간 (오전·오후 구분 없이 하루 안에서 print_open_hour~print_close_hour)
     const sh = kstHour(start);
     const eh = sh + (end - start) / 3600_000;
@@ -358,12 +400,14 @@ async function route(req, env, url) {
     const now = Date.now();
     const r = await env.DB.prepare(
       `INSERT INTO reservations (user_id, room_id, start_at, end_at, purpose, status, decided_at, created_at,
-         printer_type, advisor_name, advisor_sig)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         printer_type, advisor_name, advisor_sig, phone, department)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
       .bind(user.id, room.id, start, end, String(purpose).trim().slice(0, 200), auto.ok ? 'approved' : 'pending',
-        auto.ok ? now : null, now, printer_type, advisor, advisor_sig)
+        auto.ok ? now : null, now, printer_type, advisor, advisor_sig, telFmt, dept)
       .run();
+    // 다음 신청 때 자동으로 채우도록 계정에 저장
+    await env.DB.prepare('UPDATE users SET phone = ?, department = ? WHERE id = ?').bind(telFmt, dept, user.id).run();
     return json({ ok: true, id: r.meta.last_row_id, status: auto.ok ? 'approved' : 'pending', note: auto.why || null });
   }
 

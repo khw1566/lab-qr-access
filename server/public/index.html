@@ -3,46 +3,37 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#f2f4f7" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#0c121c" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#ffffff">
 <title>실습실 출입</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
 <script src="/vendor/qrcode.js"></script>
 <style>
-/* 레이아웃: 학생은 한 손 조작용 단일 열 + 하단 탭, 관리자는 넓은 화면에서 좌측 메뉴 + 작업 영역.
-   모티프: 출입 '패스' 카드(학생)와 안전 황색 띠(마스터 QR). */
+/* 레이아웃: 흰 바탕 단일 테마. 정보는 얇은 선과 여백으로 구분하고, 색은 상태 표시에만 쓴다.
+   학생은 한 손 조작용 단일 열 + 하단 탭, 관리자는 넓은 화면에서 좌측 메뉴 + 작업 영역. */
 :root {
-  --bg: #f2f4f7;          /* 살짝 푸른 회색 바탕 */
+  --bg: #ffffff;
   --surface: #ffffff;
-  --sunken: #e8ecf2;
-  --line: #d7dde6;
-  --fg: #141b26;
-  --muted: #5b6676;
-  --accent: #2148b8;      /* 코발트: 주요 동작 */
+  --sunken: #f5f6f8;      /* 입력칸 비활성, 보조 바탕 */
+  --line: #e5e7eb;        /* 구분선 */
+  --line-strong: #d1d5db;
+  --fg: #111827;          /* 본문 잉크 */
+  --muted: #6b7280;
+  --accent: #111827;      /* 주요 버튼은 잉크색 */
   --accent-fg: #ffffff;
-  --accent-soft: #e3e9fb;
-  --master: #f0a500;      /* 안전 황색: 마스터 QR 전용 */
+  --accent-soft: #f3f4f6;
+  --link: #1d4ed8;
+  --master: #f0a500;      /* 마스터 QR 전용 안전 황색 */
   --master-ink: #1b1400;
-  --ok: #138a4b; --ok-soft: #dff3e7;
-  --warn: #b25e00; --warn-soft: #fbeedc;
-  --bad: #c62a2a; --bad-soft: #fbe4e4;
+  --ok: #15803d; --ok-soft: #ecfdf3;
+  --warn: #b45309; --warn-soft: #fff7ed;
+  --bad: #b91c1c; --bad-soft: #fef2f2;
   --font-sans: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
   --r: 10px;
-  --shadow: 0 1px 2px rgba(20, 27, 38, .06), 0 6px 20px rgba(20, 27, 38, .06);
+  --shadow: 0 1px 2px rgba(17, 24, 39, .05);
   color-scheme: light;
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0c121c; --surface: #141c29; --sunken: #0f1622; --line: #263244; --fg: #e6ebf2; --muted: #93a0b3;
-    --accent: #6f93ff; --accent-fg: #0a1020; --accent-soft: #1b2849;
-    --master: #ffbb2e; --master-ink: #1b1400;
-    --ok: #3fcf80; --ok-soft: #10301f; --warn: #f0a24a; --warn-soft: #33240f; --bad: #ff6b6b; --bad-soft: #3a1515;
-    --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px rgba(0, 0, 0, .25);
-    color-scheme: dark;
-  }
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; }
@@ -70,7 +61,7 @@ p { margin: 0; }
   transition: filter .15s, background .15s;
 }
 .btn:hover { filter: brightness(1.06); }
-a { color: var(--accent); }
+a { color: var(--link); }
 a.btn { text-decoration: none; }
 .btn:disabled { opacity: .5; cursor: default; }
 .btn.secondary { background: var(--surface); color: var(--fg); border-color: var(--line); }
@@ -87,7 +78,7 @@ a.btn { text-decoration: none; }
   border: 1px solid var(--line); background: var(--surface); font-size: 16px;
 }
 textarea.input { min-height: 84px; resize: vertical; }
-.input:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px var(--accent-soft); }
+.input:focus { border-color: var(--fg); outline: none; box-shadow: 0 0 0 3px #e5e7eb; }
 
 .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; }
 .stack { display: grid; gap: 16px; }
@@ -131,7 +122,7 @@ textarea.input { min-height: 84px; resize: vertical; }
 
 /* ---------- 상단 바 ---------- */
 .topbar {
-  position: sticky; top: 0; z-index: 20; background: color-mix(in srgb, var(--bg) 88%, transparent);
+  position: sticky; top: 0; z-index: 20; background: rgba(255,255,255,.94);
   backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--line);
   padding-top: env(safe-area-inset-top, 0px);
 }
@@ -162,24 +153,21 @@ textarea.input { min-height: 84px; resize: vertical; }
 .auth .seg button { flex: 1; }
 
 /* ---------- 학생: 출입증 ---------- */
-.pass {
-  position: relative; overflow: hidden; border-radius: 18px; color: #fff;
-  background: linear-gradient(160deg, #1d3c9e 0%, #14245e 100%); box-shadow: var(--shadow);
-}
-.pass-top { padding: 20px 20px 18px; display: grid; gap: 4px; }
-.pass-top .eyebrow { color: rgba(255,255,255,.7); }
+.pass { position: relative; overflow: hidden; border-radius: 16px; background: var(--surface); color: var(--fg); border: 1px solid var(--line-strong); }
+.pass::before { content: ""; position: absolute; inset: 0 0 auto; height: 4px; background: var(--ok); }
+.pass-top { padding: 22px 20px 18px; display: grid; gap: 4px; }
+.pass-top .eyebrow { color: var(--ok); }
 .pass-room { font-size: 24px; font-weight: 700; }
-.pass-time { font-family: var(--font-mono); font-size: 15px; color: rgba(255,255,255,.88); }
-.pass-perf { position: relative; height: 0; border-top: 2px dashed rgba(255,255,255,.28); margin: 0 14px; }
-.pass-perf::before, .pass-perf::after { content: ""; position: absolute; top: -12px; width: 22px; height: 22px; border-radius: 50%; background: var(--bg); }
+.pass-time { font-family: var(--font-mono); font-size: 15px; color: var(--muted); }
+.pass-perf { position: relative; height: 0; border-top: 1px dashed var(--line-strong); margin: 0 14px; }
+.pass-perf::before, .pass-perf::after { content: ""; position: absolute; top: -11px; width: 22px; height: 22px; border-radius: 50%; background: var(--bg); border: 1px solid var(--line-strong); }
 .pass-perf::before { left: -26px; } .pass-perf::after { right: -26px; }
 .pass-bottom { padding: 16px 20px 20px; display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
-.pass-who { font-size: 13px; color: rgba(255,255,255,.75); }
-.pass-who b { color: #fff; font-size: 15px; display: block; }
-.pass .btn { background: #fff; color: #14245e; }
-.pass.idle { background: var(--surface); color: var(--fg); border: 1px dashed var(--line); box-shadow: none; }
+.pass-who { font-size: 13px; color: var(--muted); }
+.pass-who b { color: var(--fg); font-size: 15px; display: block; }
+.pass.idle { border-style: dashed; }
+.pass.idle::before { background: var(--line-strong); }
 .pass.idle .pass-top .eyebrow { color: var(--muted); }
-.pass.idle .pass-time { color: var(--muted); }
 
 .list { display: grid; }
 .item { display: grid; gap: 4px; padding: 14px 16px; border-top: 1px solid var(--line); }
@@ -214,7 +202,7 @@ textarea.input { min-height: 84px; resize: vertical; }
   color: var(--muted); text-decoration: none;
 }
 .tabbar a svg { width: 22px; height: 22px; }
-.tabbar a[aria-current="page"] { color: var(--accent); }
+.tabbar a[aria-current="page"] { color: var(--fg); font-weight: 600; }
 
 /* ---------- QR 전체 화면 ---------- */
 .qr-sheet {
@@ -229,7 +217,7 @@ textarea.input { min-height: 84px; resize: vertical; }
 .qr-frame .ring { position: absolute; inset: -14px; width: calc(100% + 28px); height: calc(100% + 28px); pointer-events: none; }
 .qr-frame .ring rect { fill: none; stroke-width: 4; }
 .qr-frame .ring .track { stroke: #e3e7ee; }
-.qr-frame .ring .prog { stroke: #2148b8; stroke-linecap: round; transition: stroke-dashoffset 1s linear; }
+.qr-frame .ring .prog { stroke: #111827; stroke-linecap: round; transition: stroke-dashoffset 1s linear; }
 .qr-sheet.master { background: #fff; }
 .qr-sheet.master .ring .prog { stroke: #f0a500; }
 .qr-sheet .count { font-family: var(--font-mono); font-size: 13px; color: #4a5566; }
@@ -249,7 +237,7 @@ textarea.input { min-height: 84px; resize: vertical; }
 }
 .side a svg { width: 18px; height: 18px; flex: none; }
 .side a:hover { background: var(--sunken); color: var(--fg); }
-.side a[aria-current="page"] { background: var(--surface); color: var(--fg); box-shadow: var(--shadow); }
+.side a[aria-current="page"] { background: var(--sunken); color: var(--fg); font-weight: 600; }
 .side a .count { margin-left: auto; font-family: var(--font-mono); font-size: 12px; background: var(--warn-soft); color: var(--warn); padding: 0 7px; border-radius: 99px; }
 .side .sep { height: 1px; background: var(--line); margin: 10px 4px; }
 .main-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
@@ -314,7 +302,7 @@ dialog .row.end { justify-content: flex-end; }
 .rules { margin: 0; padding: 6px 0; list-style: none; counter-reset: rule; }
 .rules li { counter-increment: rule; display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 10px; padding: 12px 18px; border-top: 1px solid var(--line); }
 .rules li:first-child { border-top: 0; }
-.rules li::before { content: counter(rule); font-family: var(--font-mono); font-weight: 600; color: var(--accent); background: var(--accent-soft); width: 26px; height: 26px; border-radius: 7px; display: grid; place-items: center; font-size: 13px; }
+.rules li::before { content: counter(rule); font-family: var(--font-mono); font-weight: 600; color: var(--fg); background: var(--sunken); width: 26px; height: 26px; border-radius: 7px; display: grid; place-items: center; font-size: 13px; }
 .steps { display: grid; gap: 0; padding: 6px 0; }
 .steps div { display: grid; gap: 2px; padding: 12px 18px; border-top: 1px solid var(--line); }
 .steps div:first-child { border-top: 0; }
@@ -330,35 +318,16 @@ dialog .row.end { justify-content: flex-end; }
 .cautions li::marker { color: var(--warn); }
 
 /* 장비 배치도: 실습실 평면 위 프린터 타일 */
-.floor {
-  padding: 22px 18px 18px; display: grid; grid-template-columns: max-content max-content; justify-content: space-evenly; gap: 18px 48px; align-items: start;
-  background-color: var(--surface);
-  background-image: linear-gradient(var(--sunken) 1px, transparent 1px), linear-gradient(90deg, var(--sunken) 1px, transparent 1px);
-  background-size: 22px 22px; background-position: -1px -1px;
-}
-.fp-rows { display: grid; gap: 10px; min-width: 0; }
-.fp-row { display: grid; grid-template-columns: 38px minmax(0, 1fr); gap: 10px; align-items: center; }
-.fp-label { display: grid; justify-items: center; line-height: 1.1; }
-.fp-label b { font-family: var(--font-mono); font-size: 16px; }
-.fp-label small { font-size: 11px; color: var(--muted); font-family: var(--font-mono); }
-.fp-tiles { display: flex; gap: 8px; flex-wrap: wrap; }
-.pr {
-  width: 62px; display: grid; justify-items: center; gap: 2px; padding: 8px 4px 6px; border-radius: 10px;
-  border: 1px solid var(--line); background: var(--bg); color: var(--fg); font: 600 11px/1.2 var(--font-mono);
-}
-.pr svg { width: 32px; height: 32px; }
-.pr small { font: 500 10px/1.2 var(--font-sans); color: var(--ok); }
-.pr.down { color: var(--muted); background: repeating-linear-gradient(-45deg, var(--sunken) 0 6px, var(--bg) 6px 12px); border-style: dashed; }
-.pr.down small { color: var(--bad); }
-.pr.z18 { width: 104px; padding: 12px 6px 10px; border-color: var(--accent); background: var(--accent-soft); }
-.pr.z18 svg { width: 52px; height: 60px; }
-.pr.z18.down { border-color: var(--line); background: repeating-linear-gradient(-45deg, var(--sunken) 0 6px, var(--bg) 6px 12px); }
-button.pr { cursor: pointer; }
-button.pr:hover { border-color: var(--accent); }
-.fp-side { display: grid; gap: 8px; justify-items: center; }
-.fp-side .cap { font-size: 12px; color: var(--muted); }
-.fp-door { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--muted); }
-.fp-door::before, .fp-door::after { content: ""; flex: 1; border-top: 2px dashed var(--line); }
+.floor { padding: 14px 14px 12px; display: grid; gap: 10px; background: var(--surface); }
+.plan-scroll { overflow-x: auto; }
+.plan { display: block; width: 100%; max-width: 760px; height: auto; margin: 0 auto; }
+.pr-g { cursor: pointer; outline: none; }
+.pr-g:hover .body, .pr-g:focus-visible .body { stroke: #1d4ed8; stroke-width: 2.4; }
+.legend { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; font-size: 12px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend .dot { width: 9px; height: 9px; border-radius: 50%; }
+.legend .dot.ok { background: var(--ok); }
+.legend .dot.down { background: var(--bad); }
 .eq-summary { display: flex; gap: 8px; flex-wrap: wrap; }
 .eq-summary span { font-size: 13px; padding: 4px 10px; border-radius: 99px; background: var(--surface); border: 1px solid var(--line); }
 .eq-summary b { font-family: var(--font-mono); }
@@ -390,8 +359,6 @@ button.pr:hover { border-color: var(--accent); }
 
 @media (max-width: 760px) {
   .home-grid { grid-template-columns: minmax(0, 1fr); }
-  .floor { grid-template-columns: minmax(0, 1fr); justify-content: stretch; }
-  .fp-side { justify-items: start; grid-template-columns: auto 1fr; align-items: center; }
 }
 @media (max-width: 860px) {
   .admin { grid-template-columns: minmax(0, 1fr); gap: 16px; padding-block: 12px 60px; }
@@ -767,22 +734,54 @@ function printWindow() {
   const o = info.print_open_hour, c = info.print_close_hour;
   return { open: h >= o && h < c, o, c };
 }
-function floorPlan(printers, editable = false) {
-  const tile = (p) => {
-    const tag = editable ? 'button type="button"' : 'div';
-    const end = editable ? 'button' : 'div';
-    const lbl = `${p.id} ${PT[p.type]} ${p.down ? '점검 중' : '사용 가능'}`;
-    return `<${tag} class="pr ${p.type === 'z18' ? 'z18' : ''} ${p.down ? 'down' : ''}" data-pr="${p.id}" title="${lbl}" aria-label="${lbl}">
-      <svg aria-hidden="true"><use href="#${p.type === 'z18' ? 'p-z18' : 'p-rep'}"/></svg>${p.type === 'z18' ? 'Z18' : esc(p.id)}<small>${p.down ? '점검 중' : '사용 가능'}</small></${end}>`;
+// 2번실 평면도 (보내 주신 건물 배치도 기준, SVG). 테이블 2개 섬에 A~C / D~F 배열, 복도 쪽 선반에 Z18
+const TABLES = { A: [130, 140], B: [130, 236], C: [130, 332], D: [330, 140], E: [330, 236], F: [330, 332] };
+function floorSvg(printers, editable = false) {
+  const tile = (p, x, y, w, h) => {
+    const label = `${p.id} ${PT[p.type]} ${p.down ? '점검 중' : '사용 가능'}`;
+    const attrs = editable ? ` role="button" tabindex="0" class="pr-g"` : ` class="pr-s"`;
+    return `<g data-pr="${p.id}"${attrs} aria-label="${label}"><title>${label}</title>
+      <rect class="body" x="${x}" y="${y}" width="${w}" height="${h}" rx="5" fill="${p.down ? 'url(#hatch)' : '#ffffff'}" stroke="${p.down ? '#9ca3af' : '#111827'}" stroke-width="1.4"/>
+      <rect x="${x + 6}" y="${y + 6}" width="${w - 12}" height="${h * .42}" rx="2" fill="none" stroke="${p.down ? '#c4c8ce' : '#9ca3af'}" stroke-width="1"/>
+      <text x="${x + w / 2}" y="${y + h - 7}" text-anchor="middle" font-size="14" font-weight="700" fill="${p.down ? '#9ca3af' : '#111827'}">${p.type === 'z18' ? 'Z18' : p.id}</text>
+      <circle cx="${x + w - 6}" cy="${y + 6}" r="3.6" fill="${p.down ? '#b91c1c' : '#15803d'}" stroke="#fff" stroke-width="1.2"/></g>`;
   };
-  const rows = [...new Set(printers.filter((p) => p.type !== 'z18').map((p) => p.row))];
-  const z = printers.filter((p) => p.type === 'z18');
-  return `<div class="fp-rows">${rows.map((r) => {
-      const ps = printers.filter((p) => p.row === r);
-      return `<div class="fp-row"><div class="fp-label"><b>${r}</b><small>${ps.length}대</small></div><div class="fp-tiles">${ps.map(tile).join('')}</div></div>`;
-    }).join('')}</div>
-    <div class="fp-side">${z.map(tile).join('')}<span class="cap">대형 출력용</span></div>
-    <div class="fp-door">출입문</div>`;
+  const W = 50, H = 38;
+  const pos = [[8, 8], [62, 8], [8, 48], [62, 48]];
+  let body = '';
+  for (const [row, [tx, ty]] of Object.entries(TABLES)) {
+    const ps = printers.filter((p) => p.row === row);
+    body += `<rect x="${tx}" y="${ty}" width="120" height="${ps.length > 2 ? 94 : 54}" rx="3" fill="#f9fafb" stroke="#d1d5db"/>
+      <text x="${tx - 12}" y="${ty + 30}" text-anchor="end" font-size="17" font-weight="700" fill="#111827">${row}</text>
+      <text x="${tx - 12}" y="${ty + 46}" text-anchor="end" font-size="12" fill="#6b7280">${ps.length}대</text>`;
+    ps.forEach((p, i) => { body += tile(p, tx + pos[i][0], ty + pos[i][1], W, H); });
+  }
+  const z = printers.find((p) => p.type === 'z18');
+  return `<svg class="plan" viewBox="0 0 560 520" role="img" aria-label="2번실 3D 프린터 배치도" font-family="IBM Plex Sans KR, Apple SD Gothic Neo, Malgun Gothic, sans-serif">
+    <defs><pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#f3f4f6"/><line x1="0" y1="0" x2="0" y2="6" stroke="#d1d5db" stroke-width="2"/></pattern></defs>
+    <rect x="0" y="0" width="560" height="40" fill="#f5f6f8"/>
+    <text x="280" y="25" text-anchor="middle" font-size="13" letter-spacing="4" fill="#6b7280">복도</text>
+    <path d="M24 48 H36 M100 48 H536 V500 H24 V48" fill="none" stroke="#374151" stroke-width="6" stroke-linejoin="miter"/>
+    <path d="M36 48 A64 64 0 0 0 100 112" fill="none" stroke="#9ca3af" stroke-width="1" stroke-dasharray="3 3"/>
+    <line x1="100" y1="48" x2="100" y2="112" stroke="#9ca3af" stroke-width="1.4"/>
+    <text x="68" y="132" text-anchor="middle" font-size="12" fill="#374151">출입문</text>
+    <text x="68" y="146" text-anchor="middle" font-size="11" fill="#9ca3af">QR 단말</text>
+    <rect x="112" y="54" width="300" height="56" fill="#f3f4f6" stroke="#d1d5db"/>
+    <text x="404" y="102" text-anchor="end" font-size="12" fill="#6b7280">복도 쪽 선반</text>
+    ${z ? tile(z, 122, 60, 76, 44) : ''}
+    <rect x="474" y="54" width="56" height="50" fill="url(#hatch)" stroke="#d1d5db"/>
+    <text x="502" y="83" text-anchor="middle" font-size="11" fill="#6b7280">기둥</text>
+    ${body}
+    <rect x="506" y="320" width="24" height="80" fill="#f3f4f6" stroke="#d1d5db"/>
+    <text x="500" y="364" text-anchor="end" font-size="11" fill="#6b7280">수납장</text>
+    <rect x="60" y="456" width="290" height="30" fill="#f3f4f6" stroke="#d1d5db"/>
+    <text x="205" y="476" text-anchor="middle" font-size="12" fill="#6b7280">작업대</text>
+    <text x="524" y="488" text-anchor="end" font-size="13" font-weight="700" fill="#111827">2번실 · 3D 프린터 실습실</text>
+  </svg>`;
+}
+function floorPlan(printers, editable = false) {
+  return `<div class="plan-scroll">${floorSvg(printers, editable)}</div>
+    <div class="legend"><span><i class="dot ok"></i>사용 가능</span><span><i class="dot down"></i>점검 중</span>${editable ? '<span class="muted">장비를 누르면 상태가 바뀝니다</span>' : ''}</div>`;
 }
 function renderHome() {
   if (!info) return;
@@ -846,7 +845,7 @@ async function loadMine() {
     pc.innerHTML = `<article class="pass idle">
       <div class="pass-top"><span class="eyebrow">출입증</span><div class="pass-room">승인된 이용이 없습니다</div><div class="pass-time">이용을 신청하고 승인을 받으면 여기에 출입 QR이 나타납니다.</div></div>
       <div class="pass-perf"></div>
-      <div class="pass-bottom"><a class="btn" href="#new" style="background:var(--accent);color:var(--accent-fg)">이용 신청하기</a></div></article>`;
+      <div class="pass-bottom"><a class="btn" href="#new">이용 신청하기</a></div></article>`;
   }
   const upcoming = asc.filter((r) => ['pending', 'approved'].includes(r.status) && r.end_at > now && r !== live);
   $('#upcomingList').innerHTML = upcoming.length ? upcoming.map((r) => resItem(r, now)).join('') : '<div class="empty">예정된 이용이 없습니다.</div>';
@@ -1157,6 +1156,7 @@ A.equipment = async () => {
   const ps = info.printers.map((p) => ({ ...p, down: down.has(p.id) }));
   $('#adminMain').innerHTML = head('장비 상태', '장비를 누르면 사용 가능 ↔ 점검 중이 바뀝니다. 첫 화면 배치도와 신청 화면에 바로 반영됩니다.') +
     `<div class="panel floor">${floorPlan(ps, true)}</div>`;
+  $$('[data-pr]').forEach((b) => b.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); b.onclick(); } });
   $$('[data-pr]').forEach((b) => b.onclick = async () => {
     const id = b.dataset.pr; if (down.has(id)) down.delete(id); else down.add(id);
     try {

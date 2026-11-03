@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 520" role="img" aria-label="2번실 3D 프린터 배치도" font-family="IBM Plex Sans KR, Apple SD Gothic Neo, Malgun Gothic, sans-serif">
+    <defs><pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#f3f4f6"/><line x1="0" y1="0" x2="0" y2="6" stroke="#d1d5db" stroke-width="2"/></pattern></defs>
+    <rect x="0" y="0" width="560" height="40" fill="#f5f6f8"/>
+    <text x="280" y="25" text-anchor="middle" font-size="13" letter-spacing="4" fill="#6b7280">복도</text>
+    <path d="M24 48 H36 M100 48 H536 V500 H24 V48" fill="none" stroke="#374151" stroke-width="6" stroke-linejoin="miter"/>
+    <path d="M36 48 A64 64 0 0 0 100 112" fill="none" stroke="#9ca3af" stroke-width="1" stroke-dasharray="3 3"/>
+    <line x1="100" y1="48" x2="100" y2="112" stroke="#9ca3af" stroke-width="1.4"/>
+    <text x="68" y="132" text-anchor="middle" font-size="12" fill="#374151">출입문</text>
+    <text x="68" y="146" text-anchor="middle" font-size="11" fill="#9ca3af">QR 단말</text>
+    <rect x="112" y="54" width="300" height="56" fill="#f3f4f6" stroke="#d1d5db"/>
+    <text x="404" y="102" text-anchor="end" font-size="12" fill="#6b7280">복도 쪽 선반</text>
+    <g data-pr="Z1" aria-label="Z1 Z18 사용 가능"><title>Z1 Z18 사용 가능</title>
+      <rect class="body" x="122" y="60" width="76" height="44" rx="5" fill="#ffffff" stroke="#111827" stroke-width="1.4"/>
+      <rect x="128" y="66" width="64" height="18.48" rx="2" fill="none" stroke="#9ca3af" stroke-width="1"/>
+      <text x="160" y="97" text-anchor="middle" font-size="14" font-weight="700" fill="#111827">Z18</text>
+      <circle cx="192" cy="66" r="3.6" fill="#15803d" stroke="#fff" stroke-width="1.2"/></g>
+    <rect x="474" y="54" width="56" height="50" fill="url(#hatch)" stroke="#d1d5db"/>
+    <text x="502" y="83" text-anchor="middle" font-size="11" fill="#6b7280">기둥</text>
+    <rect x="130" y="140" width="120" height="94" rx="3" fill="#f9fafb" stroke="#d1d5db"/>
+      <text x="118" y="170" text-anchor="end" font-size="17" font-weight="700" fill="#111827">A</text>
+      <text x="118" y="186" text-anchor="end" font-size="12" fill="#6b7280">4대</text><g data-pr="A1" aria-label="A1 Replicator+ 사용 가능"><title>A1 Replicator+ 사용 가능</title>
+      <rect class="body" x="138" y="148" width="50" height="38" rx="5" fill="#ffffff" stroke="#111827" stroke-width="1.4"/>
+      <rect x="144" y="154" width="38" height="15.959999999999999" rx="2" fill="none" stroke="#9ca3af" stroke-width="1"/>
+      <text x="163" y="179" text-anchor="middle" font-size="14" font-weight="700" fill="#111827">A1</text>
+      <circle cx="182" cy="154" r="3.6" fill="#15803d" stroke="#fff" stroke-width="1.2"/></g><g data-pr="A2" aria-label="A2 Replicator+ 사용 가능"><title>A2 Replicator+ 사용 가능</title>
+      <rect class="body" x="192" y="148" width="50" height="38" rx="5" fill="#ffffff" stroke="#111827" stroke-width="1.4"/>
+      <rect x="198" y="154" width="38" height="15.959999999999999" rx="2" fill="none" stroke="#9ca3af" stroke-width="1"/>
+      <text x="217" y="179" text-anchor="middle" font-size="14" font-weight="700" fill="#111827">A2</text>
+      <circle cx="236" cy="154" r="3.6" fill="#15803d" stroke="#fff" stroke-width="1.2"/></g><g data-pr="A3" aria-label="A3 Replicator+ 사용 가능"><title>A3 Replicator+ 사용 가능</title>
+      <rect class="body" x="138" y="188" width="50" height="38" rx="5" fill="#ffffff" stroke="#111827" stroke-width="1.4"/>
+      <rect x="144" y="194" width="38" height="15.959999999999999" rx="2" fill="none" stroke="#9ca3af" stroke-width="1"/>
+      <text x="163" y="219" text-anchor="middle" font-size="14" font-weight="700" fill="#111827">A3</text>
+      <circle cx="182" cy="194" r="3.6" fill="#15803d" stroke="#fff" stroke-width="1.2"/></g><g data-pr="A4" aria-label="A4 Replicator+ 사용 가능"><title>A4 Replicator+ 사용 가능</title>
+      <rect class="body" x="192" y="188" width="50" height="38" rx="5" fill="#ffffff" stroke="#111827" stroke-width="1.4"/>
+      <rect x="198" y="194" width="38" height="15.959999999999999" rx="2" fill="none" stroke="#9ca3af" stroke-width="1"/>
+      <text x="217" y="219" text-anchor="middle" font-size="14" font-weight="700" fill="#111827">A4</text>
+      <circle cx="236" cy="194" r="3.6" fill="#15803d" stroke="#fff" stroke-width="1.2"/></g><rect x="130" y="236" width="120" height="94" rx="3" fill="#f9fafb" stroke="#d1d5db"/>
+      <text x="118" y="266" text-anchor="end" font-size="17" font-weight="700" fill="#111827">B</text>
+      <text x="118" y="282" text-anchor="end" font-size="12" fill="#6b7280">4대</text><g data-pr="B1" aria-label="B1 Replicator+ 사용 가능"><title>B1 Replicator+ 사용 가능</title>
+      <rect class="body" x="138" y="244" width="50" height="38" rx="5" fill="#ffffff" stroke="#111827" stroke-width="1.4"/>
+      <rect x="144" y="250" width="38" height="15.959999999999999" rx="2" fill="none" stroke="#9ca3af" stroke-width="1"/>
+      <text x="163" y="275" text-anchor="middle" font-size="14" font-weight="700" fill="#111827">B1</text>
+      <circle cx="182" cy="250" r="3.6" fill="#15803d" stroke="#fff" stroke-width="1.2"/></g><g data-pr="B2" aria-label="B2 Replicator+ 사용 가능"><title>B2 Replicator+ 사용 가능</title>
+      <rect class="body" x="192" y="244" width="50" height="38" rx="5" fill="#ffffff" stroke="#111827" stroke-width="1.4"/>
+      <rect x="198" y="250" width="38" height="15.959999999999999" rx="2" fill="none" stroke="#9ca3af" stroke-width="1"/>
+      <text x="217" y="275" text-anchor="middle" font-size="14" font-weight="700" fill="#111827">B2</text>
+      <circle cx="236" cy="250" r="3.6" fill="#15803d" stroke="#fff" stroke-width="1.2"/></g><g data-pr="B3" aria-label="B3 Replicator+ 사용 가능"><title>B3 Replicator+ 사용 가능</title>
+      <rect class="body" x="138" y="284" width="50" height="38" rx="5" fill="#ffffff" stroke="#111827" stroke-width="1.4"/>
+      <rect x="144" y="290" width="38" height="15.959999999999999" rx="2" fill="none" stroke="#9ca3af" stroke-width="1"/>
+      <text x="163" y="315" text-anchor="middle" font-size="14" font-weight="700" fill="#111827">B3</text>
+      <circle cx="182" cy="290" r="3.6" fill="#15803d" stroke="#fff" stroke-width="1.2"/></g><g data-pr="B4" aria-label="B4 Replicator+ 사용 가능"><title>B4 Replicator+ 사용 가능</title>
+      <rect class="body" x="192" y="284" width="50" height="38" rx="5" fill="#ffffff" stroke="#111827" stroke-width="1.4"/>
+      <rect x="198" y="290" width="38" height="15.959999999999999" rx="2" fill="none" stroke="#9ca3af" stroke-width="1"/>
+      <text x="217" y="315" text-anchor="middle" font-size="14" font-weight="700" fill="#111827">B4</text>
+      <circle cx="236" cy="290" r="3.6" fill="#15803d" stroke="#fff" stroke-width="1.2"/></g><rect x="130" y="332" width="120" height="94" rx="3" fill="#f9fafb" stroke="#d1d5db"/>
+      <text x="118" y="362" text-anchor="end" font-size="17" font-weight="700" fill="#111827">C</text>
+      <text x="118" y="378" text-anchor="end" font-size="12" fill="#6b7280">4대</text><g data-pr="C1" aria-label="C1 Replicator+ 사용 가능"><title>C1 Replicator+ 사용 가능</title>
+      <rect class="body" x="138" y="340" width="50" height="38" rx="5" fill="#ffffff" stroke="#111827" stroke-width="1.4"/>
+      <rect x="144" y="346" width="38" height="15.959999999999999" rx="2" fill="none" stroke="#9ca3af" stroke-width="1"/>
+      <text x="163" y="371" text-anchor="middle" font-size="14" font-weight="700" fill="#111827">C1</text>
+      <circle cx="182" cy="346" r="3.6" fill="#15803d" stroke="#fff" stroke-width="1.2"/></g><g data-pr="C2" aria-label="C2 Replicator+ 사용 가능"><title>C2 Replicator+ 사용 가능</title>
+      <rect class="body" x="192" y="340" width="50" height="38" rx="5" fill="#ffffff" stroke="#111827" stroke-width="1.4"/>
+      <rect x="198" y="346" width="38" height="15.959999999999999" rx="2" fill="none" stroke="#9ca3af" stroke-width="1"/>
+      <text x="217" y="371" text-anchor="middle" font-size="14" font-weight="700" fill="#111827">C2</text>
+      <circle cx="236" cy="346" r="3.6" fill="#15803d" stroke="#fff" stroke-width="1.2"/></g><g data-pr="C3" aria-label="C3 Replicator+ 사용 가능"><title>C3 Replicator+ 사용 가능</title>
+      <rect class="body" x="138" y="380" width="50" height="38" rx="5" fill="#ffffff" stroke="#111827" stroke-width="1.4"/>
+      <rect x="144" y="386" width="38" height="15.959999999999999" rx="2" fill="none" stroke="#9ca3af" stroke-width="1"/>
+      <text x="163" y="411" text-anchor="middle" font-size="14" font-weight="700" fill="#111827">C3</text>
+      <circle cx="182" cy="386" r="3.6" fill="#15803d" stroke="#fff" stroke-width="1.2"/></g><g data-pr="C4" aria-label="C4 Replicator+ 사용 가능"><title>C4 Replicator+ 사용 가능</title>
+      <rect class="body" x="192" y="380" width="50" height="38" rx="5" fill="#ffffff" stroke="#111827" stroke-width="1.4"/>
+      <rect x="198" y="386" width="38" height="15.959999999999999" rx="2" fill="none" stroke="#9ca3af" stroke-width="1"/>
+      <text x="217" y="411" text-anchor="middle" font-size="14" font-weight="700" fill="#111827">C4</text>
+      <circle cx="236" cy="386" r="3.6" fill="#15803d" stroke="#fff" stroke-width="1.2"/></g><rect x="330" y="140" width="120" height="94" rx="3" fill="#f9fafb" stroke="#d1d5db"/>
+      <text x="318" y="170" text-anchor="end" font-size="17" font-weight="700" fill="#111827">D</text>
+      <text x="318" y="186" text-anchor="end" font-size="12" fill="#6b7280">3대</text><g data-pr="D1" aria-label="D1 Replicator+ 사용 가능"><title>D1 Replicator+ 사용 가능</title>
+      <rect class="body" x="338" y="148" width="50" height="38" rx="5" fill="#ffffff" stroke="#111827" stroke-width="1.4"/>
+      <rect x="344" y="154" width="38" height="15.959999999999999" rx="2" fill="none" stroke="#9ca3af" stroke-width="1"/>
+      <text x="363" y="179" text-anchor="middle" font-size="14" font-weight="700" fill="#111827">D1</text>
+      <circle cx="382" cy="154" r="3.6" fill="#15803d" stroke="#fff" stroke-width="1.2"/></g><g data-pr="D2" aria-label="D2 Replicator+ 사용 가능"><title>D2 Replicator+ 사용 가능</title>
+      <rect class="body" x="392" y="148" width="50" height="38" rx="5" fill="#ffffff" stroke="#111827" stroke-width="1.4"/>
+      <rect x="398" y="154" width="38" height="15.959999999999999" rx="2" fill="none" stroke="#9ca3af" stroke-width="1"/>
+      <text x="417" y="179" text-anchor="middle" font-size="14" font-weight="700" fill="#111827">D2</text>
+      <circle cx="436" cy="154" r="3.6" fill="#15803d" stroke="#fff" stroke-width="1.2"/></g><g data-pr="D3" aria-label="D3 Replicator+ 사용 가능"><title>D3 Replicator+ 사용 가능</title>
+      <rect class="body" x="338" y="188" width="50" height="38" rx="5" fill="#ffffff" stroke="#111827" stroke-width="1.4"/>
+      <rect x="344" y="194" width="38" height="15.959999999999999" rx="2" fill="none" stroke="#9ca3af" stroke-width="1"/>
+      <text x="363" y="219" text-anchor="middle" font-size="14" font-weight="700" fill="#111827">D3</text>
+      <circle cx="382" cy="194" r="3.6" fill="#15803d" stroke="#fff" stroke-width="1.2"/></g><rect x="330" y="236" width="120" height="94" rx="3" fill="#f9fafb" stroke="#d1d5db"/>
+      <text x="318" y="266" text-anchor="end" font-size="17" font-weight="700" fill="#111827">E</text>
+      <text x="318" y="282" text-anchor="end" font-size="12" fill="#6b7280">3대</text><g data-pr="E1" aria-label="E1 Replicator+ 사용 가능"><title>E1 Replicator+ 사용 가능</title>
+      <rect class="body" x="338" y="244" width="50" height="38" rx="5" fill="#ffffff" stroke="#111827" stroke-width="1.4"/>
+      <rect x="344" y="250" width="38" height="15.959999999999999" rx="2" fill="none" stroke="#9ca3af" stroke-width="1"/>
+      <text x="363" y="275" text-anchor="middle" font-size="14" font-weight="700" fill="#111827">E1</text>
+      <circle cx="382" cy="250" r="3.6" fill="#15803d" stroke="#fff" stroke-width="1.2"/></g><g data-pr="E2" aria-label="E2 Replicator+ 사용 가능"><title>E2 Replicator+ 사용 가능</title>
+      <rect class="body" x="392" y="244" width="50" height="38" rx="5" fill="#ffffff" stroke="#111827" stroke-width="1.4"/>
+      <rect x="398" y="250" width="38" height="15.959999999999999" rx="2" fill="none" stroke="#9ca3af" stroke-width="1"/>
+      <text x="417" y="275" text-anchor="middle" font-size="14" font-weight="700" fill="#111827">E2</text>
+      <circle cx="436" cy="250" r="3.6" fill="#15803d" stroke="#fff" stroke-width="1.2"/></g><g data-pr="E3" aria-label="E3 Replicator+ 사용 가능"><title>E3 Replicator+ 사용 가능</title>
+      <rect class="body" x="338" y="284" width="50" height="38" rx="5" fill="#ffffff" stroke="#111827" stroke-width="1.4"/>
+      <rect x="344" y="290" width="38" height="15.959999999999999" rx="2" fill="none" stroke="#9ca3af" stroke-width="1"/>
+      <text x="363" y="315" text-anchor="middle" font-size="14" font-weight="700" fill="#111827">E3</text>
+      <circle cx="382" cy="290" r="3.6" fill="#15803d" stroke="#fff" stroke-width="1.2"/></g><rect x="330" y="332" width="120" height="54" rx="3" fill="#f9fafb" stroke="#d1d5db"/>
+      <text x="318" y="362" text-anchor="end" font-size="17" font-weight="700" fill="#111827">F</text>
+      <text x="318" y="378" text-anchor="end" font-size="12" fill="#6b7280">2대</text><g data-pr="F1" aria-label="F1 Replicator+ 사용 가능"><title>F1 Replicator+ 사용 가능</title>
+      <rect class="body" x="338" y="340" width="50" height="38" rx="5" fill="#ffffff" stroke="#111827" stroke-width="1.4"/>
+      <rect x="344" y="346" width="38" height="15.959999999999999" rx="2" fill="none" stroke="#9ca3af" stroke-width="1"/>
+      <text x="363" y="371" text-anchor="middle" font-size="14" font-weight="700" fill="#111827">F1</text>
+      <circle cx="382" cy="346" r="3.6" fill="#15803d" stroke="#fff" stroke-width="1.2"/></g><g data-pr="F2" aria-label="F2 Replicator+ 사용 가능"><title>F2 Replicator+ 사용 가능</title>
+      <rect class="body" x="392" y="340" width="50" height="38" rx="5" fill="#ffffff" stroke="#111827" stroke-width="1.4"/>
+      <rect x="398" y="346" width="38" height="15.959999999999999" rx="2" fill="none" stroke="#9ca3af" stroke-width="1"/>
+      <text x="417" y="371" text-anchor="middle" font-size="14" font-weight="700" fill="#111827">F2</text>
+      <circle cx="436" cy="346" r="3.6" fill="#15803d" stroke="#fff" stroke-width="1.2"/></g>
+    <rect x="506" y="320" width="24" height="80" fill="#f3f4f6" stroke="#d1d5db"/>
+    <text x="500" y="364" text-anchor="end" font-size="11" fill="#6b7280">수납장</text>
+    <rect x="60" y="456" width="290" height="30" fill="#f3f4f6" stroke="#d1d5db"/>
+    <text x="205" y="476" text-anchor="middle" font-size="12" fill="#6b7280">작업대</text>
+    <text x="524" y="488" text-anchor="end" font-size="13" font-weight="700" fill="#111827">2번실 · 3D 프린터 실습실</text>
+  </svg>

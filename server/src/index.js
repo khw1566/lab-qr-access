@@ -2,8 +2,14 @@
 // 정적 화면(public/)은 Workers Static Assets가 서빙하고, /api/* 만 이 코드가 처리한다.
 import { hashPassword, hmac, randomHex, safeEqual, sha256Hex } from './crypto.js';
 
-const QR_STEP_MS = 30_000; // QR이 바뀌는 주기 (30초)
-const QR_ACCEPT_PAST_STEPS = 2; // 화면 갱신 지연·시계 오차 허용 (최대 약 90초 전 토큰까지)
+// QR 토큰의 숫자 칸(t)은 발급 시각을 10초 단위로 센 값. 발급 후 5분간 유효하고, 한 번 쓰면 끝.
+// 화면은 5초마다 같은 t로 다시 물어보고, 쓰였거나 만료가 가까우면 새 t로 바꾼다.
+const QR_TICK_MS = 10_000;
+const QR_VALID_MS = 5 * 60_000; // QR 유효 시간 (5분)
+const QR_GRACE_MS = 30_000; // 시계 오차·스캔 지연 허용
+const QR_POLL_MS = 5_000; // 화면이 상태를 다시 묻는 주기
+const DUPLICATE_SCAN_MS = 15_000; // 통과 직후 같은 QR 재인식은 거부 대신 '중복 인식'으로 조용히 무시
+const STATIC_MASTER_DEDUP_MS = 10_000; // 인쇄용 마스터 QR: 같은 장면이 연달아 읽히는 것 무시
 const SESSION_DAYS = 14;
 const KST_OFFSET_MS = 9 * 3600_000;
 
@@ -216,7 +222,7 @@ async function makeQrToken(env, resId, step) {
 }
 
 // 마스터 QR: LA1.M<마스터ID>.<스텝>.<서명16자>  (펌웨어는 "LA1."로 시작하는 문자열을 그대로 서버로 보내므로 수정 불필요)
-//   dynamic 은 30초 스텝, static(인쇄용) 은 스텝 0. 서명에 nonce를 섞어 재발급 시 예전 QR을 무효화한다.
+//   dynamic 은 10초 단위 발급 시각(5분 유효·일회용), static(인쇄용) 은 스텝 0. 서명에 nonce를 섞어 재발급 시 예전 QR을 무효화한다.
 async function makeMasterToken(env, mk, step) {
   const payload = `LA1.M${mk.id}.${step}`;
   return `${payload}.${await hmac(env.QR_SECRET, `${payload}.${mk.nonce}`, 12)}`;
@@ -431,7 +437,7 @@ async function route(req, env, url) {
     return json({ ok: true });
   }
 
-  // --- 학생: 인증 QR 발급 (30초마다 바뀌는 동적 QR, 한 번만 통과) ---
+  // --- 학생: 인증 QR 발급 (5분 유효, 한 번만 통과, 쓰이면 화면이 새 QR로 바뀜) ---
   if ((m = path.match(/^\/api\/reservations\/(\d+)\/qr$/)) && method === 'GET') {
     const s = await getSettings(env);
     if (s.lockdown) throw new HttpError(423, '실습실이 임시로 잠겨 있습니다. 관리자에게 문의하세요.');
@@ -448,13 +454,8 @@ async function route(req, env, url) {
     if (now < r.start_at - r.early_minutes * 60000)
       throw new HttpError(403, `입장 ${r.early_minutes}분 전부터 QR이 열립니다.`);
     if (now > r.end_at) throw new HttpError(403, '이용 시간이 끝났습니다.');
-    const step = Math.floor(now / QR_STEP_MS);
-    return json({
-      token: await makeQrToken(env, r.id, step),
-      refresh_in_ms: (step + 1) * QR_STEP_MS - now,
-      step_ms: QR_STEP_MS,
-      end_at: r.end_at,
-    });
+    const q = await issueQr(env, r.id, url.searchParams.get('keep'), (t) => makeQrToken(env, r.id, t));
+    return json({ ...q, expires_at: Math.min(q.expires_at, r.end_at), end_at: r.end_at });
   }
 
   // ===== 관리자 =====
@@ -693,18 +694,43 @@ async function adminRoute(req, env, path, method, admin, url) {
     if (mk.revoked) throw new HttpError(403, '폐기된 마스터 QR입니다.');
     if (mk.expires_at < now) throw new HttpError(403, '기간이 끝난 마스터 QR입니다.');
     if (mk.mode === 'static') return json({ token: await makeMasterToken(env, mk, 0), mode: 'static', expires_at: mk.expires_at });
-    const step = Math.floor(now / QR_STEP_MS);
-    return json({
-      token: await makeMasterToken(env, mk, step),
-      mode: 'dynamic',
-      refresh_in_ms: (step + 1) * QR_STEP_MS - now,
-      step_ms: QR_STEP_MS,
-      expires_at: mk.expires_at,
-    });
+    const q = await issueQr(env, -mk.id, url.searchParams.get('keep'), (t) => makeMasterToken(env, mk, t));
+    return json({ ...q, mode: 'dynamic', expires_at: Math.min(q.expires_at, mk.expires_at) });
   }
 
   throw new HttpError(404, '없는 경로입니다.');
 }
+
+
+// QR 발급 공통: keep(t)이 아직 쓸 만하고 쓰이지 않았으면 같은 t를 다시 서명, 아니면 새 t.
+//   useKey: token_uses.reservation_id 값 (학생 = 예약 id, 마스터 = -마스터 id)
+async function issueQr(env, useKey, keepRaw, sign) {
+  const now = Date.now();
+  const cur = Math.floor(now / QR_TICK_MS);
+  const isUsed = async (t) =>
+    !!(await env.DB.prepare('SELECT 1 FROM token_uses WHERE reservation_id = ? AND step = ?').bind(useKey, t).first());
+  let t = null;
+  let usedPrev = false;
+  const keep = /^\d+$/.test(keepRaw || '') ? Number(keepRaw) : null;
+  if (keep !== null && keep <= cur + 1 && keep * QR_TICK_MS + QR_VALID_MS - now > 20_000) {
+    if (await isUsed(keep)) usedPrev = true;
+    else t = keep;
+  }
+  // 새 t: 지금 칸부터, 이미 쓴 칸(같은 10초 안에 쓰고 새로 받는 경우)은 건너뜀. 검증은 cur+1까지 허용.
+  for (let c = Math.max(cur, usedPrev ? keep + 1 : cur); t === null && c <= cur + 1; c++) if (!(await isUsed(c))) t = c;
+  if (t === null) throw new HttpError(429, '잠시 후 다시 시도해 주세요.');
+  const expires_at = t * QR_TICK_MS + QR_VALID_MS;
+  return {
+    token: await sign(t),
+    t,
+    used_prev: usedPrev,
+    expires_at,
+    valid_ms: QR_VALID_MS,
+    poll_ms: QR_POLL_MS,
+    server_time: now,
+  };
+}
+const qrTimeOk = (t, now) => t * QR_TICK_MS <= now + QR_TICK_MS && now - t * QR_TICK_MS <= QR_VALID_MS + QR_GRACE_MS;
 
 // ---------- 보드 인증 + QR 검증 ----------
 async function deviceAuth(req, env) {
@@ -731,14 +757,23 @@ async function deviceVerify(req, env) {
       .bind(dev.id, resId, userId, masterId, result, reason, now)
       .run();
   const deny = async (reason, ids) => {
-    await log('denied', reason, ids);
+    // duplicate_scan: 방금 통과한 QR 화면이 카메라에 남아 다시 읽힌 것 → 기록하지 않음 (보드는 조용히 무시)
+    if (reason !== 'duplicate_scan') await log('denied', reason, ids);
     return json({ ok: false, reason });
+  };
+  // 일회용 QR 사용 처리. 이미 쓴 QR이면 방금(15초 안) 쓴 것은 duplicate_scan, 아니면 token_reused.
+  const consume = async (useKey, step) => {
+    const use = await env.DB.prepare('INSERT OR IGNORE INTO token_uses (reservation_id, step, used_at) VALUES (?, ?, ?)')
+      .bind(useKey, step, now)
+      .run();
+    if (use.meta.changes) return null;
+    const prev = await env.DB.prepare('SELECT used_at FROM token_uses WHERE reservation_id = ? AND step = ?').bind(useKey, step).first();
+    return prev && now - prev.used_at < DUPLICATE_SCAN_MS ? 'duplicate_scan' : 'token_reused';
   };
 
   const p = parseQrParts(token);
   if (!p) return deny('invalid_token');
   const room = await env.DB.prepare('SELECT enabled FROM rooms WHERE id = ?').bind(dev.room_id).first();
-  const cur = Math.floor(now / QR_STEP_MS);
 
   // --- 마스터 QR ---
   if (p.master) {
@@ -750,8 +785,14 @@ async function deviceVerify(req, env) {
     if (mk.revoked) return deny('master_revoked', ids);
     if (mk.expires_at < now) return deny('master_expired', ids);
     if (mk.room_id && mk.room_id !== dev.room_id) return deny('wrong_room', ids);
-    if (mk.mode === 'static' ? p.step !== 0 : p.step > cur + 1 || p.step < cur - QR_ACCEPT_PAST_STEPS)
-      return deny('expired_token', ids);
+    if (mk.mode === 'static' ? p.step !== 0 : !qrTimeOk(p.step, now)) return deny('expired_token', ids);
+    if (mk.mode === 'static') {
+      // 인쇄용은 매번 같은 QR이라 일회용으로 막을 수 없음 → 직전 통과 직후 같은 장면 재인식만 무시
+      if (mk.last_used_at && now - mk.last_used_at < STATIC_MASTER_DEDUP_MS) return deny('duplicate_scan', ids);
+    } else {
+      const bad = await consume(-mk.id, p.step);
+      if (bad) return deny(bad, ids);
+    }
     await env.DB.prepare('UPDATE master_keys SET last_used_at = ?, use_count = use_count + 1 WHERE id = ?')
       .bind(now, mk.id)
       .run();
@@ -763,7 +804,7 @@ async function deviceVerify(req, env) {
   if (!(await verifyReservationSig(env, p))) return deny('invalid_token');
   if (s.lockdown) return deny('lockdown', { resId: p.id });
   if (room && !room.enabled) return deny('room_closed', { resId: p.id });
-  if (p.step > cur + 1 || p.step < cur - QR_ACCEPT_PAST_STEPS) return deny('expired_token', { resId: p.id });
+  if (!qrTimeOk(p.step, now)) return deny('expired_token', { resId: p.id });
 
   const r = await env.DB.prepare(
     `SELECT r.*, u.name, u.status AS user_status, rm.early_minutes FROM reservations r
@@ -779,10 +820,8 @@ async function deviceVerify(req, env) {
   if (now < r.start_at - r.early_minutes * 60000 || now > r.end_at) return deny('out_of_time', ids);
 
   // 같은 QR(같은 스텝) 재사용 차단 — 캡처 화면 공유 방지
-  const use = await env.DB.prepare('INSERT OR IGNORE INTO token_uses (reservation_id, step, used_at) VALUES (?, ?, ?)')
-    .bind(r.id, p.step, now)
-    .run();
-  if (!use.meta.changes) return deny('token_reused', ids);
+  const bad = await consume(r.id, p.step);
+  if (bad) return deny(bad, ids);
 
   await log('granted', null, ids);
   return json({ ok: true, name: r.name, open_ms: s.door_open_ms, end_at: r.end_at });

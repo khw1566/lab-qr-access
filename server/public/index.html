@@ -242,7 +242,7 @@ textarea.input { min-height: 84px; resize: vertical; }
 .qr-sheet.master { background: #fff; }
 .qr-sheet.master .ring .prog { stroke: #f0a500; }
 .qr-sheet .count { font-family: var(--font-mono); font-size: 13px; color: #4a5566; }
-.qr-sheet .hint { max-width: 32ch; font-size: 14px; color: #4a5566; }
+.qr-sheet .hint { max-width: 32ch; font-size: 14px; color: #4a5566; word-break: keep-all; }
 .qr-sheet .err { color: #c62a2a; font-weight: 600; max-width: 30ch; }
 .qr-sheet .close { min-height: 48px; padding: 0 28px; border-radius: 12px; border: 1px solid #d7dde6; background: #fff; color: #141b26; font-weight: 600; cursor: pointer; }
 .hazard { height: 10px; width: min(78vw, 340px); border-radius: 3px; background: repeating-linear-gradient(-45deg, #f0a500 0 10px, #1b1400 10px 20px); }
@@ -574,7 +574,7 @@ dialog .row.end { justify-content: flex-end; }
     <div id="qrCode"></div>
   </div>
   <p class="count mono" id="qrCount"></p>
-  <p class="hint" id="qrHint">출입문 카메라에 화면을 비춰 주세요. QR은 30초마다 바뀌고, 한 번 쓴 QR과 캡처한 화면은 통과하지 않습니다.</p>
+  <p class="hint" id="qrHint">출입문 카메라에 화면을 비춰 주세요. QR은 5분 동안 한 번만 쓸 수 있고, 쓰고 나면 새 QR로 바뀝니다.</p>
   <button class="close" id="qrClose" type="button">닫기</button>
 </div>
 
@@ -598,7 +598,7 @@ const REASON = {
   invalid_token:'잘못된 QR', expired_token:'만료된 QR', token_reused:'이미 사용한 QR', no_reservation:'없는 신청',
   not_approved:'승인 안 됨', user_blocked:'정지된 사용자', wrong_room:'다른 실습실', out_of_time:'이용 시간 아님',
   lockdown:'긴급 잠금 중', room_closed:'실습실 운영 중지', master:'마스터 QR', master_disabled:'마스터 QR 꺼짐',
-  master_revoked:'폐기된 마스터 QR', master_expired:'기간 끝난 마스터 QR',
+  master_revoked:'폐기된 마스터 QR', master_expired:'기간 끝난 마스터 QR', duplicate_scan:'중복 인식',
 };
 const KST = 9 * 3600e3;
 let me = null, settings = {}, info = null, rooms = [], skew = 0, afterLogin = null;
@@ -610,7 +610,7 @@ async function api(path, opts = {}) {
   const res = await fetch(path, { method: opts.method || 'GET', headers: { 'content-type': 'application/json' }, body: opts.body ? JSON.stringify(opts.body) : undefined });
   const data = await res.json().catch(() => ({}));
   if (res.status === 401 && me && !path.startsWith('/api/auth')) { me = null; route(); }
-  if (!res.ok) throw new Error(data.error || '요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.');
+  if (!res.ok) throw Object.assign(new Error(data.error || '요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.'), { status: res.status });
   return data;
 }
 const kd = (ms) => new Date(ms + KST);
@@ -642,26 +642,40 @@ function openQr({ title, sub, master = false, fetcher }) {
   sh.hidden = false; sh.classList.toggle('master', master); $('#qrHazard').hidden = !master;
   $('#qrTitle').textContent = title; $('#qrSub').textContent = sub || '';
   $('#qrHint').textContent = master
-    ? '마스터 QR입니다. 다른 사람에게 보여 주거나 캡처해서 보내지 마세요. 30초마다 바뀝니다.'
-    : '출입문 카메라에 화면을 비춰 주세요. QR은 30초마다 바뀌고, 한 번 쓴 QR과 캡처한 화면은 통과하지 않습니다.';
+    ? '마스터 QR입니다. 다른 사람에게 보여 주거나 캡처해서 보내지 마세요. 한 번 쓰면 새 QR로 바뀝니다.'
+    : '출입문 카메라에 화면을 비춰 주세요. QR은 5분 동안 한 번만 쓸 수 있고, 쓰고 나면 새 QR로 바뀝니다.';
   $('#qrCode').innerHTML = ''; $('#qrCount').textContent = '';
   document.body.style.overflow = 'hidden';
+  // 같은 t로 주기적으로 다시 물어봄 → 서버가 '쓰였음/만료 임박'이면 새 QR을 준다
+  let cur = null, until = 0, total = 300000;
+  const prog = $('#qrProg');
+  const upd = () => {
+    const left = Math.max(0, until - Date.now());
+    prog.style.strokeDashoffset = String(100 - (left / total) * 100);
+    const sec = Math.ceil(left / 1000);
+    $('#qrCount').textContent = `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')} 동안 유효`;
+  };
   const tick = async () => {
-    clearTimeout(qrTimer); clearInterval(qrCountTimer);
+    clearTimeout(qrTimer);
     try {
-      const r = await fetcher();
-      $('#qrCode').innerHTML = qrSvg(r.token);
-      const total = r.step_ms || 30000, until = Date.now() + r.refresh_in_ms;
-      const prog = $('#qrProg');
-      const upd = () => {
-        const left = Math.max(0, until - Date.now());
-        prog.style.strokeDashoffset = String(100 - (left / total) * 100);
-        $('#qrCount').textContent = `${Math.ceil(left / 1000)}초 후 새 QR`;
-      };
-      prog.style.transition = 'none'; upd(); requestAnimationFrame(() => { prog.style.transition = ''; });
-      qrCountTimer = setInterval(upd, 1000);
-      qrTimer = setTimeout(tick, r.refresh_in_ms + 150);
+      const r = await fetcher(cur ? cur.t : null);
+      if (!cur || r.token !== cur.token) {
+        $('#qrCode').innerHTML = qrSvg(r.token);
+        if (r.used_prev) toast(master ? '출입 확인됨 · 새 마스터 QR로 바뀌었습니다.' : '출입 확인됨 · 새 QR로 바뀌었습니다.');
+        total = r.valid_ms || 300000;
+        until = Date.now() + (r.expires_at - r.server_time);
+        prog.style.transition = 'none'; upd(); requestAnimationFrame(() => { prog.style.transition = ''; });
+      }
+      cur = r;
+      if (!qrCountTimer) qrCountTimer = setInterval(upd, 1000);
+      qrTimer = setTimeout(tick, r.poll_ms || 5000);
     } catch (e) {
+      // 잠깐의 통신 끊김이나 '잠시 후' 응답이면 지금 QR을 그대로 두고 다시 물어봄
+      if (cur && (!e.status || e.status === 429 || e.status >= 500) && until > Date.now()) {
+        qrTimer = setTimeout(tick, 3000);
+        return;
+      }
+      clearInterval(qrCountTimer); qrCountTimer = null; cur = null;
       $('#qrCode').innerHTML = `<p class="err" style="padding-top:40%">${esc(e.message)}</p>`;
       $('#qrCount').textContent = '';
     }
@@ -671,7 +685,7 @@ function openQr({ title, sub, master = false, fetcher }) {
   $('#qrClose').focus();
 }
 function closeQr() {
-  clearTimeout(qrTimer); clearInterval(qrCountTimer); $('#qrSheet').hidden = true; document.body.style.overflow = '';
+  clearTimeout(qrTimer); clearInterval(qrCountTimer); qrCountTimer = null; $('#qrSheet').hidden = true; document.body.style.overflow = '';
   try { wake?.release(); } catch {} wake = null;
 }
 $('#qrClose').onclick = closeQr;
@@ -883,7 +897,7 @@ document.addEventListener('click', async (e) => {
   const q = e.target.closest('[data-qr]'), c = e.target.closest('[data-cancel]');
   if (q) {
     const r = mine.find((x) => x.id == q.dataset.qr);
-    openQr({ title: `${r.room_name} 입장`, sub: `${me.name} · ${fRange(r.start_at, r.end_at)}`, fetcher: () => api(`/api/reservations/${r.id}/qr`) });
+    openQr({ title: `${r.room_name} 입장`, sub: `${me.name} · ${fRange(r.start_at, r.end_at)}`, fetcher: (keep) => api(`/api/reservations/${r.id}/qr${keep != null ? '?keep=' + keep : ''}`) });
   }
   if (c) {
     if (!(await ask({ title: '이 신청을 취소할까요?', text: '취소하면 출입 QR도 함께 사라집니다.', ok: '신청 취소', danger: true }))) return;
@@ -1131,7 +1145,7 @@ A.master = async () => {
   const card = (m) => {
     const dead = m.revoked || m.expires_at < server_time;
     return `<article class="panel master-card ${dead ? 'dead' : ''}"><div class="stripe"></div><div class="body">
-      <div class="item-head"><b>${esc(m.label)}</b>${m.revoked ? '<span class="pill denied">폐기</span>' : m.expires_at < server_time ? '<span class="pill expired">기간 끝</span>' : `<span class="pill master">${m.mode === 'static' ? '인쇄용 고정' : '화면용 30초'}</span>`}</div>
+      <div class="item-head"><b>${esc(m.label)}</b>${m.revoked ? '<span class="pill denied">폐기</span>' : m.expires_at < server_time ? '<span class="pill expired">기간 끝</span>' : `<span class="pill master">${m.mode === 'static' ? '인쇄용 고정' : '화면용 5분'}</span>`}</div>
       <div class="small muted">${m.room_name ? esc(m.room_name) : '모든 실습실'} · <span class="mono">${fDT(m.expires_at)}</span>까지</div>
       <div class="small muted">사용 ${m.use_count}회${m.last_used_at ? ' · 마지막 ' + ago(m.last_used_at) : ''} · 발급 ${esc(m.created_by_name || '-')}</div>
       ${dead ? '' : `<div class="item-actions">
@@ -1147,7 +1161,7 @@ A.master = async () => {
       <div class="grid-fields">
         <label class="field"><span>이름 (사용자/용도)</span><input class="input" id="mLabel" placeholder="예: 조교 김OO" maxlength="40"></label>
         <label class="field"><span>실습실</span><select class="input" id="mRoom"><option value="">모든 실습실</option>${rs.map((r) => `<option value="${r.id}">${esc(r.name)}</option>`).join('')}</select></label>
-        <label class="field"><span>종류</span><select class="input" id="mMode"><option value="dynamic">화면용 30초 QR (권장)</option><option value="static">인쇄용 고정 QR</option></select></label>
+        <label class="field"><span>종류</span><select class="input" id="mMode"><option value="dynamic">화면용 5분 QR (권장)</option><option value="static">인쇄용 고정 QR</option></select></label>
         <label class="field"><span>유효 기간</span><select class="input" id="mHours"></select></label>
       </div>
       <p class="small muted" id="mModeHint"></p>
@@ -1162,7 +1176,7 @@ A.master = async () => {
     $('#mHours').innerHTML = hoursFor(mode).map(([h, l], i) => `<option value="${h}" ${i === (mode === 'static' ? 1 : 2) ? 'selected' : ''}>${l}</option>`).join('');
     $('#mModeHint').textContent = mode === 'static'
       ? '인쇄용 고정 QR은 사진을 찍으면 누구나 쓸 수 있습니다. 비상용으로 금고 등에 보관하고, 분실하면 바로 재발급하거나 폐기하세요.'
-      : '관리자 폰 화면에 띄워 쓰는 QR입니다. 30초마다 바뀌어 캡처본이 금방 무효가 됩니다.';
+      : '관리자 폰 화면에 띄워 쓰는 QR입니다. 5분 동안 한 번만 쓸 수 있어 캡처본은 통과하지 않습니다.';
   };
   $('#mMode').onchange = syncMode; syncMode();
   $('#mForm').onsubmit = async (e) => {
@@ -1192,7 +1206,7 @@ function showImage(title, src) {
 async function showMaster(id) {
   const m = masters.find((x) => x.id === id); if (!m) return;
   const sub = `${m.room_name || '모든 실습실'} · ${fDT(m.expires_at)}까지`;
-  if (m.mode === 'dynamic') return openQr({ title: `마스터 · ${m.label}`, sub, master: true, fetcher: () => api(`/api/admin/masters/${id}/qr`) });
+  if (m.mode === 'dynamic') return openQr({ title: `마스터 · ${m.label}`, sub, master: true, fetcher: (keep) => api(`/api/admin/masters/${id}/qr${keep != null ? '?keep=' + keep : ''}`) });
   try {
     const { token } = await api(`/api/admin/masters/${id}/qr`);
     const png = qrPng(token);

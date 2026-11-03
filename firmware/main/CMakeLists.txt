@@ -7,9 +7,9 @@ idf_component_register(
              esp_video esp_wifi_remote esp_lcd_jd9165 esp_lcd_touch_gt911 esp_codec_dev lvgl vfs quirc ov02c10
     # 안내 음성은 tools/gen_voice.py가 만든다
     EMBED_FILES "voice/scan.pcm" "voice/checking.pcm" "voice/granted.pcm" "voice/denied.pcm" "voice/offline.pcm"
-                "assets/icon_0.rgb565a8" "assets/icon_1.rgb565a8" "assets/icon_2.rgb565a8"
-                "assets/icon_3.rgb565a8" "assets/icon_4.rgb565a8" "assets/icon_5.rgb565a8"
-                "assets/icon_6.rgb565a8" "assets/icon_7.rgb565a8" "assets/icon_8.rgb565a8"
-                "assets/icon_9.rgb565a8" "assets/icon_10.rgb565a8" "assets/icon_11.rgb565a8"
-                "assets/icon_12.rgb565a8"
+                "assets/icon_0.a8" "assets/icon_1.a8" "assets/icon_2.a8"
+                "assets/icon_3.a8" "assets/icon_4.a8" "assets/icon_5.a8"
+                "assets/icon_6.a8" "assets/icon_7.a8" "assets/icon_8.a8"
+                "assets/icon_9.a8" "assets/icon_10.a8" "assets/icon_11.a8"
+                "assets/icon_12.a8"
 )

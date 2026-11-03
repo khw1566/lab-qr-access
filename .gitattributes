@@ -1,3 +1,4 @@
 # LVGL image maps are binary; line-ending conversion corrupts their pixels.
 *.rgb565 binary
 *.rgb565a8 binary
+*.a8 binary

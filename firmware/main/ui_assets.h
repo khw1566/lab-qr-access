@@ -1,3 +1,3 @@
 #pragma once
 #include "lvgl.h"
-extern const lv_image_dsc_t *const ui_icon_images[13];
+const lv_image_dsc_t *ui_icon_asset(unsigned icon, unsigned size);

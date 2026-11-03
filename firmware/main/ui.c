@@ -46,6 +46,8 @@ static void show_tab(tab_t tab)
     set_hidden(s_home, tab != TAB_HOME);
     set_hidden(s_scan, tab != TAB_SCAN);
     set_hidden(s_guide, tab != TAB_GUIDE);
+    lv_obj_update_layout(lv_screen_active());
+    ESP_LOGI(TAG, "Icon geometry: %u visible images at native size", ui_icons_validate(lv_screen_active()));
 }
 
 static void on_tab(lv_event_t *e)
@@ -109,7 +111,7 @@ static void home_build(lv_obj_t *screen)
 
     lv_obj_t *settings = ui_icon_button(s_home, UI_ICON_SETTINGS, "", 928, 414, 80, 80, false, on_settings, 0);
     lv_obj_t *settings_icon = lv_obj_get_child(settings, 0);
-    lv_obj_set_size(settings_icon, 64, 64);
+    ui_icon_resize(settings_icon, 64);
     lv_obj_center(settings_icon);
     ui_icon_color(settings_icon, lv_color_black());
 }
@@ -169,15 +171,23 @@ static void guide_build(lv_obj_t *screen)
     lv_obj_t *url = ui_text(s_guide, url_text, &lv_font_montserrat_24, 36, 356, 340, UI_MUTED);
     lv_obj_set_style_text_align(url, LV_TEXT_ALIGN_CENTER, 0);
     ui_text(s_guide, "이용안내", &lab_font_40, 412, 48, 570, UI_INK);
-    ui_icon(s_guide, UI_ICON_USER, 444, 164, 80, UI_BLUE);
-    ui_icon(s_guide, UI_ICON_RIGHT, 566, 188, 28, UI_MUTED);
-    ui_icon(s_guide, UI_ICON_CALENDAR, 624, 164, 80, UI_BLUE);
-    ui_icon(s_guide, UI_ICON_RIGHT, 746, 188, 28, UI_MUTED);
-    ui_icon(s_guide, UI_ICON_QR, 804, 164, 80, UI_BLUE);
-    ui_text(s_guide, "가입", &lab_font_28, 444, 276, 100, UI_INK);
-    ui_text(s_guide, "이용 신청", &lab_font_28, 600, 276, 160, UI_INK);
-    ui_text(s_guide, "출입증", &lab_font_28, 798, 276, 144, UI_INK);
-    footer(s_guide, false);
+    lv_obj_t *steps = ui_text(s_guide,
+        "1. 왼쪽 QR을 휴대폰으로 스캔합니다.\n"
+        "2. 가입 후 실습실 이용을 신청합니다.\n"
+        "3. 승인된 출입증의 QR을 엽니다.\n"
+        "4. 단말 카메라에 QR을 보여 주세요.",
+        &lab_font_24, 412, 132, 570, UI_INK);
+    lv_obj_set_style_text_line_space(steps, 22, 0);
+    lv_obj_t *home = ui_icon_button(s_guide, UI_ICON_HOME, "", 36, 430, 80, 64, false, on_tab, TAB_HOME);
+    lv_obj_set_style_bg_opa(home, LV_OPA_COVER, 0);
+    ui_icon_resize(lv_obj_get_child(home, 0), 44);
+    lv_obj_center(lv_obj_get_child(home, 0));
+    lv_obj_t *scan = ui_icon_button(s_guide, UI_ICON_QR, "", 808, 430, 80, 64, true, on_tab, TAB_SCAN);
+    lv_obj_t *settings = ui_icon_button(s_guide, UI_ICON_SETTINGS, "", 908, 430, 80, 64, false, on_settings, 0);
+    lv_obj_set_style_bg_opa(settings, LV_OPA_COVER, 0);
+    ui_icon_resize(lv_obj_get_child(settings, 0), 44);
+    lv_obj_center(lv_obj_get_child(settings, 0));
+    (void)scan;
 }
 
 static void hide_result(lv_timer_t *timer)

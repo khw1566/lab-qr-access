@@ -4,8 +4,8 @@
 
 - Lucide 아이콘: `https://github.com/lucide-icons/lucide`, `source/LUCIDE-LICENSE` 포함. 원본 `circle-question-mark`와 `fingerprint-pattern`은 각각 `circle-help.svg`, `fingerprint.svg`로 보관한다.
 - 설정 아이콘: Google Material Design Icons의 `action/settings`, `source/MATERIAL-LICENSE` 포함.
-- SVG를 PC의 resvg로 512px PNG로 렌더링한 후, 128px 이미지로 변환한다. 지문·안내·설정은 확인용 JPG 원본도 함께 보관한다.
-- 보드에서는 PNG/JPG 디코딩을 반복하지 않도록 RGB565와 알파 채널을 가진 비트맵을 사용한다. 배율과 색상은 LVGL에서 처리한다.
+- SVG를 PC의 resvg로 512px PNG로 렌더링한 후, 20/28/44/52/56/64/80/128px의 각 표시 크기로 변환한다. 지문·안내·설정은 확인용 JPG 원본도 함께 보관한다.
+- 보드에서는 A8 알파 비트맵을 원본 크기 그대로 그린다. 이미지의 실제 크기와 위젯 크기는 같고 배율은 1배다. 색상만 LVGL에서 처리한다. 표시 크기를 바꿀 때는 `ui_icon_resize()`로 해당 크기의 이미지도 함께 교체한다.
 
 재생성:
 

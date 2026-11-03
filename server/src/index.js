@@ -32,7 +32,7 @@ async function body(req) {
 
 // ---------- 운영 설정 (관리자 화면에서 변경) ----------
 const SETTING_DEFS = {
-  site_name: { type: 'str', max: 30, def: () => '실습실 출입' },
+  site_name: { type: 'str', max: 30, def: () => '3D 스마트 창작실' },
   notice: { type: 'str', max: 300, def: () => '' },
   registration_open: { type: 'bool', def: () => true },
   require_user_approval: { type: 'bool', def: (env) => env.REQUIRE_USER_APPROVAL !== 'false' },

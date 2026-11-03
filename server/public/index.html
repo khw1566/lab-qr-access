@@ -224,6 +224,16 @@ textarea.input { min-height: 84px; resize: vertical; }
 .rules li::before { content: counter(r); grid-row: span 2; width: 26px; height: 26px; border-radius: 50%; background: var(--accent); color: var(--accent-fg); display: grid; place-items: center; font-family: var(--font-mono); font-size: 13px; font-weight: 600; }
 .rules b { font-weight: 600; }
 .rules span { font-size: 13px; color: var(--muted); }
+.specs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-top: 1px solid var(--line); }
+.spec { padding: 14px 16px; display: grid; gap: 3px; font-size: 13px; color: var(--muted); }
+.spec + .spec { border-left: 1px solid var(--line); }
+.spec b { color: var(--fg); font-size: 14px; font-weight: 600; }
+details.panel summary { padding: 14px 16px; font-weight: 600; cursor: pointer; }
+.notes { margin: 0; padding: 0 16px 16px 32px; display: grid; gap: 6px; font-size: 14px; }
+.links { display: grid; }
+.links a, .links div { display: flex; justify-content: space-between; gap: 12px; padding: 13px 16px; border-top: 1px solid var(--line); color: inherit; text-decoration: none; font-size: 14px; }
+.links > :first-child { border-top: 0; }
+.links span { color: var(--muted); }
 .check { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; cursor: pointer; }
 .check input { width: 20px; height: 20px; margin: 1px 0 0; flex: none; accent-color: var(--accent); }
 
@@ -413,9 +423,10 @@ dialog .row.end { justify-content: flex-end; }
     <!-- 공개 안내: 로그인 없이 볼 수 있다 -->
     <section id="s-home" class="stack" hidden>
       <div class="panel hero">
-        <span class="eyebrow">3D 프린터 실습실</span>
-        <h1 id="homeTitle">실습실 출입</h1>
-        <p class="muted">오늘 출력 가능 시간 <b class="mono" id="homeHours" style="color:var(--fg)"></b></p>
+        <span class="eyebrow">3D 프린터 실습실 · E2-207호</span>
+        <h1 id="homeTitle">3D 스마트 창작실</h1>
+        <p class="muted">다양한 3D 프린터로 수업에서 배운 내용과 아이디어를 실제 형상으로 만들어 볼 수 있습니다.</p>
+        <p class="muted">출력 가능 시간 <b class="mono" id="homeHours" style="color:var(--fg)"></b></p>
         <div class="row"><a class="btn" href="#new">이용 신청</a><a class="btn secondary" id="homeSecond" href="#pass">출입증</a></div>
       </div>
       <div>
@@ -434,6 +445,24 @@ dialog .row.end { justify-content: flex-end; }
           <li><b>승인 확인</b><span>승인되면 출입증 화면에 출입 QR이 열립니다.</span></li>
           <li><b>입장</b><span>출입문 카메라에 QR을 비추면 문이 열립니다.</span></li>
         </ol>
+      </div>
+      <details class="panel">
+        <summary>사용 시 주의사항</summary>
+        <ol class="notes">
+          <li>사용 목적 외 사용을 금지합니다.</li>
+          <li>기자재를 분실, 파손, 도난하면 손해배상을 청구합니다.</li>
+          <li>사용 기간과 사용 시간을 지켜 주세요.</li>
+          <li>사용 내용이 바뀌면 사전에 변경 확인을 받아 주세요.</li>
+          <li>사용 신청 없이 출력 중인 출력물은 발견 즉시 폐기되며, 사용자는 이후 출력이 금지됩니다.</li>
+          <li>사용 후 정리정돈은 필수입니다.</li>
+          <li>사용 전 청소하고 이상 유무를 확인해 이상이 있으면 보고해 주세요.</li>
+          <li>이상을 사전이나 사후에 보고하지 않으면 본인 과실로 간주합니다.</li>
+        </ol>
+      </details>
+      <div class="panel links">
+        <div><b>문의</b><a style="padding:0;border:0;color:var(--accent)" href="tel:0522793101">학부사무실 052-279-3101</a></div>
+        <a href="https://drive.google.com/file/d/1307Ac6LOjH0T_fboYQe4uepAe5MfJSyx/view?usp=sharing" target="_blank" rel="noopener"><b>설명서</b><span>내려받기</span></a>
+        <a href="https://docs.google.com/forms/d/e/1FAIpQLSc1q96Q9BOxN9XxtQuu0qSdLgfmXZokfb1Ggsf7oR15xQHcpQ/viewform" target="_blank" rel="noopener"><b>건의사항</b><span>의견 보내기</span></a>
       </div>
     </section>
 
@@ -691,7 +720,7 @@ async function loadConfig() {
 const FLEET = { rows: [4, 4, 4, 3, 3, 2], name: 'Replicator+', single: 'Z18' };
 function renderHome() {
   const a = config.print_start_hour ?? 9, b = config.print_end_hour ?? 16;
-  $('#homeTitle').textContent = config.site_name || '실습실 출입';
+  $('#homeTitle').textContent = config.site_name || '3D 스마트 창작실';
   $('#homeHours').textContent = `${pad(a)}:00–${pad(b)}:00`;
   $('#homeSecond').hidden = !me;
   const total = FLEET.rows.reduce((x, y) => x + y, 0);
@@ -706,7 +735,11 @@ function renderHome() {
       <div class="fleet-gap"></div>
       <div class="fleet-row"><span>단독</span><div class="fleet-units"><div class="unit big">${FLEET.single}</div></div><span>1</span></div>
     </div>
-    <div class="legend"><span><i></i>${FLEET.name}</span><span><i class="big"></i>${FLEET.single}</span></div>`;
+    <div class="legend"><span><i></i>${FLEET.name}</span><span><i class="big"></i>${FLEET.single}</span></div>
+    <div class="specs">
+      <div class="spec"><b>${FLEET.name}</b><span>FDM 방식</span><span class="mono">29.5 × 19.5 × 16.5 cm</span><span>필라멘트 1.75 mm</span></div>
+      <div class="spec"><b>${FLEET.single}</b><span>FDM 방식</span><span class="mono">30.5 × 30.5 × 45.7 cm</span><span>필라멘트 1.75 mm</span></div>
+    </div>`;
   $('#rules').innerHTML = `
     <li><b>필라멘트를 가져오지 않아도 됩니다</b><span>출력에 쓸 필라멘트를 따로 준비할 필요가 없습니다.</span></li>
     <li><b>출력 가능 시간은 ${a}시부터 ${b}시까지입니다</b><span>오전과 오후 구분 없이 이 시간 안에서 출력할 수 있습니다.</span></li>
@@ -1145,7 +1178,7 @@ function fillRooms() {
   if (rooms.some((r) => r.id == prev)) $('#room').value = prev;
 }
 function applyChrome() {
-  const name = settings.site_name || config.site_name || '실습실 출입', notice = settings.notice ?? config.notice;
+  const name = settings.site_name || config.site_name || '3D 스마트 창작실', notice = settings.notice ?? config.notice;
   $('#brandName').textContent = name; document.title = name;
   $('#noticeBanner').hidden = !notice; $('#noticeBanner').textContent = notice || '';
   $('#lockBanner').hidden = !settings.lockdown;

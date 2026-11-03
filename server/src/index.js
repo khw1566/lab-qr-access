@@ -31,17 +31,21 @@ async function body(req) {
 }
 
 // ---------- 실습실 보유 장비 (배치도) ----------
-// 열 이름과 대수: Replicator+ 4/4/4/3/3/2 = 20대, Z18 1대
+// 2번실 배치: Replicator+ 세로 배열 A~F (4/4/4/3/3/2 = 20대), 복도 쪽 선반 Z18 1대,
+// 하단 Creality Ender 3 3대 (별도 관리, 신청 불가)
 const PRINTER_ROWS = [['A', 4], ['B', 4], ['C', 4], ['D', 3], ['E', 3], ['F', 2]];
 const PRINTERS = [
   ...PRINTER_ROWS.flatMap(([row, n]) =>
-    Array.from({ length: n }, (_, i) => ({ id: `${row}${i + 1}`, row, type: 'replicator' }))),
-  { id: 'Z1', row: 'Z', type: 'z18' },
+    Array.from({ length: n }, (_, i) => ({ id: `${row}${i + 1}`, row, type: 'replicator', bookable: true }))),
+  { id: 'Z1', row: 'Z', type: 'z18', bookable: true },
+  ...[1, 2, 3].map((i) => ({ id: `N${i}`, row: 'N', type: 'ender3', bookable: false })),
 ];
+// 신청할 수 있는 장비 종류
 const PRINTER_TYPES = { replicator: 'Replicator+', z18: 'Z18' };
 const PRINTER_SPECS = {
   replicator: { name: 'MakerBot Replicator+', method: 'FDM (용융 적층)', volume: '29.5 × 19.5 × 16.5 cm', filament: '1.75 mm PLA' },
   z18: { name: 'MakerBot Replicator Z18', method: 'FDM (용융 적층)', volume: '30.5 × 30.5 × 45.7 cm', filament: '1.75 mm PLA' },
+  ender3: { name: 'Creality Ender 3', method: 'FDM (용융 적층)', volume: '22 × 22 × 25 cm', filament: '1.75 mm PLA', note: '별도 관리 장비로 이 사이트에서 신청할 수 없습니다.' },
 };
 
 // 이전 사이트(3D 스마트 창작실)의 주의사항을 옮김. 관리자 화면에서 수정 가능
@@ -106,7 +110,7 @@ function normalizeSetting(key, v) {
   if (!d) throw new HttpError(400, `알 수 없는 설정: ${key}`);
   if (d.type === 'bool') return v === true || v === 1 || v === '1' || v === 'true' ? '1' : '0';
   if (key === 'printer_down') {
-    const ids = new Set(PRINTERS.map((p) => p.id));
+    const ids = new Set(PRINTERS.filter((p) => p.bookable).map((p) => p.id));
     if (!Array.isArray(v) || !v.every((x) => ids.has(x))) throw new HttpError(400, '장비 목록이 올바르지 않습니다.');
     return JSON.stringify([...new Set(v)]);
   }

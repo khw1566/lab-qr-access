@@ -298,6 +298,87 @@ dialog::backdrop { background: rgba(10, 14, 22, .5); }
 dialog form { padding: 22px; display: grid; gap: 16px; }
 dialog .row.end { justify-content: flex-end; }
 
+/* ---------- 공개 첫 화면 ---------- */
+.home { max-width: 980px; margin: 0 auto; display: grid; gap: 32px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px calc(110px + env(safe-area-inset-bottom, 0px)); }
+.hero { display: grid; gap: 14px; }
+.hero h1 { font-size: clamp(28px, 5vw, 40px); font-weight: 700; letter-spacing: -.02em; }
+.hero p.lead { color: var(--muted); max-width: 46ch; }
+.status-chip { display: inline-flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); width: fit-content; max-width: 100%; font-size: 14px; }
+.status-chip .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); flex: none; }
+.status-chip.open .dot { background: var(--ok); box-shadow: 0 0 0 4px var(--ok-soft); }
+.status-chip b { font-family: var(--font-mono); font-weight: 600; }
+.home-grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.rules { margin: 0; padding: 6px 0; list-style: none; counter-reset: rule; }
+.rules li { counter-increment: rule; display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 10px; padding: 12px 18px; border-top: 1px solid var(--line); }
+.rules li:first-child { border-top: 0; }
+.rules li::before { content: counter(rule); font-family: var(--font-mono); font-weight: 600; color: var(--accent); background: var(--accent-soft); width: 26px; height: 26px; border-radius: 7px; display: grid; place-items: center; font-size: 13px; }
+.steps { display: grid; gap: 0; padding: 6px 0; }
+.steps div { display: grid; gap: 2px; padding: 12px 18px; border-top: 1px solid var(--line); }
+.steps div:first-child { border-top: 0; }
+.steps b { font-weight: 600; }
+.steps span { font-size: 13px; color: var(--muted); }
+.panel-head { padding: 16px 18px 4px; }
+.specs { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-top: 12px; }
+.spec { padding: 14px 16px; display: grid; gap: 8px; }
+.spec dl { margin: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 12px; font-size: 13px; }
+.spec dt { color: var(--muted); }
+.spec dd { margin: 0; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.cautions { margin: 0; padding: 6px 18px 14px 36px; display: grid; gap: 6px; font-size: 14px; }
+.cautions li::marker { color: var(--warn); }
+
+/* 장비 배치도: 실습실 평면 위 프린터 타일 */
+.floor {
+  padding: 18px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 18px 22px; align-items: start;
+  background-color: var(--surface);
+  background-image: linear-gradient(var(--sunken) 1px, transparent 1px), linear-gradient(90deg, var(--sunken) 1px, transparent 1px);
+  background-size: 22px 22px; background-position: -1px -1px;
+}
+.fp-rows { display: grid; gap: 10px; min-width: 0; }
+.fp-row { display: grid; grid-template-columns: 38px minmax(0, 1fr); gap: 10px; align-items: center; }
+.fp-label { display: grid; justify-items: center; line-height: 1.1; }
+.fp-label b { font-family: var(--font-mono); font-size: 16px; }
+.fp-label small { font-size: 11px; color: var(--muted); font-family: var(--font-mono); }
+.fp-tiles { display: flex; gap: 8px; flex-wrap: wrap; }
+.pr {
+  width: 62px; display: grid; justify-items: center; gap: 2px; padding: 8px 4px 6px; border-radius: 10px;
+  border: 1px solid var(--line); background: var(--bg); color: var(--fg); font: 600 11px/1.2 var(--font-mono);
+}
+.pr svg { width: 32px; height: 32px; }
+.pr small { font: 500 10px/1.2 var(--font-sans); color: var(--ok); }
+.pr.down { color: var(--muted); background: repeating-linear-gradient(-45deg, var(--sunken) 0 6px, var(--bg) 6px 12px); border-style: dashed; }
+.pr.down small { color: var(--bad); }
+.pr.z18 { width: 104px; padding: 12px 6px 10px; border-color: var(--accent); background: var(--accent-soft); }
+.pr.z18 svg { width: 52px; height: 60px; }
+.pr.z18.down { border-color: var(--line); background: repeating-linear-gradient(-45deg, var(--sunken) 0 6px, var(--bg) 6px 12px); }
+button.pr { cursor: pointer; }
+button.pr:hover { border-color: var(--accent); }
+.fp-side { display: grid; gap: 8px; justify-items: center; }
+.fp-side .cap { font-size: 12px; color: var(--muted); }
+.fp-door { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--muted); }
+.fp-door::before, .fp-door::after { content: ""; flex: 1; border-top: 2px dashed var(--line); }
+.eq-summary { display: flex; gap: 8px; flex-wrap: wrap; }
+.eq-summary span { font-size: 13px; padding: 4px 10px; border-radius: 99px; background: var(--surface); border: 1px solid var(--line); }
+.eq-summary b { font-family: var(--font-mono); }
+
+/* 신청: 장비 선택, 서명 */
+.choice { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.choice button {
+  display: grid; gap: 2px; text-align: left; padding: 12px 14px; border-radius: var(--r); border: 1px solid var(--line);
+  background: var(--surface); cursor: pointer;
+}
+.choice button b { font-weight: 600; }
+.choice button span { font-size: 12px; color: var(--muted); }
+.choice button[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.choice button:disabled { opacity: .5; cursor: default; }
+.sig-wrap { position: relative; border: 1.5px dashed var(--line); border-radius: var(--r); background: #fff; overflow: hidden; }
+.sig-wrap canvas { display: block; width: 100%; height: 160px; touch-action: none; cursor: crosshair; }
+.sig-wrap .ph { position: absolute; inset: 0; display: grid; place-items: center; color: #9aa3b1; font-size: 14px; pointer-events: none; }
+.sig-wrap .line { position: absolute; left: 18px; right: 18px; bottom: 38px; border-top: 1px solid #d7dde6; pointer-events: none; }
+.sig-wrap .clear { position: absolute; top: 8px; right: 8px; background: #fff; color: #141b26; border: 1px solid #d7dde6; }
+.sig-img { width: 100%; max-width: 360px; background: #fff; border-radius: 8px; border: 1px solid var(--line); }
+
 /* 인쇄: 고정 마스터 QR 카드만 출력 */
 #printCard { display: none; }
 @media print {
@@ -306,6 +387,11 @@ dialog .row.end { justify-content: flex-end; }
   #printCard img { width: 70mm; height: 70mm; }
 }
 
+@media (max-width: 760px) {
+  .home-grid { grid-template-columns: minmax(0, 1fr); }
+  .floor { grid-template-columns: minmax(0, 1fr); }
+  .fp-side { justify-items: start; grid-template-columns: auto 1fr; align-items: center; }
+}
 @media (max-width: 860px) {
   .admin { grid-template-columns: minmax(0, 1fr); gap: 16px; padding-block: 12px 60px; }
   .side { position: static; display: flex; overflow-x: auto; gap: 4px; padding-bottom: 6px; scrollbar-width: none; }
@@ -337,15 +423,21 @@ dialog .row.end { justify-content: flex-end; }
   <symbol id="i-chip" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="5" y="5" width="14" height="14" rx="2"/><path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3"/></symbol>
   <symbol id="i-log" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
   <symbol id="i-gear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></symbol>
+  <symbol id="i-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></symbol>
+  <symbol id="i-printer" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 8h18M10 8v3M8 11h4M7 17h10"/></symbol>
+  <!-- Replicator+: 정면 창이 있는 소형 박스 / Z18: 키가 큰 대형 박스 -->
+  <symbol id="p-rep" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="4" y="3" width="24" height="26" rx="3"/><rect x="8" y="9" width="16" height="14" rx="1.5"/><path d="M13 12h6M16 12v3"/><path d="M10 20h12" stroke-width="2"/><circle cx="16" cy="6" r=".9" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="p-z18" viewBox="0 0 40 46" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="3" y="3" width="34" height="40" rx="3"/><rect x="8" y="10" width="24" height="26" rx="1.5"/><path d="M16 14h8M20 14v4"/><path d="M11 32h18" stroke-width="2"/><path d="M8 40h24" stroke-width="1"/><circle cx="20" cy="6.5" r="1" fill="currentColor" stroke="none"/></symbol>
 </svg>
 
-<header class="topbar" id="topbar" hidden>
+<header class="topbar" id="topbar">
   <div class="topbar-in">
-    <div class="brand"><div class="brand-mark"><svg><use href="#i-door"/></svg></div><span id="brandName">실습실 출입</span></div>
+    <a class="brand" href="#home" style="color:inherit;text-decoration:none"><div class="brand-mark"><svg><use href="#i-door"/></svg></div><span id="brandName">실습실 출입</span></a>
     <div class="spacer"></div>
-    <span class="who" id="whoName"></span>
+    <span class="who" id="whoName" hidden></span>
     <a class="btn secondary sm" id="modeSwitch" href="#admin" hidden>관리자</a>
-    <button class="btn quiet sm" id="logoutBtn" type="button">로그아웃</button>
+    <button class="btn quiet sm" id="logoutBtn" type="button" hidden>로그아웃</button>
+    <a class="btn sm" id="loginBtn" href="#login">로그인</a>
   </div>
 </header>
 
@@ -354,7 +446,7 @@ dialog .row.end { justify-content: flex-end; }
   <div class="auth-head">
     <div class="brand-mark" style="width:40px;height:40px;border-radius:10px"><svg style="width:22px;height:22px"><use href="#i-door"/></svg></div>
     <h1 id="authTitle">실습실 출입</h1>
-    <p class="muted">이용 신청이 승인되면 이 화면에서 출입 QR을 받을 수 있습니다.</p>
+    <p class="muted">이용 신청과 출입 QR 발급은 로그인 후에 할 수 있습니다.</p>
   </div>
   <div class="banner info" id="authNotice" hidden></div>
   <form class="panel stack" id="authForm" style="margin-top:14px" novalidate>
@@ -373,6 +465,35 @@ dialog .row.end { justify-content: flex-end; }
     <p class="small muted" id="authHint" hidden>가입 후 관리자가 승인하면 로그인할 수 있습니다.</p>
   </form>
 </section>
+
+<!-- ========== 공개 첫 화면 (로그인 없이 보기) ========== -->
+<main class="home" id="homeView" hidden>
+  <section class="hero">
+    <span class="eyebrow">3D 프린터 실습실</span>
+    <h1 id="homeTitle">실습실 출입</h1>
+    <p class="lead" id="homeIntro"></p>
+    <p class="small muted" id="homeMeta"></p>
+    <div class="status-chip" id="printStatus"><span class="dot"></span><span>불러오는 중…</span></div>
+    <div class="row"><a class="btn" href="#new">이용 신청하기</a><a class="btn secondary" href="#pass">내 출입증</a></div>
+  </section>
+  <div class="banner info" id="homeNotice" hidden></div>
+  <section>
+    <div class="section-title"><h2>보유 장비</h2><div class="eq-summary" id="eqSummary"></div></div>
+    <div class="panel floor" id="floorPlan"><div class="empty">불러오는 중…</div></div>
+    <div class="specs" id="specs"></div>
+  </section>
+  <section class="home-grid">
+    <div class="panel"><h3 class="panel-head">이용 규정</h3><ol class="rules" id="rulesList"></ol></div>
+    <div class="panel"><h3 class="panel-head">이용 절차</h3>
+      <div class="steps">
+        <div><b>1. 이용 신청</b><span>날짜, 시간, 장비를 고르고 지도교수 서명을 받아 신청합니다.</span></div>
+        <div><b>2. 승인</b><span>관리자가 승인하면 출입증 화면에 QR이 열립니다.</span></div>
+        <div><b>3. QR로 출입</b><span>이용 시작 전부터 출입문 카메라에 QR을 비추면 문이 열립니다.</span></div>
+      </div>
+    </div>
+  </section>
+  <section class="panel"><h3 class="panel-head">주의사항</h3><ul class="cautions" id="cautionsList"></ul></section>
+</main>
 
 <!-- ========== 학생 ========== -->
 <main class="wrap" id="studentView" hidden>
@@ -399,7 +520,13 @@ dialog .row.end { justify-content: flex-end; }
           <label class="field"><span>시작</span><select class="input mono" id="startT"></select></label>
           <label class="field"><span>종료</span><select class="input mono" id="endT"></select></label>
         </div>
-        <label class="field"><span>사용 목적</span><textarea class="input" id="purpose" maxlength="200" placeholder="예: 캡스톤 프로젝트 회로 납땜"></textarea></label>
+        <div class="field"><span>사용 장비</span><div class="choice" id="ptChoice" role="group" aria-label="사용 장비"></div></div>
+        <label class="field"><span>사용 목적</span><textarea class="input" id="purpose" maxlength="200" placeholder="예: 캡스톤 프로젝트 부품 시제품 출력"></textarea></label>
+        <label class="field"><span>지도교수 성명</span><input class="input" id="advisor" maxlength="30" placeholder="예: 김OO 교수"></label>
+        <div class="field"><span>지도교수 서명</span>
+          <div class="sig-wrap"><canvas id="sigPad" aria-label="지도교수 서명란"></canvas><div class="line"></div><div class="ph" id="sigPh">지도교수님께 이곳에 직접 서명을 받아 주세요</div>
+            <button class="btn sm clear" type="button" id="sigClear">지우기</button></div>
+        </div>
         <div class="rule" id="roomRule"></div>
         <button class="btn block" id="reqBtn" type="submit">신청하기</button>
       </form>
@@ -413,8 +540,9 @@ dialog .row.end { justify-content: flex-end; }
     </section>
   </div>
 </main>
-<nav class="tabbar" id="tabbar" hidden>
+<nav class="tabbar" id="tabbar">
   <div class="tabbar-in">
+    <a href="#home" data-nav="home"><svg><use href="#i-home"/></svg>홈</a>
     <a href="#pass" data-nav="pass"><svg><use href="#i-pass"/></svg>출입증</a>
     <a href="#new" data-nav="new"><svg><use href="#i-plus"/></svg>이용 신청</a>
     <a href="#history" data-nav="history"><svg><use href="#i-list"/></svg>신청 내역</a>
@@ -429,6 +557,7 @@ dialog .row.end { justify-content: flex-end; }
     <a href="#admin-users" data-a="users"><svg><use href="#i-users"/></svg>사용자<span class="count" id="cntUsers" hidden></span></a>
     <a href="#admin-master" data-a="master"><svg><use href="#i-key"/></svg>마스터 QR</a>
     <div class="sep"></div>
+    <a href="#admin-equipment" data-a="equipment"><svg><use href="#i-printer"/></svg>장비 상태</a>
     <a href="#admin-rooms" data-a="rooms"><svg><use href="#i-room"/></svg>실습실·자동 승인</a>
     <a href="#admin-devices" data-a="devices"><svg><use href="#i-chip"/></svg>출입 단말</a>
     <a href="#admin-logs" data-a="logs"><svg><use href="#i-log"/></svg>출입 기록</a>
@@ -476,7 +605,8 @@ const REASON = {
   master_revoked:'폐기된 마스터 QR', master_expired:'기간 끝난 마스터 QR',
 };
 const KST = 9 * 3600e3;
-let me = null, settings = {}, rooms = [], skew = 0;
+let me = null, settings = {}, info = null, rooms = [], skew = 0, afterLogin = null;
+const PT = { replicator: 'Replicator+', z18: 'Z18' };
 
 // ---------- 공통 ----------
 function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 3200); }
@@ -578,42 +708,97 @@ $('#authForm').onsubmit = async (e) => {
     }
     await api('/api/auth/login', { method: 'POST', body: { student_no, password } });
     $('#spw').value = '';
-    await boot();
+    const next = afterLogin || 'pass'; afterLogin = null;
+    await boot(next);
   } catch (err) { toast(err.message); } finally { btn.disabled = false; }
 };
-$('#logoutBtn').onclick = async () => { await api('/api/auth/logout', { method: 'POST' }).catch(() => {}); me = null; location.hash = ''; route(); };
+$('#logoutBtn').onclick = async () => { await api('/api/auth/logout', { method: 'POST' }).catch(() => {}); me = null; settings = { ...info }; if (location.hash === '#home') route(); else location.hash = 'home'; };
 
 // ---------- 라우팅 ----------
+const STUDENT_TABS = ['pass', 'new', 'history'];
 function route() {
   closeQr();
-  const h = location.hash.slice(1) || 'pass';
-  const isAdmin = h.startsWith('admin');
-  $('#authView').hidden = !!me;
-  $('#topbar').hidden = !me;
-  if (!me) { $('#studentView').hidden = $('#tabbar').hidden = $('#adminView').hidden = true; loadConfig(); return; }
-  const admin = isAdmin && me.role === 'admin';
-  $('#studentView').hidden = $('#tabbar').hidden = admin;
-  $('#adminView').hidden = !admin;
-  $('#modeSwitch').hidden = me.role !== 'admin';
-  $('#modeSwitch').textContent = admin ? '학생 화면' : '관리자';
-  $('#modeSwitch').href = admin ? '#pass' : '#admin';
-  if (admin) return showAdmin(h === 'admin' ? 'overview' : h.slice(6));
-  const tab = ['pass', 'new', 'history'].includes(h) ? h : 'pass';
-  ['pass', 'new', 'history'].forEach((t) => { $('#s-' + t).hidden = t !== tab; });
-  $$('[data-nav]').forEach((a) => { if (a.dataset.nav === tab) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
-  if (tab === 'pass' || tab === 'history') loadMine();
-  if (tab === 'new') initRequestForm();
+  const h = location.hash.slice(1) || 'home';
+  const needsLogin = STUDENT_TABS.includes(h) || h.startsWith('admin');
+  // 상단 바
+  $('#loginBtn').hidden = !!me; $('#logoutBtn').hidden = !me; $('#whoName').hidden = !me;
+  $('#modeSwitch').hidden = !me || me.role !== 'admin';
+  const views = ['#authView', '#homeView', '#studentView', '#adminView'];
+  const show = (v) => views.forEach((x) => { $(x).hidden = x !== v; });
+  const nav = (tab) => $$('[data-nav]').forEach((a) => { if (a.dataset.nav === tab) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
   window.scrollTo(0, 0);
+
+  if (h === 'login' || (needsLogin && !me)) {
+    if (me) { location.hash = 'pass'; return; }
+    if (needsLogin) afterLogin = h;
+    show('#authView'); $('#tabbar').hidden = false; nav(needsLogin ? h : '');
+    if (needsLogin) toast('로그인하면 이용할 수 있습니다.');
+    loadConfig(); return;
+  }
+  if (h.startsWith('admin') && me.role === 'admin') {
+    show('#adminView'); $('#tabbar').hidden = true;
+    $('#modeSwitch').textContent = '학생 화면'; $('#modeSwitch').href = '#home';
+    return showAdmin(h === 'admin' ? 'overview' : h.slice(6));
+  }
+  $('#modeSwitch').textContent = '관리자'; $('#modeSwitch').href = '#admin';
+  $('#tabbar').hidden = false;
+  if (!STUDENT_TABS.includes(h)) { show('#homeView'); nav('home'); renderHome(); return; }
+  show('#studentView'); nav(h);
+  STUDENT_TABS.forEach((t) => { $('#s-' + t).hidden = t !== h; });
+  if (h === 'pass' || h === 'history') loadMine();
+  if (h === 'new') initRequestForm();
 }
 window.addEventListener('hashchange', route);
 
 async function loadConfig() {
   try {
-    config = await api('/api/config');
+    config = info || await api('/api/config');
     $('#authTitle').textContent = config.site_name; document.title = config.site_name;
     $('#authNotice').hidden = !config.notice; $('#authNotice').textContent = config.notice;
     setAuthMode(authMode);
   } catch {}
+}
+
+// ---------- 공개 첫 화면 ----------
+function printWindow() {
+  const d = kd(Date.now() + skew), h = d.getUTCHours() + d.getUTCMinutes() / 60;
+  const o = info.print_open_hour, c = info.print_close_hour;
+  return { open: h >= o && h < c, o, c };
+}
+function floorPlan(printers, editable = false) {
+  const tile = (p) => {
+    const tag = editable ? 'button type="button"' : 'div';
+    const end = editable ? 'button' : 'div';
+    const lbl = `${p.id} ${PT[p.type]} ${p.down ? '점검 중' : '사용 가능'}`;
+    return `<${tag} class="pr ${p.type === 'z18' ? 'z18' : ''} ${p.down ? 'down' : ''}" data-pr="${p.id}" title="${lbl}" aria-label="${lbl}">
+      <svg aria-hidden="true"><use href="#${p.type === 'z18' ? 'p-z18' : 'p-rep'}"/></svg>${p.type === 'z18' ? 'Z18' : esc(p.id)}<small>${p.down ? '점검 중' : '사용 가능'}</small></${end}>`;
+  };
+  const rows = [...new Set(printers.filter((p) => p.type !== 'z18').map((p) => p.row))];
+  const z = printers.filter((p) => p.type === 'z18');
+  return `<div class="fp-rows">${rows.map((r) => {
+      const ps = printers.filter((p) => p.row === r);
+      return `<div class="fp-row"><div class="fp-label"><b>${r}</b><small>${ps.length}대</small></div><div class="fp-tiles">${ps.map(tile).join('')}</div></div>`;
+    }).join('')}</div>
+    <div class="fp-side">${z.map(tile).join('')}<span class="cap">대형 출력용</span></div>
+    <div class="fp-door">출입문</div>`;
+}
+function renderHome() {
+  if (!info) return;
+  $('#homeTitle').textContent = info.site_name;
+  $('#homeIntro').textContent = info.intro || '';
+  $('#homeMeta').textContent = [info.location && `위치 ${info.location}`, info.contact && `문의 ${info.contact}`].filter(Boolean).join(' · ');
+  $('#homeNotice').hidden = !info.notice; $('#homeNotice').textContent = info.notice || '';
+  const w = printWindow();
+  $('#printStatus').className = 'status-chip' + (w.open ? ' open' : '');
+  $('#printStatus').innerHTML = `<span class="dot"></span><span>${w.open ? '지금 출력 가능 시간입니다' : '지금은 출력 시간이 아닙니다'} · 출력 가능 <b>${pad(w.o)}:00–${pad(w.c)}:00</b></span>`;
+  const ps = info.printers, cnt = (t, up) => ps.filter((p) => p.type === t && (!up || !p.down)).length;
+  $('#eqSummary').innerHTML = `<span>Replicator+ <b>${cnt('replicator', 1)}</b>/${cnt('replicator')}대 사용 가능</span><span>Z18 <b>${cnt('z18', 1)}</b>/${cnt('z18')}대</span>`;
+  $('#floorPlan').innerHTML = floorPlan(ps);
+  $('#specs').innerHTML = Object.entries(info.printer_specs).map(([k, v]) => `<div class="panel spec">
+    <div class="item-head"><b>${esc(v.name)}</b><span class="small muted">${cnt(k)}대</span></div>
+    <dl><dt>방식</dt><dd>${esc(v.method)}</dd><dt>출력 크기</dt><dd>${esc(v.volume)}</dd><dt>필라멘트</dt><dd>${esc(v.filament)} · 실습실 제공</dd></dl></div>`).join('');
+  $('#rulesList').innerHTML = info.rules.map((r) => `<li><span>${esc(r)}</span></li>`).join('');
+  $('#cautionsList').innerHTML = info.cautions.map((r) => `<li>${esc(r)}</li>`).join('');
 }
 
 // ---------- 학생: 출입증 + 내역 ----------
@@ -622,7 +807,7 @@ function resItem(r, now) {
   const canCancel = ['pending', 'approved'].includes(r.status) && now < r.end_at;
   return `<div class="item">
     <div class="item-head"><b>${esc(r.room_name)}</b><span class="pill ${r.status}">${STATUS[r.status]}</span></div>
-    <div class="mono small">${fRange(r.start_at, r.end_at)}</div>
+    <div class="mono small">${fRange(r.start_at, r.end_at)}${r.printer_type ? ` · ${PT[r.printer_type]}` : ''}</div>
     ${r.purpose ? `<div class="small muted">${esc(r.purpose)}</div>` : ''}
     ${r.reject_reason ? `<div class="small" style="color:var(--bad)">반려 사유: ${esc(r.reject_reason)}</div>` : ''}
     ${live || canCancel ? `<div class="item-actions">
@@ -644,7 +829,7 @@ async function loadMine() {
   const pc = $('#passCard');
   if (live) {
     pc.innerHTML = `<article class="pass">
-      <div class="pass-top"><span class="eyebrow">지금 입장 가능</span><div class="pass-room">${esc(live.room_name)}</div><div class="pass-time">${fRange(live.start_at, live.end_at)}</div></div>
+      <div class="pass-top"><span class="eyebrow">지금 입장 가능</span><div class="pass-room">${esc(live.room_name)}</div><div class="pass-time">${fRange(live.start_at, live.end_at)}${live.printer_type ? ' · ' + PT[live.printer_type] : ''}</div></div>
       <div class="pass-perf"></div>
       <div class="pass-bottom"><div class="pass-who"><b>${esc(me.name)}</b><span class="mono">${esc(me.student_no)}</span></div>
       <button class="btn" type="button" data-qr="${live.id}">출입 QR 열기</button></div></article>`;
@@ -694,21 +879,50 @@ function initRequestForm() {
   $$('[data-day]').forEach((b) => { b.setAttribute('aria-pressed', String(Number(b.dataset.day) === pickedDay)); b.onclick = () => { pickedDay = Number(b.dataset.day); $$('[data-day]').forEach((x) => x.setAttribute('aria-pressed', String(x === b))); fillTimes(); }; });
   fillTimes();
   renderRule();
+  renderPrinterChoice();
+  requestAnimationFrame(sizePad);
+}
+let pickedType = 'replicator';
+function renderPrinterChoice() {
+  const ps = info.printers;
+  $('#ptChoice').innerHTML = Object.keys(PT).map((t) => {
+    const up = ps.filter((p) => p.type === t && !p.down).length, all = ps.filter((p) => p.type === t).length;
+    return `<button type="button" data-pt="${t}" aria-pressed="${t === pickedType}" ${up ? '' : 'disabled'}><b>${PT[t]}</b><span>${up ? `${up}/${all}대 사용 가능` : '모두 점검 중'} · ${esc(info.printer_specs[t].volume)}</span></button>`;
+  }).join('');
+  $$('[data-pt]').forEach((b) => b.onclick = () => { pickedType = b.dataset.pt; $$('[data-pt]').forEach((x) => x.setAttribute('aria-pressed', String(x === b))); });
+}
+// 지도교수 서명란
+const sig = $('#sigPad'); let sigDirty = false, sigDraw = false;
+function sizePad() {
+  const r = sig.getBoundingClientRect(); if (!r.width) return;
+  const d = window.devicePixelRatio || 1; sig.width = Math.round(r.width * d); sig.height = Math.round(r.height * d);
+  const g = sig.getContext('2d'); g.setTransform(d, 0, 0, d, 0, 0); g.lineWidth = 2.4; g.lineCap = 'round'; g.lineJoin = 'round'; g.strokeStyle = '#111';
+  sigDirty = false; $('#sigPh').hidden = false;
+}
+const sigPt = (e) => { const r = sig.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+sig.addEventListener('pointerdown', (e) => { sig.setPointerCapture(e.pointerId); sigDraw = true; const g = sig.getContext('2d'); g.beginPath(); g.moveTo(...sigPt(e)); g.lineTo(...sigPt(e)); g.stroke(); sigDirty = true; $('#sigPh').hidden = true; });
+sig.addEventListener('pointermove', (e) => { if (!sigDraw) return; const g = sig.getContext('2d'); g.lineTo(...sigPt(e)); g.stroke(); });
+['pointerup', 'pointercancel'].forEach((t) => sig.addEventListener(t, () => { sigDraw = false; }));
+$('#sigClear').onclick = sizePad;
+window.addEventListener('resize', () => { if (!$('#s-new').hidden && !sigDirty) sizePad(); });
+function sigData() {
+  const w = 600, h = Math.round(w * sig.height / sig.width), c = document.createElement('canvas'); c.width = w; c.height = h;
+  c.getContext('2d').drawImage(sig, 0, 0, w, h); return c.toDataURL('image/png');
 }
 function fillTimes() {
   const now = Date.now() + skew, opts = [];
-  for (let m = 0; m <= 24 * 60; m += 30) opts.push(m);
+  for (let m = info.print_open_hour * 60; m <= info.print_close_hour * 60; m += 30) opts.push(m);
   const label = (m) => `${pad(Math.floor(m / 60))}:${pad(m % 60)}`;
   const prevS = $('#startT').value, prevE = $('#endT').value;
-  const startOpts = opts.filter((m) => m < 24 * 60 && pickedDay + (m + 30) * 60000 > now);
-  $('#startT').innerHTML = startOpts.map((m) => `<option value="${m}">${label(m)}</option>`).join('') || '<option value="">오늘은 신청 가능한 시간이 없습니다</option>';
+  const startOpts = opts.filter((m) => m < info.print_close_hour * 60 && pickedDay + (m + 30) * 60000 > now);
+  $('#startT').innerHTML = startOpts.map((m) => `<option value="${m}">${label(m)}</option>`).join('') || `<option value="">이날은 신청 가능한 시간이 없습니다 (출력 ${info.print_open_hour}~${info.print_close_hour}시)</option>`;
   if (startOpts.includes(Number(prevS))) $('#startT').value = prevS;
-  else { const def = startOpts.find((m) => m >= 13 * 60) ?? startOpts[0]; if (def !== undefined) $('#startT').value = def; }
+  else if (startOpts.length) $('#startT').value = startOpts[0];
   const fillEnd = () => {
     const s = Number($('#startT').value);
     const endOpts = opts.filter((m) => m > s);
     $('#endT').innerHTML = endOpts.map((m) => `<option value="${m}">${m === 1440 ? '24:00' : label(m)}</option>`).join('');
-    if (endOpts.includes(Number(prevE)) && Number(prevE) > s) $('#endT').value = prevE; else $('#endT').value = Math.min(s + 120, 1440);
+    if (endOpts.includes(Number(prevE)) && Number(prevE) > s) $('#endT').value = prevE; else if (endOpts.length) $('#endT').value = endOpts[Math.min(3, endOpts.length - 1)];
     renderRule();
   };
   $('#startT').onchange = fillEnd; $('#endT').onchange = renderRule;
@@ -718,7 +932,7 @@ function renderRule() {
   const r = rooms.find((x) => x.id == $('#room').value); if (!r) return;
   const s = Number($('#startT').value), e = Number($('#endT').value), mins = e - s;
   const dur = `${Math.floor(mins / 60) ? Math.floor(mins / 60) + '시간 ' : ''}${mins % 60 ? (mins % 60) + '분' : ''}`.trim();
-  if (!r.auto_approve) { $('#roomRule').innerHTML = `<b>${esc(dur)}</b> 이용 · 관리자가 승인하면 QR이 발급됩니다.`; return; }
+  if (!r.auto_approve) { $('#roomRule').innerHTML = `<b>${esc(dur)}</b> 이용 · 필라멘트는 실습실에서 제공합니다. 관리자가 승인하면 QR이 발급됩니다.`; return; }
   const fits = s >= r.open_hour * 60 && e <= r.close_hour * 60 && mins <= r.max_minutes;
   $('#roomRule').innerHTML = `<b>${esc(dur)}</b> 이용 · ${fits ? '<b style="color:var(--ok)">바로 자동 승인</b>될 수 있는 신청입니다' : '자동 승인 기준 밖이라 관리자 승인이 필요합니다'}<br>자동 승인 기준: ${r.open_hour}시–${r.close_hour}시, 최대 ${r.max_minutes}분, 동시 ${r.capacity}명`;
 }
@@ -727,13 +941,15 @@ $('#reqForm').onsubmit = async (e) => {
   e.preventDefault();
   if ($('#startT').value === '') return toast('신청할 수 있는 시간이 없습니다. 다른 날짜를 골라 주세요.');
   const start_at = pickedDay + Number($('#startT').value) * 60000, end_at = pickedDay + Number($('#endT').value) * 60000;
-  const purpose = $('#purpose').value.trim();
+  const purpose = $('#purpose').value.trim(), advisor_name = $('#advisor').value.trim();
   if (!purpose) { $('#purpose').focus(); return toast('사용 목적을 적어 주세요.'); }
+  if (!advisor_name) { $('#advisor').focus(); return toast('지도교수 성명을 적어 주세요.'); }
+  if (!sigDirty) return toast('지도교수 서명을 받아 주세요.');
   const btn = $('#reqBtn'); btn.disabled = true;
   try {
-    const r = await api('/api/reservations', { method: 'POST', body: { room_id: Number($('#room').value), start_at, end_at, purpose } });
+    const r = await api('/api/reservations', { method: 'POST', body: { room_id: Number($('#room').value), start_at, end_at, purpose, printer_type: pickedType, advisor_name, advisor_sig: sigData() } });
     toast(r.status === 'approved' ? '자동 승인되었습니다. 출입증에서 확인하세요.' : '신청했습니다. 관리자 승인을 기다려 주세요.');
-    $('#purpose').value = '';
+    $('#purpose').value = ''; sizePad();
     location.hash = 'pass';
   } catch (err) { toast(err.message); } finally { btn.disabled = false; }
 };
@@ -785,15 +1001,19 @@ A.requests = async () => {
   const rows = reservations.map((r) => `<tr>
     <td><b>${esc(r.name)}</b> <span class="mono small muted">${esc(r.student_no)}</span></td>
     <td>${esc(r.room_name)}</td>
-    <td class="mono small">${fRange(r.start_at, r.end_at)}</td>
+    <td class="mono small">${fRange(r.start_at, r.end_at)}<div class="muted">${PT[r.printer_type] || ''}</div></td>
+    <td class="small">${esc(r.advisor_name || '-')}${r.has_sig ? ` <button class="btn quiet sm" type="button" data-sig="${r.id}">서명 보기</button>` : ''}</td>
     <td class="small">${esc(r.purpose)}${r.reject_reason ? `<div style="color:var(--bad)">사유: ${esc(r.reject_reason)}</div>` : ''}${r.status === 'approved' && !r.decided_by ? '<div class="muted">자동 승인</div>' : ''}</td>
     <td class="actions">
       ${r.status === 'pending' ? `<button class="btn ok sm" type="button" data-approve="${r.id}">승인</button>` : ''}
       ${r.status !== 'rejected' ? `<button class="btn secondary sm" type="button" data-reject="${r.id}">${r.status === 'approved' ? '승인 취소' : '반려'}</button>` : ''}
     </td></tr>`).join('');
   $('#adminMain').innerHTML = head('이용 신청 승인', '승인하면 학생 화면에 출입 QR이 열립니다.', seg) +
-    `<div class="panel table-wrap">${rows ? `<table class="resp"><thead><tr><th>신청자</th><th>실습실</th><th>이용 시간</th><th>목적</th><th></th></tr></thead><tbody>${rows}</tbody></table>` : '<div class="empty">해당하는 신청이 없습니다.</div>'}</div>`;
+    `<div class="panel table-wrap">${rows ? `<table class="resp"><thead><tr><th>신청자</th><th>실습실</th><th>이용 시간·장비</th><th>지도교수</th><th>목적</th><th></th></tr></thead><tbody>${rows}</tbody></table>` : '<div class="empty">해당하는 신청이 없습니다.</div>'}</div>`;
   $$('[data-rf]').forEach((b) => b.onclick = () => { reqFilter = b.dataset.rf; reload(); });
+  $$('[data-sig]').forEach((b) => b.onclick = async () => {
+    try { const r = await api(`/api/admin/reservations/${b.dataset.sig}/signature`); showImage(`지도교수 서명 · ${r.advisor_name}`, r.advisor_sig); } catch (e) { toast(e.message); }
+  });
   $$('[data-approve]').forEach((b) => b.onclick = async () => { if (await act(() => api(`/api/admin/reservations/${b.dataset.approve}/approve`, { method: 'POST' }), '승인했습니다.')) reload(); });
   $$('[data-reject]').forEach((b) => b.onclick = async () => {
     const reason = await ask({ title: '신청을 반려할까요?', text: '학생에게 반려 사유가 표시됩니다.', input: true, label: '반려 사유', ok: '반려', danger: true });
@@ -885,6 +1105,15 @@ A.master = async () => {
     if (await act(() => api(`/api/admin/masters/${b.dataset.mreissue}/reissue`, { method: 'POST' }), '재발급했습니다.')) { await reload(); showMaster(Number(b.dataset.mreissue)); }
   });
 };
+function showImage(title, src) {
+  const d = $('#dlg');
+  $('#dlgTitle').textContent = title; $('#dlgText').hidden = true; $('#dlgInputWrap').hidden = true;
+  const box = document.createElement('div'); box.innerHTML = `<img class="sig-img" alt="${esc(title)}" src="${esc(src)}">`;
+  $('#dlgForm').insertBefore(box, $('#dlgForm .row.end'));
+  $('#dlgOk').textContent = '닫기'; $('#dlgOk').className = 'btn'; $('#dlgForm .row.end .secondary').hidden = true;
+  d.onclose = () => { box.remove(); $('#dlgForm .row.end .secondary').hidden = false; };
+  d.returnValue = ''; d.showModal();
+}
 async function showMaster(id) {
   const m = masters.find((x) => x.id === id); if (!m) return;
   const sub = `${m.room_name || '모든 실습실'} · ${fDT(m.expires_at)}까지`;
@@ -918,6 +1147,22 @@ function qrPng(text) {
   for (let r = 0; r < n; r++) for (let k = 0; k < n; k++) if (q.isDark(r, k)) g.fillRect((k + margin) * cell, (r + margin) * cell, cell, cell);
   return c.toDataURL('image/png');
 }
+
+A.equipment = async () => {
+  const { settings: s } = await api('/api/admin/settings');
+  const down = new Set(s.printer_down);
+  const ps = info.printers.map((p) => ({ ...p, down: down.has(p.id) }));
+  $('#adminMain').innerHTML = head('장비 상태', '장비를 누르면 사용 가능 ↔ 점검 중이 바뀝니다. 첫 화면 배치도와 신청 화면에 바로 반영됩니다.') +
+    `<div class="panel floor">${floorPlan(ps, true)}</div>`;
+  $$('[data-pr]').forEach((b) => b.onclick = async () => {
+    const id = b.dataset.pr; if (down.has(id)) down.delete(id); else down.add(id);
+    try {
+      const r = await api('/api/admin/settings', { method: 'PATCH', body: { printer_down: [...down] } });
+      info = (await api('/api/config')); Object.assign(settings, r.settings);
+      toast(`${id} ${down.has(id) ? '점검 중' : '사용 가능'}으로 바꿨습니다.`); reload();
+    } catch (e) { toast(e.message); }
+  });
+};
 
 A.rooms = async () => {
   const { rooms: rs } = await api('/api/rooms?all=1');
@@ -1014,6 +1259,8 @@ A.features = async () => {
     <div class="panel">
       ${sw('reservations_open', '이용 신청 받기', '끄면 학생이 새 이용 신청을 할 수 없습니다. 이미 승인된 예약은 그대로입니다.')}
       ${num('max_days_ahead', '신청 가능 기간', '오늘부터 며칠 뒤까지 신청을 받을지', '일', 1, 90)}
+      ${num('print_open_hour', '출력 시작 시각', '이 시각부터 이용을 신청할 수 있습니다', '시', 0, 23)}
+      ${num('print_close_hour', '출력 종료 시각', '이 시각까지 이용이 끝나야 합니다', '시', 1, 24)}
       ${sw('registration_open', '새 가입 받기', '끄면 가입 화면에서 새 계정을 만들 수 없습니다.')}
       ${sw('require_user_approval', '가입 승인 필요', '켜면 관리자가 승인해야 새 계정으로 로그인할 수 있습니다.')}
     </div>
@@ -1021,10 +1268,14 @@ A.features = async () => {
     <div class="panel">
       <div class="setting wide"><div class="txt"><b>서비스 이름</b><span>로그인 화면과 상단에 표시됩니다.</span></div><div class="ctl"><input class="input" data-s="site_name" value="${esc(s.site_name)}" maxlength="30"></div></div>
       <div class="setting wide"><div class="txt"><b>공지</b><span>로그인 화면과 학생 화면 위쪽에 보입니다. 비우면 숨깁니다.</span></div><div class="ctl"><textarea class="input" data-s="notice" maxlength="300" placeholder="예: 11/10(월)은 장비 점검으로 실습실을 운영하지 않습니다.">${esc(s.notice)}</textarea></div></div>
-      <div class="setting"><div class="txt"><span>서비스 이름과 공지는 저장 버튼을 눌러야 반영됩니다.</span></div><div class="ctl"><button class="btn sm" type="button" id="saveText">저장</button></div></div>
+      <div class="setting wide"><div class="txt"><b>소개 문구</b><span>첫 화면 제목 아래에 보입니다.</span></div><div class="ctl"><textarea class="input" data-s="intro" maxlength="300">${esc(s.intro)}</textarea></div></div>
+      <div class="setting wide"><div class="txt"><b>위치 · 문의</b><span>첫 화면에 함께 표시됩니다.</span></div><div class="ctl two"><input class="input" data-s="location" value="${esc(s.location)}" maxlength="60" aria-label="위치"><input class="input" data-s="contact" value="${esc(s.contact)}" maxlength="80" aria-label="문의"></div></div>
+      <div class="setting wide"><div class="txt"><b>이용 규정</b><span>한 줄에 하나씩 적습니다. 첫 화면에 번호를 붙여 보여 줍니다.</span></div><div class="ctl"><textarea class="input" data-s="rules" maxlength="2000" style="min-height:120px">${esc(s.rules)}</textarea></div></div>
+      <div class="setting wide"><div class="txt"><b>주의사항</b><span>한 줄에 하나씩 적습니다.</span></div><div class="ctl"><textarea class="input" data-s="cautions" maxlength="2000" style="min-height:160px">${esc(s.cautions)}</textarea></div></div>
+      <div class="setting"><div class="txt"><span>글자로 된 항목은 저장 버튼을 눌러야 반영됩니다.</span></div><div class="ctl"><button class="btn sm" type="button" id="saveText">저장</button></div></div>
     </div>`;
   const save = async (patch) => {
-    try { const r = await api('/api/admin/settings', { method: 'PATCH', body: patch }); Object.assign(settings, r.settings); applyChrome(); toast('저장했습니다.'); return true; }
+    try { const r = await api('/api/admin/settings', { method: 'PATCH', body: patch }); Object.assign(settings, r.settings); info = await api('/api/config'); applyChrome(); toast('저장했습니다.'); return true; }
     catch (e) { toast(e.message); return false; }
   };
   $$('input[type=checkbox][data-s]').forEach((i) => i.onchange = async () => {
@@ -1032,7 +1283,10 @@ A.features = async () => {
     if (!(await save({ [i.dataset.s]: i.checked }))) i.checked = !i.checked;
   });
   $$('input[type=number][data-s]').forEach((i) => i.onchange = () => save({ [i.dataset.s]: Number(i.value) }));
-  $('#saveText').onclick = () => save({ site_name: $('[data-s=site_name]').value, notice: $('[data-s=notice]').value });
+  $('#saveText').onclick = async () => {
+    const keys = ['site_name', 'notice', 'intro', 'location', 'contact', 'rules', 'cautions'];
+    if (await save(Object.fromEntries(keys.map((k) => [k, $(`[data-s=${k}]`).value])))) info = await api('/api/config');
+  };
 };
 
 // ---------- 시작 ----------
@@ -1042,18 +1296,22 @@ function fillRooms() {
   if (rooms.some((r) => r.id == prev)) $('#room').value = prev;
 }
 function applyChrome() {
-  $('#brandName').textContent = settings.site_name; document.title = settings.site_name;
+  const name = (info && info.site_name) || settings.site_name;
+  $('#brandName').textContent = name; document.title = name;
   $('#noticeBanner').hidden = !settings.notice; $('#noticeBanner').textContent = settings.notice || '';
   $('#lockBanner').hidden = !settings.lockdown;
 }
-async function boot() {
-  try { const r = await api('/api/me'); me = r.user; settings = r.settings; } catch { me = null; }
+async function boot(next) {
+  try { info = await api('/api/config'); } catch { info = null; }
+  try { const r = await api('/api/me'); me = r.user; settings = r.settings; } catch { me = null; settings = { ...(info || {}) }; }
+  if (info) applyChrome();
   if (me) {
     $('#whoName').textContent = `${me.name} · ${me.student_no}`;
     applyChrome();
     rooms = (await api('/api/rooms')).rooms; fillRooms();
     if (me.role === 'admin') settings = { ...settings, ...(await api('/api/admin/settings')).settings };
   }
+  if (next && location.hash.slice(1) !== next) { location.hash = next; return; }
   route();
 }
 boot();

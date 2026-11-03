@@ -30,9 +30,45 @@ async function body(req) {
   }
 }
 
+// ---------- 실습실 보유 장비 (배치도) ----------
+// 열 이름과 대수: Replicator+ 4/4/4/3/3/2 = 20대, Z18 1대
+const PRINTER_ROWS = [['A', 4], ['B', 4], ['C', 4], ['D', 3], ['E', 3], ['F', 2]];
+const PRINTERS = [
+  ...PRINTER_ROWS.flatMap(([row, n]) =>
+    Array.from({ length: n }, (_, i) => ({ id: `${row}${i + 1}`, row, type: 'replicator' }))),
+  { id: 'Z1', row: 'Z', type: 'z18' },
+];
+const PRINTER_TYPES = { replicator: 'Replicator+', z18: 'Z18' };
+const PRINTER_SPECS = {
+  replicator: { name: 'MakerBot Replicator+', method: 'FDM (용융 적층)', volume: '29.5 × 19.5 × 16.5 cm', filament: '1.75 mm PLA' },
+  z18: { name: 'MakerBot Replicator Z18', method: 'FDM (용융 적층)', volume: '30.5 × 30.5 × 45.7 cm', filament: '1.75 mm PLA' },
+};
+
+// 이전 사이트(3D 스마트 창작실)의 주의사항을 옮김. 관리자 화면에서 수정 가능
+const DEFAULT_CAUTIONS = [
+  '사용 목적 외 사용 금지',
+  '기자재 분실, 파손, 도난 금지. 손해배상을 청구합니다.',
+  '사용 기간과 사용 시간 엄수',
+  '사용 내용이 바뀌면 미리 신청 내용을 변경하고 확인받기',
+  '사용 신청 없이 출력 중인 출력물은 발견 즉시 폐기하며, 사용자는 이후 출력이 금지됩니다.',
+  '사용 후 정리정돈 필수',
+  '사용 전 청소하고 이상 유무를 확인하며, 이상이 있으면 보고합니다.',
+  '이상 발생 시 사전·사후에 보고하지 않으면 본인 과실로 간주하며 불이익이 있습니다.',
+].join('\n');
+
+const DEFAULT_RULES = [
+  '필라멘트는 실습실에서 제공합니다. 따로 가져오지 않아도 됩니다.',
+  '오전·오후 구분 없이 출력할 수 있습니다. 단, 출력 가능 시간은 09:00~16:00입니다.',
+  '이용 신청에는 지도교수의 서명이 필요합니다.',
+].join('\n');
+
 // ---------- 운영 설정 (관리자 화면에서 변경) ----------
 const SETTING_DEFS = {
-  site_name: { type: 'str', max: 30, def: () => '실습실 출입' },
+  site_name: { type: 'str', max: 30, def: () => '3D 스마트 창작실' },
+  intro: { type: 'str', max: 300, def: () => '다양한 3D 프린터로 상상 속 아이디어를 실제 형상으로 만들 수 있는 공간입니다. 수업에서 배운 것을 활용해 더 나은 미래의 모습을 만들어 보세요.' },
+  location: { type: 'str', max: 60, def: () => 'E2-207호' },
+  contact: { type: 'str', max: 80, def: () => '학부사무실 052-279-3101' },
+  cautions: { type: 'str', max: 2000, def: () => DEFAULT_CAUTIONS },
   notice: { type: 'str', max: 300, def: () => '' },
   registration_open: { type: 'bool', def: () => true },
   require_user_approval: { type: 'bool', def: (env) => env.REQUIRE_USER_APPROVAL !== 'false' },
@@ -41,6 +77,10 @@ const SETTING_DEFS = {
   lockdown: { type: 'bool', def: () => false },
   master_qr_enabled: { type: 'bool', def: () => true },
   door_open_ms: { type: 'int', min: 1000, max: 15000, def: (env) => Number(env.DOOR_OPEN_MS || 3000) },
+  print_open_hour: { type: 'int', min: 0, max: 23, def: () => 9 },
+  print_close_hour: { type: 'int', min: 1, max: 24, def: () => 16 },
+  rules: { type: 'str', max: 2000, def: () => DEFAULT_RULES },
+  printer_down: { type: 'json', def: () => [] }, // 점검 중인 장비 id 목록
 };
 
 async function getSettings(env) {
@@ -50,6 +90,10 @@ async function getSettings(env) {
   for (const { key, value } of results) {
     const d = SETTING_DEFS[key];
     if (!d) continue;
+    if (d.type === 'json') {
+      try { out[key] = JSON.parse(value); } catch { /* 기본값 유지 */ }
+      continue;
+    }
     out[key] = d.type === 'bool' ? value === '1' : d.type === 'int' ? Number(value) : value;
   }
   return out;
@@ -59,6 +103,11 @@ function normalizeSetting(key, v) {
   const d = SETTING_DEFS[key];
   if (!d) throw new HttpError(400, `알 수 없는 설정: ${key}`);
   if (d.type === 'bool') return v === true || v === 1 || v === '1' || v === 'true' ? '1' : '0';
+  if (key === 'printer_down') {
+    const ids = new Set(PRINTERS.map((p) => p.id));
+    if (!Array.isArray(v) || !v.every((x) => ids.has(x))) throw new HttpError(400, '장비 목록이 올바르지 않습니다.');
+    return JSON.stringify([...new Set(v)]);
+  }
   if (d.type === 'int') {
     const n = Math.round(Number(v));
     if (!Number.isFinite(n) || n < d.min || n > d.max) throw new HttpError(400, `${key} 값은 ${d.min}~${d.max} 사이여야 합니다.`);
@@ -66,6 +115,32 @@ function normalizeSetting(key, v) {
   }
   return String(v ?? '').trim().slice(0, d.max);
 }
+
+function publicInfo(s) {
+  const down = new Set(s.printer_down);
+  return {
+    site_name: s.site_name,
+    notice: s.notice,
+    intro: s.intro,
+    location: s.location,
+    contact: s.contact,
+    rules: s.rules.split('\n').map((x) => x.trim()).filter(Boolean),
+    cautions: s.cautions.split('\n').map((x) => x.trim()).filter(Boolean),
+    printer_specs: PRINTER_SPECS,
+    print_open_hour: s.print_open_hour,
+    print_close_hour: s.print_close_hour,
+    reservations_open: s.reservations_open,
+    max_days_ahead: s.max_days_ahead,
+    registration_open: s.registration_open,
+    require_user_approval: s.require_user_approval,
+    printer_types: PRINTER_TYPES,
+    printers: PRINTERS.map((p) => ({ ...p, down: down.has(p.id) })),
+  };
+}
+
+// 신청 목록에서는 큰 서명 이미지를 빼고 보낸다
+const RES_COLS = `r.id, r.user_id, r.room_id, r.start_at, r.end_at, r.purpose, r.status, r.decided_by, r.decided_at,
+  r.reject_reason, r.created_at, r.printer_type, r.advisor_name, (r.advisor_sig IS NOT NULL) AS has_sig`;
 
 const kstHour = (ms) => new Date(ms + KST_OFFSET_MS).getUTCHours() + new Date(ms + KST_OFFSET_MS).getUTCMinutes() / 60;
 const kstDay = (ms) => new Date(ms + KST_OFFSET_MS).toISOString().slice(0, 10);
@@ -169,13 +244,7 @@ async function route(req, env, url) {
 
   // ===== 로그인 전 화면용 공개 설정 =====
   if (path === '/api/config' && method === 'GET') {
-    const s = await getSettings(env);
-    return json({
-      site_name: s.site_name,
-      notice: s.notice,
-      registration_open: s.registration_open,
-      require_user_approval: s.require_user_approval,
-    });
+    return json(publicInfo(await getSettings(env)));
   }
 
   // ===== 인증 =====
@@ -230,13 +299,7 @@ async function route(req, env, url) {
     const s = await getSettings(env);
     return json({
       user,
-      settings: {
-        site_name: s.site_name,
-        notice: s.notice,
-        reservations_open: s.reservations_open,
-        max_days_ahead: s.max_days_ahead,
-        lockdown: s.lockdown,
-      },
+      settings: { ...publicInfo(s), lockdown: s.lockdown },
     });
   }
 
@@ -250,7 +313,7 @@ async function route(req, env, url) {
   if (path === '/api/reservations' && method === 'POST') {
     const s = await getSettings(env);
     if (!s.reservations_open) throw new HttpError(403, '지금은 이용 신청을 받지 않습니다.');
-    const { room_id, start_at, end_at, purpose } = await body(req);
+    const { room_id, start_at, end_at, purpose, printer_type, advisor_name, advisor_sig } = await body(req);
     const start = Number(start_at);
     const end = Number(end_at);
     if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start)
@@ -259,6 +322,20 @@ async function route(req, env, url) {
     if (start - Date.now() > s.max_days_ahead * 86400_000)
       throw new HttpError(400, `${s.max_days_ahead}일 이내로만 신청할 수 있습니다.`);
     if (!String(purpose || '').trim()) throw new HttpError(400, '사용 목적을 적어 주세요.');
+    // 출력 가능 시간 (오전·오후 구분 없이 하루 안에서 print_open_hour~print_close_hour)
+    const sh = kstHour(start);
+    const eh = sh + (end - start) / 3600_000;
+    if (kstDay(start) !== kstDay(end - 1) || sh < s.print_open_hour || eh > s.print_close_hour)
+      throw new HttpError(400, `출력 가능 시간은 ${s.print_open_hour}시~${s.print_close_hour}시입니다.`);
+    if (!PRINTER_TYPES[printer_type]) throw new HttpError(400, '사용할 장비를 골라 주세요.');
+    const down = new Set(s.printer_down);
+    if (!PRINTERS.some((p) => p.type === printer_type && !down.has(p.id)))
+      throw new HttpError(409, `${PRINTER_TYPES[printer_type]}는 모두 점검 중입니다.`);
+    const advisor = String(advisor_name || '').trim().slice(0, 30);
+    if (!advisor) throw new HttpError(400, '지도교수 성명을 적어 주세요.');
+    if (typeof advisor_sig !== 'string' || !advisor_sig.startsWith('data:image/png;base64,') || advisor_sig.length < 200)
+      throw new HttpError(400, '지도교수 서명을 받아 주세요.');
+    if (advisor_sig.length > 150_000) throw new HttpError(400, '서명 이미지가 너무 큽니다. 지우고 다시 서명해 주세요.');
     const room = await env.DB.prepare('SELECT * FROM rooms WHERE id = ? AND enabled = 1').bind(id(room_id)).first();
     if (!room) throw new HttpError(404, '신청할 수 있는 실습실이 아닙니다.');
     const dup = await env.DB.prepare(
@@ -272,18 +349,19 @@ async function route(req, env, url) {
     const auto = await autoApproveDecision(env, room, user.id, start, end);
     const now = Date.now();
     const r = await env.DB.prepare(
-      `INSERT INTO reservations (user_id, room_id, start_at, end_at, purpose, status, decided_at, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO reservations (user_id, room_id, start_at, end_at, purpose, status, decided_at, created_at,
+         printer_type, advisor_name, advisor_sig)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
       .bind(user.id, room.id, start, end, String(purpose).trim().slice(0, 200), auto.ok ? 'approved' : 'pending',
-        auto.ok ? now : null, now)
+        auto.ok ? now : null, now, printer_type, advisor, advisor_sig)
       .run();
     return json({ ok: true, id: r.meta.last_row_id, status: auto.ok ? 'approved' : 'pending', note: auto.why || null });
   }
 
   if (path === '/api/reservations' && method === 'GET') {
     const { results } = await env.DB.prepare(
-      `SELECT r.*, rm.name AS room_name, rm.early_minutes FROM reservations r JOIN rooms rm ON rm.id = r.room_id
+      `SELECT ${RES_COLS}, rm.name AS room_name, rm.early_minutes FROM reservations r JOIN rooms rm ON rm.id = r.room_id
        WHERE r.user_id = ? AND r.end_at > ? ORDER BY r.start_at DESC LIMIT 50`,
     )
       .bind(user.id, Date.now() - 14 * 86400_000)
@@ -374,6 +452,9 @@ async function adminRoute(req, env, path, method, admin, url) {
         .bind(k, normalizeSetting(k, v)),
     );
     if (!stmts.length) throw new HttpError(400, '변경할 항목이 없습니다.');
+    const cur = await getSettings(env);
+    if (Number(b.print_open_hour ?? cur.print_open_hour) >= Number(b.print_close_hour ?? cur.print_close_hour))
+      throw new HttpError(400, '출력 시작 시각은 종료 시각보다 빨라야 합니다.');
     await env.DB.batch(stmts);
     return json({ ok: true, settings: await getSettings(env) });
   }
@@ -382,13 +463,19 @@ async function adminRoute(req, env, path, method, admin, url) {
   if (path === '/api/admin/reservations' && method === 'GET') {
     const status = url.searchParams.get('status') || 'pending';
     const { results } = await env.DB.prepare(
-      `SELECT r.*, u.student_no, u.name, rm.name AS room_name
+      `SELECT ${RES_COLS}, u.student_no, u.name, rm.name AS room_name
        FROM reservations r JOIN users u ON u.id = r.user_id JOIN rooms rm ON rm.id = r.room_id
        WHERE r.status = ? AND r.end_at > ? ORDER BY r.start_at LIMIT 200`,
     )
       .bind(status, now - 86400_000)
       .all();
     return json({ reservations: results });
+  }
+
+  if ((m = path.match(/^\/api\/admin\/reservations\/(\d+)\/signature$/)) && method === 'GET') {
+    const r = await env.DB.prepare('SELECT advisor_name, advisor_sig FROM reservations WHERE id = ?').bind(id(m[1])).first();
+    if (!r || !r.advisor_sig) throw new HttpError(404, '서명이 없습니다.');
+    return json(r);
   }
 
   if ((m = path.match(/^\/api\/admin\/reservations\/(\d+)\/(approve|reject)$/)) && method === 'POST') {

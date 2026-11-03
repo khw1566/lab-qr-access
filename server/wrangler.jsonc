@@ -15,7 +15,7 @@
     { "binding": "DB", "database_name": "lab-access", "database_id": "c2076680-7ed6-4728-9c2e-e5df5f657f94" }
   ],
   "vars": {
-    "REQUIRE_USER_APPROVAL": "true",
+    "REQUIRE_USER_APPROVAL": "false",
     "DOOR_OPEN_MS": "3000"
   }
   // 비밀값은 vars가 아니라 secret으로 등록:

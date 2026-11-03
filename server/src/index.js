@@ -100,6 +100,22 @@ function closedDays(s) {
 }
 
 // ---------- 운영 설정 (관리자 화면에서 변경) ----------
+// 학부(과) 드롭다운 목록. 한 줄에 '학부: 전공, 전공' (전공이 없으면 '학부'만)
+const DEFAULT_DEPARTMENTS = `기계공학부: 기계시스템전공, 기계설비전공, 스마트해양수송시스템전공
+전기전자공학부: 전기전공, 스마트전자전공, 반도체응용전공`;
+function parseDepartments(text) {
+  return String(text || '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [school, rest = ''] = line.split(/[:：]/);
+      const majors = rest.split(/[,，]/).map((x) => x.trim()).filter(Boolean);
+      const name = school.trim();
+      return { school: name, options: majors.length ? majors.map((mj) => `${name} ${mj}`) : [name], majors };
+    });
+}
+
 const SETTING_DEFS = {
   site_name: { type: 'str', max: 30, def: () => '3D 스마트 창작실' },
   intro: { type: 'str', max: 300, def: () => '다양한 3D 프린터로 상상 속 아이디어를 실제 형상으로 만들 수 있는 공간입니다. 수업에서 배운 것을 활용해 더 나은 미래의 모습을 만들어 보세요.' },
@@ -110,7 +126,8 @@ const SETTING_DEFS = {
   feedback_url: { type: 'str', max: 300, def: () => 'https://docs.google.com/forms/d/e/1FAIpQLSc1q96Q9BOxN9XxtQuu0qSdLgfmXZokfb1Ggsf7oR15xQHcpQ/viewform' },
   notice: { type: 'str', max: 300, def: () => '' },
   registration_open: { type: 'bool', def: () => true },
-  require_user_approval: { type: 'bool', def: (env) => env.REQUIRE_USER_APPROVAL !== 'false' },
+  require_user_approval: { type: 'bool', def: (env) => env.REQUIRE_USER_APPROVAL === 'true' }, // 기본: 가입 즉시 사용
+  departments: { type: 'str', max: 2000, def: () => DEFAULT_DEPARTMENTS },
   reservations_open: { type: 'bool', def: () => true },
   max_days_ahead: { type: 'int', min: 1, max: 90, def: () => 30 },
   lockdown: { type: 'bool', def: () => false },
@@ -166,6 +183,7 @@ function publicInfo(s) {
     location: s.location,
     contact: s.contact,
     rules: s.rules.split('\n').map((x) => x.trim()).filter(Boolean),
+    departments: parseDepartments(s.departments),
     cautions: s.cautions.split('\n').map((x) => x.trim()).filter(Boolean),
     printer_specs: PRINTER_SPECS,
     closed_days: closedDays(s),
@@ -368,7 +386,9 @@ async function route(req, env, url) {
       throw new HttpError(400, `${s.max_days_ahead}일 이내로만 신청할 수 있습니다.`);
     if (!String(purpose || '').trim()) throw new HttpError(400, '사용 목적을 적어 주세요.');
     const dept = String(department || '').trim().slice(0, 40);
-    if (!dept) throw new HttpError(400, '학부(과)를 적어 주세요.');
+    if (!dept) throw new HttpError(400, '학부(과)를 골라 주세요.');
+    if (!parseDepartments(s.departments).some((g) => g.options.includes(dept)))
+      throw new HttpError(400, '학부(과)를 목록에서 골라 주세요.');
     const tel = String(phone || '').replace(/[^0-9]/g, '');
     if (!/^0\d{8,10}$/.test(tel)) throw new HttpError(400, '전화번호를 확인해 주세요. 예: 010-1234-5678');
     const telFmt = tel.length === 11 ? `${tel.slice(0, 3)}-${tel.slice(3, 7)}-${tel.slice(7)}` : tel.length === 10 && tel.startsWith('02') ? `02-${tel.slice(2, 6)}-${tel.slice(6)}` : tel.length === 10 ? `${tel.slice(0, 3)}-${tel.slice(3, 6)}-${tel.slice(6)}` : tel;

@@ -17,7 +17,7 @@ static int post_json(const char *path, const char *body, char *out, int out_len)
     esp_http_client_config_t cfg = {
         .url = url,
         .method = HTTP_METHOD_POST,
-        .timeout_ms = 5000,
+        .timeout_ms = 12000,    // 보드의 TLS 연결만 4초 이상 걸려 5초로는 자주 시간 초과된다
         .crt_bundle_attach = esp_crt_bundle_attach,
     };
     esp_http_client_handle_t c = esp_http_client_init(&cfg);
@@ -75,9 +75,15 @@ verify_result_t server_verify(const char *token)
     return r;
 }
 
-void server_ping(void)
+bool server_ping(void)
 {
     char resp[128];
     int s = post_json("/api/device/ping", "{}", resp, sizeof(resp));
     if (s != 200) ESP_LOGW(TAG, "ping 실패 (HTTP %d)", s);
+    else ESP_LOGI(TAG, "ping 성공");
+    char server_time[24];
+    if (s == 200 && json_find(resp, "server_time", server_time, sizeof(server_time))) {
+        ui_clock_set(strtoll(server_time, NULL, 10));
+    }
+    return s == 200;
 }

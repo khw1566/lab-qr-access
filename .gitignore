@@ -6,3 +6,7 @@ firmware/managed_components/
 firmware/sdkconfig
 firmware/sdkconfig.old
 firmware/dependencies.lock
+firmware/tools/.google_tts_key
+/.playwright-cli/
+/output/
+/firmware/.vscode/

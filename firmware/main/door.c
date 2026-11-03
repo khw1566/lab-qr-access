@@ -57,5 +57,4 @@ void door_signal(bool granted)
         vTaskDelay(pdMS_TO_TICKS(80));
     }
 #endif
-    // TODO: 7인치 LCD에 결과 표시 (LVGL, 다음 단계)
 }

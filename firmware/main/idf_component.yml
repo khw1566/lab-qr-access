@@ -2,7 +2,14 @@
 dependencies:
   idf: ">=5.5"
   # ESP32-P4에는 Wi-Fi가 없으므로 보드의 ESP32-C6를 SDIO로 연결해 표준 esp_wifi API를 그대로 사용
-  espressif/esp_wifi_remote: "*"
-  espressif/esp_hosted: "*"
+  # 보드의 C6에 설치된 슬레이브 펌웨어(2.12.2)와 메이저 버전을 맞춘다
+  espressif/esp_wifi_remote: "1.6.5"
+  espressif/esp_hosted: "2.12.2"
+  # 7인치 MIPI-DSI LCD
+  espressif/esp_lcd_jd9165: "2.0.2"
+  espressif/esp_lcd_touch_gt911: "1.2.1"
+  # ES8311 스피커 (음성 안내)
+  espressif/esp_codec_dev: "1.2.0"
+  lvgl/lvgl: "9.2.2"
   # MIPI-CSI 카메라 + ISP를 V4L2 방식으로 다루는 드라이버 (센서 드라이버 esp_cam_sensor 포함)
   espressif/esp_video: "*"

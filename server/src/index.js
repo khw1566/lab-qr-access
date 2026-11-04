@@ -223,6 +223,10 @@ async function makeSession(env, uid) {
   return `${payload}.${await hmac(env.SESSION_SECRET, payload)}`;
 }
 
+async function adminExists(env) {
+  return !!(await env.DB.prepare("SELECT 1 FROM users WHERE role = 'admin' AND status = 'active' LIMIT 1").first());
+}
+
 async function currentUser(req, env) {
   const cookie = req.headers.get('cookie') || '';
   const m = cookie.match(/(?:^|;\s*)sid=([^;]+)/);
@@ -315,7 +319,8 @@ async function route(req, env, url) {
 
   // ===== 로그인 전 화면용 공개 설정 =====
   if (path === '/api/config' && method === 'GET') {
-    return json(publicInfo(await getSettings(env)));
+    // 관리자 계정 만들기 버튼은 관리자가 아직 한 명도 없을 때만 보여 준다
+    return json({ ...publicInfo(await getSettings(env)), admin_setup_open: !(await adminExists(env)) });
   }
 
   // ===== 인증 =====
@@ -325,6 +330,9 @@ async function route(req, env, url) {
     // 첫 관리자 만들기: 비밀값 ADMIN_SETUP_CODE를 가입 화면의 "관리자 코드"에 넣으면 바로 관리자가 된다
     const isAdmin = !!(env.ADMIN_SETUP_CODE && setup_code && safeEqual(String(setup_code), env.ADMIN_SETUP_CODE));
     if (setup_code && !isAdmin) throw new HttpError(403, '관리자 코드가 올바르지 않습니다.');
+    // 관리자 코드는 첫 관리자를 만들 때만 쓴다. 그 뒤로는 기존 관리자가 사용자 메뉴에서 지정한다.
+    if (isAdmin && (await adminExists(env)))
+      throw new HttpError(403, '관리자 계정이 이미 있습니다. 기존 관리자에게 관리자 지정을 요청하세요.');
     if (!s.registration_open && !isAdmin) throw new HttpError(403, '지금은 가입을 받지 않습니다.');
     if (!/^[0-9A-Za-z]{4,20}$/.test(student_no || '')) throw new HttpError(400, '학번은 영문/숫자 4~20자입니다.');
     if (!name || String(name).trim().length > 30) throw new HttpError(400, '이름을 확인해 주세요.');
@@ -488,7 +496,9 @@ async function route(req, env, url) {
 
   // ===== 관리자 =====
   if (path.startsWith('/api/admin/')) {
-    if (user.role !== 'admin') throw new HttpError(403, '관리자만 사용할 수 있습니다.');
+    // 매 요청마다 DB의 현재 역할로 검사 (관리자 해제·정지는 즉시 반영)
+    if (user.role !== 'admin' || user.status !== 'active') throw new HttpError(403, '관리자 권한이 없습니다.');
+    if (path === '/api/admin/check' && method === 'GET') return json({ ok: true, role: user.role });
     return adminRoute(req, env, path, method, user, url);
   }
 

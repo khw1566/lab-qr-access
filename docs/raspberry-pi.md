@@ -19,6 +19,48 @@ Cloudflare Worker와 같은 코드(`server/src/index.js`)를 라즈베리파이�
 - 믿을 만한 SD카드(A1/A2 등급, 32GB) 또는 USB SSD. 가능하면 소형 UPS
 - 파이는 유선 LAN 권장. 공유기에서 **파이 IP를 고정(DHCP 예약)** 해 두세요. 보드가 이 IP로 접속합니다.
 
+## 라즈베리파이를 처음 쓴다면
+
+라즈베리파이는 ESP32 보드처럼 펌웨어를 굽는 방식이 아니라, **SD카드에 리눅스(Raspberry Pi OS)를 써 넣고** 그 위에서 서버 프로그램을 실행합니다. 모니터나 키보드 없이 PC에서 원격 접속(SSH)으로 설정합니다.
+
+### 1. SD카드에 OS 쓰기 (PC에서)
+
+1. PC에 [Raspberry Pi Imager](https://www.raspberrypi.com/software/)를 설치하고 SD카드를 꽂습니다.
+2. 장치 **Raspberry Pi 3**, 운영체제 **Raspberry Pi OS (other) > Raspberry Pi OS Lite (64-bit)**, 저장소는 SD카드를 고릅니다.
+3. "설정 편집"(OS 커스터마이징)에서:
+   - 호스트 이름: `labpi`
+   - 사용자 이름/비밀번호: 예) `lab` / 원하는 비밀번호 (잊지 않게 적어 두기)
+   - 무선 LAN: 유선을 쓸 거면 비워도 됨. 쓸 거면 실습실 Wi-Fi 이름, 국가 KR
+   - 로캘: 시간대 `Asia/Seoul`
+   - 서비스 탭: **SSH 사용**, 비밀번호 인증
+4. 쓰기를 누르고 끝나면 SD카드를 뺍니다. (5분 정도)
+
+### 2. 파이 켜고 접속하기
+
+1. SD카드를 파이에 꽂고, LAN 선을 공유기(학내망)에 연결한 뒤 전원(5V 2.5A 마이크로 USB)을 꽂습니다. 2~3분 기다립니다.
+2. 같은 망의 PC에서 PowerShell을 열고 `ssh lab@labpi.local` (처음 묻는 질문은 `yes`, 그다음 비밀번호).
+   - 접속이 안 되면 공유기 관리 화면의 접속 기기 목록에서 `labpi`의 IP를 찾아 `ssh lab@<IP>`로 접속합니다.
+3. 접속되면 아래부터는 이 창(파이 안)에서 입력합니다.
+
+```bash
+sudo apt update && sudo apt full-upgrade -y
+sudo apt install -y git
+hostname -I        # 파이 IP 확인 → 공유기에서 이 IP를 labpi 에 고정(DHCP 예약)
+```
+
+### 3. 코드 받기
+
+```bash
+git clone https://github.com/khw1566/lab-qr-access.git
+cd lab-qr-access
+git checkout claude/project-thread-4yga4i   # 파이 버전이 main에 합쳐지기 전까지만 필요
+cd server
+```
+
+저장소가 비공개라 비밀번호를 물으면, GitHub 비밀번호 대신 GitHub > Settings > Developer settings > Personal access tokens 에서 만든 토큰을 넣습니다.
+
+그다음 아래 "설치"를 그대로 진행합니다. 출입 보드 펌웨어는 지금처럼 **PC(ESP-IDF)에서** 빌드하고 USB로 올립니다. 파이는 보드에 아무것도 올리지 않습니다.
+
 ## 설치
 
 ```bash

@@ -1,0 +1,18 @@
+[Unit]
+Description=Lab access server (Node.js + SQLite)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=__USER__
+WorkingDirectory=__DIR__
+ExecStart=/usr/bin/env node --disable-warning=ExperimentalWarning pi/server.js
+Restart=always
+RestartSec=3
+# SD카드 쓰기를 줄이려고 로그는 journald(메모리)로만
+StandardOutput=journal
+StandardError=journal
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

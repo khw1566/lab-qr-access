@@ -10,6 +10,18 @@ menu "Lab Door Config"
         config LAB_SERVER_URL
             string "Server base URL (끝에 / 없이)"
             default "https://lab.audreaming.com"
+        config LAB_DEVICE_API_URL
+            string "Device API URL (라즈베리파이 내부망 주소, 비우면 위 Server URL 사용)"
+            default ""
+            help
+                보드가 QR 확인·상태 보고를 보낼 주소. 라즈베리파이 서버를 쓰면 학내망으로 직접 붙도록
+                http://<파이IP>:8788 처럼 적는다. Server URL은 학생 안내용 QR 화면에만 쓰인다.
+        config LAB_VERIFY_RESPONSE_SIG
+            bool "서버 응답 서명 확인 (개방형 Wi-Fi에서 가짜 '열림' 응답 차단)"
+            default y
+            help
+                요청마다 임의 nonce를 보내고, 서버가 단말 키로 만든 X-Lab-Sig 서명이 맞을 때만 응답을 믿는다.
+                서명이 없거나 틀리면 서버 연결 실패로 처리해 문을 열지 않는다.
         config LAB_DEVICE_KEY
             string "Device key (관리자 화면 > 단말 등록에서 발급)"
             default ""

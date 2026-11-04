@@ -10,3 +10,7 @@ firmware/tools/.google_tts_key
 /.playwright-cli/
 /output/
 /firmware/.vscode/
+
+# 라즈베리파이 서버
+server/.env
+server/data/

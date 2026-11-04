@@ -1,0 +1,8 @@
+[Unit]
+Description=Lab access DB backup
+
+[Service]
+Type=oneshot
+User=__USER__
+WorkingDirectory=__DIR__
+ExecStart=/usr/bin/env node --disable-warning=ExperimentalWarning pi/backup.js

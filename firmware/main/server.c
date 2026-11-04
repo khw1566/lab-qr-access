@@ -1,32 +1,97 @@
-// Cloudflare Worker와 통신: POST /api/device/verify, /api/device/ping
+// 서버와 통신: POST /api/device/verify, /api/device/ping
+// 라즈베리파이 서버를 쓰면 CONFIG_LAB_DEVICE_API_URL(학내망 http://<파이IP>:8788)로 직접 붙는다.
+// 응답은 X-Lab-Sig(HMAC-SHA256(단말 키, "<nonce>.<본문>")) 서명을 확인한 뒤에만 믿는다.
 #include <stdio.h>
 #include <string.h>
+#include <strings.h>
 #include <stdlib.h>
 #include "esp_http_client.h"
 #include "esp_crt_bundle.h"
 #include "esp_log.h"
+#include "esp_random.h"
+#include "mbedtls/md.h"
 #include "sdkconfig.h"
 #include "app.h"
 
 static const char *TAG = "server";
 
+#define SIG_HEX_LEN 64
+
+static const char *api_base(void)
+{
+    return CONFIG_LAB_DEVICE_API_URL[0] ? CONFIG_LAB_DEVICE_API_URL : CONFIG_LAB_SERVER_URL;
+}
+
+// 응답 헤더 중 X-Lab-Sig 만 받아 둔다 (esp_http_client_get_header는 요청 헤더만 읽으므로 이벤트로 받음)
+static esp_err_t http_event(esp_http_client_event_t *evt)
+{
+    if (evt->event_id == HTTP_EVENT_ON_HEADER && evt->user_data && strcasecmp(evt->header_key, "x-lab-sig") == 0) {
+        strlcpy((char *)evt->user_data, evt->header_value, SIG_HEX_LEN + 1);
+    }
+    return ESP_OK;
+}
+
+static void to_hex(const uint8_t *in, size_t n, char *out)
+{
+    static const char d[] = "0123456789abcdef";
+    for (size_t i = 0; i < n; i++) {
+        out[i * 2] = d[in[i] >> 4];
+        out[i * 2 + 1] = d[in[i] & 15];
+    }
+    out[n * 2] = 0;
+}
+
+// 상수 시간 비교
+static bool sig_ok(const char *nonce, const char *body, const char *got)
+{
+    if (strlen(got) != SIG_HEX_LEN) return false;
+    uint8_t mac[32];
+    char expect[SIG_HEX_LEN + 1];
+    const mbedtls_md_info_t *md = mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
+    mbedtls_md_context_t ctx;
+    mbedtls_md_init(&ctx);
+    bool ok = mbedtls_md_setup(&ctx, md, 1) == 0 &&
+              mbedtls_md_hmac_starts(&ctx, (const unsigned char *)CONFIG_LAB_DEVICE_KEY, strlen(CONFIG_LAB_DEVICE_KEY)) == 0 &&
+              mbedtls_md_hmac_update(&ctx, (const unsigned char *)nonce, strlen(nonce)) == 0 &&
+              mbedtls_md_hmac_update(&ctx, (const unsigned char *)".", 1) == 0 &&
+              mbedtls_md_hmac_update(&ctx, (const unsigned char *)body, strlen(body)) == 0 &&
+              mbedtls_md_hmac_finish(&ctx, mac) == 0;
+    mbedtls_md_free(&ctx);
+    if (!ok) return false;
+    to_hex(mac, sizeof(mac), expect);
+    uint8_t diff = 0;
+    for (int i = 0; i < SIG_HEX_LEN; i++) diff |= (uint8_t)(expect[i] ^ got[i]);
+    return diff == 0;
+}
+
+// 반환: HTTP 상태 코드, 연결 실패는 -1, 응답 서명이 틀리면 -2 (둘 다 '서버 연결 실패'로 처리)
 static int post_json(const char *path, const char *body, char *out, int out_len)
 {
-    char url[160];
-    snprintf(url, sizeof(url), "%s%s", CONFIG_LAB_SERVER_URL, path);
+    char url[192];
+    snprintf(url, sizeof(url), "%s%s", api_base(), path);
+    char sig[SIG_HEX_LEN + 1] = "";
     esp_http_client_config_t cfg = {
         .url = url,
         .method = HTTP_METHOD_POST,
-        .timeout_ms = 12000,    // 보드의 TLS 연결만 4초 이상 걸려 5초로는 자주 시간 초과된다
-        .crt_bundle_attach = esp_crt_bundle_attach,
+        .timeout_ms = 12000,    // 인터넷 경유 TLS 연결은 4초 이상 걸려 넉넉히 둔다 (내부망 http는 훨씬 빠름)
+        .event_handler = http_event,
+        .user_data = sig,
     };
+    if (strncmp(url, "https://", 8) == 0) cfg.crt_bundle_attach = esp_crt_bundle_attach;
     esp_http_client_handle_t c = esp_http_client_init(&cfg);
     char auth[96];
     snprintf(auth, sizeof(auth), "Bearer %s", CONFIG_LAB_DEVICE_KEY);
     esp_http_client_set_header(c, "Authorization", auth);
     esp_http_client_set_header(c, "Content-Type", "application/json");
 
+    uint8_t rnd[16];
+    char nonce[sizeof(rnd) * 2 + 1];
+    esp_fill_random(rnd, sizeof(rnd));
+    to_hex(rnd, sizeof(rnd), nonce);
+    esp_http_client_set_header(c, "X-Lab-Nonce", nonce);
+
     int status = -1, blen = strlen(body);
+    out[0] = 0;
     if (esp_http_client_open(c, blen) == ESP_OK && esp_http_client_write(c, body, blen) == blen) {
         esp_http_client_fetch_headers(c);
         status = esp_http_client_get_status_code(c);
@@ -34,6 +99,12 @@ static int post_json(const char *path, const char *body, char *out, int out_len)
         out[n > 0 ? n : 0] = 0;
     }
     esp_http_client_cleanup(c);
+#if CONFIG_LAB_VERIFY_RESPONSE_SIG
+    if (status == 200 && !sig_ok(nonce, out, sig)) {
+        ESP_LOGE(TAG, "%s 응답 서명이 맞지 않아 무시합니다 (서버 버전 또는 단말 키 확인)", path);
+        status = -2;
+    }
+#endif
     return status;
 }
 
@@ -61,7 +132,7 @@ verify_result_t server_verify(const char *token)
         r.reachable = true;
         return r;
     }
-    char body[128], resp[256], v[32];
+    char body[128], resp[384], v[32];
     snprintf(body, sizeof(body), "{\"token\":\"%s\"}", token);
     int status = post_json("/api/device/verify", body, resp, sizeof(resp));
     if (status != 200) {
@@ -77,7 +148,7 @@ verify_result_t server_verify(const char *token)
 
 bool server_ping(void)
 {
-    char resp[128];
+    char resp[256];   // 서명 확인에는 본문 전체가 필요하다 (단말 이름이 한글이면 길어짐)
     int s = post_json("/api/device/ping", "{}", resp, sizeof(resp));
     if (s != 200) ESP_LOGW(TAG, "ping 실패 (HTTP %d)", s);
     else ESP_LOGI(TAG, "ping 성공");

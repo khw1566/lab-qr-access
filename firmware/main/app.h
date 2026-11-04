@@ -32,6 +32,9 @@ void ui_camera_failed(void);
 uint8_t *ui_preview_buffer(void);   // QR 출입 화면이 아니면 NULL
 void ui_preview_commit(void);
 void ui_settings_closed(void);
+bool ui_manual_active(void);
+void ui_code_error(const char *reason);
+bool access_submit_code(const char *code);
 
 // ui_settings.c. LVGL 9의 객체 태그를 전방 선언해 다른 모듈의 LVGL 의존을 피한다.
 struct lv_obj_t;
@@ -64,6 +67,7 @@ typedef struct {
     char reason[32];
 } verify_result_t;
 verify_result_t server_verify(const char *token);
+verify_result_t server_verify_code(const char *code);
 bool server_ping(void);
 
 // camera_qr.c

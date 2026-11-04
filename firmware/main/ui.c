@@ -20,8 +20,10 @@ static const char *TAG = "ui";
 #define IDLE_HOME_MS   60000
 #define KST_OFFSET_S   (9 * 3600)
 
-typedef enum { TAB_HOME, TAB_SCAN, TAB_GUIDE } tab_t;
+typedef enum { TAB_HOME, TAB_SCAN, TAB_GUIDE, TAB_CODE } tab_t;
 static lv_obj_t *s_status, *s_home, *s_scan, *s_guide, *s_hint;
+static lv_obj_t *s_code, *s_code_input, *s_code_error;
+static volatile bool s_manual_visible;
 static lv_obj_t *s_clock, *s_date;
 static lv_obj_t *s_preview, *s_result, *s_result_label, *s_result_hint, *s_spinner;
 static lv_obj_t *s_result_mark, *s_result_rail;
@@ -41,11 +43,17 @@ static void set_hidden(lv_obj_t *obj, bool hidden)
 
 static void show_tab(tab_t tab)
 {
+    if (s_tab == TAB_CODE && tab != TAB_CODE && s_code_input) {
+        lv_textarea_set_text(s_code_input, "");
+        lv_label_set_text(s_code_error, "");
+    }
     s_tab = tab;
+    s_manual_visible = tab == TAB_CODE;
     s_scan_visible = tab == TAB_SCAN;
     set_hidden(s_home, tab != TAB_HOME);
     set_hidden(s_scan, tab != TAB_SCAN);
     set_hidden(s_guide, tab != TAB_GUIDE);
+    set_hidden(s_code, tab != TAB_CODE);
     lv_obj_update_layout(lv_screen_active());
     ESP_LOGI(TAG, "Icon geometry: %u visible images at native size", ui_icons_validate(lv_screen_active()));
 }
@@ -64,6 +72,7 @@ static void on_settings(lv_event_t *e)
 }
 
 void ui_settings_closed(void) { s_preview_paused = false; }
+bool ui_manual_active(void) { return s_manual_visible; }
 
 static lv_obj_t *page_create(lv_obj_t *screen)
 {
@@ -109,6 +118,12 @@ static void home_build(lv_obj_t *screen)
     lv_obj_t *guide_label = ui_text(guide, "처음 이용하시나요?", &lab_font_40, 96, 0, 364, lv_color_white());
     lv_obj_align(guide_label, LV_ALIGN_LEFT_MID, 96, 0);
 
+    lv_obj_t *code = ui_button(s_home, "", 544, 396, 340, 88, false, on_tab, TAB_CODE);
+    lv_obj_set_style_pad_all(code, 0, 0);
+    ui_icon(code, UI_ICON_KEYBOARD, 24, 22, 44, UI_BLUE);
+    lv_obj_t *code_label = ui_text(code, "코드 입력", &lab_font_28, 84, 0, 236, UI_INK);
+    lv_obj_align(code_label, LV_ALIGN_LEFT_MID, 84, 0);
+
     lv_obj_t *settings = ui_icon_button(s_home, UI_ICON_SETTINGS, "", 928, 414, 80, 80, false, on_settings, 0);
     lv_obj_t *settings_icon = lv_obj_get_child(settings, 0);
     ui_icon_resize(settings_icon, 64);
@@ -133,6 +148,7 @@ static void scan_build(lv_obj_t *screen)
     s_scan = page_create(screen);
     ui_icon(s_scan, UI_ICON_PHONE, 48, 76, 128, UI_BLUE);
     ui_text(s_scan, "QR을 맞춰 주세요", &lab_font_40, 48, 264, 520, UI_INK);
+    ui_icon_button(s_scan, UI_ICON_KEYBOARD, "코드 입력", 48, 342, 260, 64, false, on_tab, TAB_CODE);
     lv_obj_t *tile = ui_panel(s_scan, 616, 36, 360, 360);
     lv_obj_set_style_bg_color(tile, UI_BLUE, 0);
     lv_obj_set_style_bg_opa(tile, LV_OPA_COVER, 0);
@@ -175,7 +191,7 @@ static void guide_build(lv_obj_t *screen)
         "1. 왼쪽 QR을 휴대폰으로 스캔합니다.\n"
         "2. 가입 후 실습실 이용을 신청합니다.\n"
         "3. 승인된 출입증의 QR을 엽니다.\n"
-        "4. 단말 카메라에 QR을 보여 주세요.",
+        "4. QR을 보여 주거나 입력 코드로 출입합니다.",
         &lab_font_24, 412, 132, 570, UI_INK);
     lv_obj_set_style_text_line_space(steps, 22, 0);
     lv_obj_t *home = ui_icon_button(s_guide, UI_ICON_HOME, "", 36, 430, 80, 64, false, on_tab, TAB_HOME);
@@ -188,6 +204,69 @@ static void guide_build(lv_obj_t *screen)
     ui_icon_resize(lv_obj_get_child(settings, 0), 44);
     lv_obj_center(lv_obj_get_child(settings, 0));
     (void)scan;
+}
+
+static void on_code_key(lv_event_t *event)
+{
+    lv_obj_t *matrix = lv_event_get_target(event);
+    const char *key = lv_buttonmatrix_get_button_text(matrix, lv_buttonmatrix_get_selected_button(matrix));
+    if (!key) return;
+    if (strcmp(key, "지움") == 0) {
+        lv_textarea_delete_char(s_code_input);
+        lv_label_set_text(s_code_error, "");
+    } else if (strcmp(key, "확인") == 0) {
+        const char *value = lv_textarea_get_text(s_code_input);
+        if (strlen(value) != 8) { lv_label_set_text(s_code_error, "숫자 8자리를 입력하세요"); return; }
+        char code[9];
+        strlcpy(code, value, sizeof(code));
+        lv_textarea_set_text(s_code_input, "");
+        lv_label_set_text(s_code_error, "");
+        if (!access_submit_code(code)) lv_label_set_text(s_code_error, "잠시 후 다시 입력하세요");
+    } else {
+        lv_label_set_text(s_code_error, "");
+        lv_textarea_add_text(s_code_input, key);
+    }
+}
+
+static void code_build(lv_obj_t *screen)
+{
+    static const char *const keys[] = {"1", "2", "3", "\n", "4", "5", "6", "\n",
+                                     "7", "8", "9", "\n", "지움", "0", "확인", ""};
+    s_code = page_create(screen);
+    ui_text(s_code, "코드 직접 입력", &lab_font_40, 40, 40, 540, UI_INK);
+    ui_text(s_code, "휴대폰 출입증의 숫자 8자리를 입력하세요", &lab_font_24, 40, 112, 540, UI_MUTED);
+    s_code_input = lv_textarea_create(s_code);
+    lv_textarea_set_one_line(s_code_input, true);
+    lv_textarea_set_accepted_chars(s_code_input, "0123456789");
+    lv_textarea_set_max_length(s_code_input, 8);
+    lv_textarea_set_cursor_click_pos(s_code_input, false);
+    lv_obj_set_pos(s_code_input, 40, 176);
+    lv_obj_set_size(s_code_input, 512, 88);
+    lv_obj_set_style_text_font(s_code_input, &lab_font_48, 0);
+    lv_obj_set_style_text_color(s_code_input, UI_INK, 0);
+    lv_obj_set_style_text_align(s_code_input, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_style_text_letter_space(s_code_input, 6, 0);
+    lv_obj_set_style_border_color(s_code_input, UI_LINE, 0);
+    lv_obj_set_style_bg_color(s_code_input, lv_color_white(), 0);
+    lv_obj_set_style_radius(s_code_input, 8, 0);
+    s_code_error = ui_text(s_code, "", &lab_font_24, 40, 296, 540, UI_RED);
+    lv_obj_t *matrix = lv_buttonmatrix_create(s_code);
+    lv_buttonmatrix_set_map(matrix, keys);
+    lv_obj_set_pos(matrix, 616, 24);
+    lv_obj_set_size(matrix, 360, 392);
+    lv_obj_set_style_bg_color(matrix, lv_color_white(), 0);
+    lv_obj_set_style_border_width(matrix, 0, 0);
+    lv_obj_set_style_pad_all(matrix, 8, 0);
+    lv_obj_set_style_pad_row(matrix, 10, 0);
+    lv_obj_set_style_pad_column(matrix, 10, 0);
+    lv_obj_set_style_bg_color(matrix, UI_SOFT, LV_PART_ITEMS);
+    lv_obj_set_style_bg_color(matrix, UI_LINE, LV_PART_ITEMS | LV_STATE_PRESSED);
+    lv_obj_set_style_text_color(matrix, UI_INK, LV_PART_ITEMS);
+    lv_obj_set_style_text_font(matrix, &lab_font_40, LV_PART_ITEMS);
+    lv_obj_set_style_border_width(matrix, 0, LV_PART_ITEMS);
+    lv_obj_set_style_radius(matrix, 8, LV_PART_ITEMS);
+    lv_obj_add_event_cb(matrix, on_code_key, LV_EVENT_VALUE_CHANGED, NULL);
+    footer(s_code, false);
 }
 
 static void hide_result(lv_timer_t *timer)
@@ -277,6 +356,7 @@ void ui_build(void)
     home_build(screen);
     scan_build(screen);
     guide_build(screen);
+    code_build(screen);
     ui_settings_build(screen);
     result_build(screen);
     show_tab(TAB_HOME);
@@ -319,6 +399,22 @@ void ui_idle(void)
 {
     if (!s_result || !display_lock(LOCK_WAIT_MS)) return;
     hide_result(NULL);
+    display_unlock();
+}
+
+void ui_code_error(const char *reason)
+{
+    if (!s_code || !display_lock(LOCK_WAIT_MS)) return;
+    hide_result(NULL);
+    show_tab(TAB_CODE);
+    const char *text = "출입이 허용되지 않았습니다";
+    if (strcmp(reason, "manual_invalid") == 0 || strcmp(reason, "invalid_token") == 0) text = "코드를 확인하고 다시 입력하세요";
+    else if (strcmp(reason, "manual_rate_limited") == 0) text = "입력이 많습니다. 잠시 후 다시 시도하세요";
+    else if (strcmp(reason, "expired_token") == 0) text = "새 출입증의 코드를 입력하세요";
+    else if (strcmp(reason, "duplicate_scan") == 0 || strcmp(reason, "token_reused") == 0) text = "이미 사용한 코드입니다";
+    else if (strcmp(reason, "wrong_room") == 0) text = "이 실습실의 코드가 아닙니다";
+    else if (strcmp(reason, "offline") == 0) text = "서버 연결을 확인하고 다시 시도하세요";
+    lv_label_set_text(s_code_error, text);
     display_unlock();
 }
 

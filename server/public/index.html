@@ -546,6 +546,13 @@ dialog .row.end { justify-content: flex-end; }
 </nav>
 
 <!-- ========== 관리자 ========== -->
+<section class="auth" id="deniedView" hidden>
+  <div class="panel stack" style="margin-top:40px;text-align:center">
+    <h2 style="margin:0">관리자 권한이 없습니다</h2>
+    <p class="muted" style="margin:0">관리자 화면은 관리자 계정으로만 열 수 있습니다. 권한이 필요하면 기존 관리자에게 요청하세요.</p>
+    <a class="btn" href="#home">홈으로</a>
+  </div>
+</section>
 <div class="admin" id="adminView" hidden>
   <nav class="side" aria-label="관리자 메뉴">
     <a href="#admin" data-a="overview"><svg><use href="#i-gauge"/></svg>현황</a>
@@ -620,6 +627,7 @@ async function api(path, opts = {}) {
   const res = await fetch(path, { method: opts.method || 'GET', headers: { 'content-type': 'application/json' }, body: opts.body ? JSON.stringify(opts.body) : undefined });
   const data = await res.json().catch(() => ({}));
   if (res.status === 401 && me && !path.startsWith('/api/auth')) { me = null; route(); }
+  if (res.status === 403 && path.startsWith('/api/admin/') && me && me.role === 'admin') setTimeout(adminDenied);
   if (!res.ok) throw Object.assign(new Error(data.error || '요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.'), { status: res.status });
   return data;
 }
@@ -708,7 +716,7 @@ function setAuthMode(mode) {
   authMode = mode;
   $$('[data-auth]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.auth === mode)));
   const reg = mode === 'register';
-  $('#nameWrap').hidden = !reg; $('#adminCodeToggle').hidden = !reg;
+  $('#nameWrap').hidden = !reg; $('#adminCodeToggle').hidden = !(reg && config && config.admin_setup_open);
   if (!reg) $('#adminCodeWrap').hidden = true;
   $('#authHint').hidden = !(reg && config.require_user_approval);
   $('#authBtn').textContent = reg ? '가입하기' : '로그인';
@@ -743,7 +751,7 @@ function route() {
   // 상단 바
   $('#loginBtn').hidden = !!me; $('#logoutBtn').hidden = !me; $('#whoName').hidden = !me;
   $('#modeSwitch').hidden = !me || me.role !== 'admin';
-  const views = ['#authView', '#homeView', '#studentView', '#adminView'];
+  const views = ['#authView', '#homeView', '#studentView', '#adminView', '#deniedView'];
   const show = (v) => views.forEach((x) => { $(x).hidden = x !== v; });
   const nav = (tab) => $$('[data-nav]').forEach((a) => { if (a.dataset.nav === tab) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
   window.scrollTo(0, 0);
@@ -755,7 +763,10 @@ function route() {
     if (needsLogin) toast('로그인하면 이용할 수 있습니다.');
     loadConfig(); return;
   }
-  if (h.startsWith('admin') && me.role === 'admin') {
+  if (h.startsWith('admin') && me.role !== 'admin') { show('#deniedView'); $('#tabbar').hidden = false; nav(''); return; }
+  if (h.startsWith('admin')) {
+    // 관리자 화면에 들어올 때마다 서버에 권한을 다시 확인 (그 사이 관리자 해제됐을 수 있음)
+    if ($('#adminView').hidden) checkAdmin();
     show('#adminView'); $('#tabbar').hidden = true;
     $('#modeSwitch').textContent = '학생 화면'; $('#modeSwitch').href = '#home';
     return showAdmin(h === 'admin' ? 'overview' : h.slice(6));
@@ -1055,6 +1066,16 @@ $('#reqForm').onsubmit = async (e) => {
 
 // ---------- 관리자 ----------
 const A = {};
+// 서버가 관리자 권한을 거부하면(403) 역할을 학생으로 낮추고 권한 없음 화면으로
+function adminDenied() {
+  if (!me) return;
+  me.role = 'student';
+  $('#modeSwitch').hidden = true;
+  if (location.hash.slice(1).startsWith('admin')) route();
+}
+async function checkAdmin() {
+  try { await api('/api/admin/check'); } catch (e) { if (e.status === 403) adminDenied(); }
+}
 let adminSection = 'overview';
 function showAdmin(sec) {
   if (!A[sec]) sec = 'overview';

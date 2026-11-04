@@ -638,8 +638,57 @@ static const lv_image_dsc_t icon_12_128 = {
     .data_size=16384, .data=icon_12_bytes + 19456,
 };
 
+extern const uint8_t icon_13_bytes[] asm("_binary_icon_13_a8_start");
+static const lv_image_dsc_t icon_13_20 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=20, .h=20, .stride=20},
+    .data_size=400, .data=icon_13_bytes + 0,
+};
+
+static const lv_image_dsc_t icon_13_28 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=28, .h=28, .stride=28},
+    .data_size=784, .data=icon_13_bytes + 400,
+};
+
+static const lv_image_dsc_t icon_13_44 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=44, .h=44, .stride=44},
+    .data_size=1936, .data=icon_13_bytes + 1184,
+};
+
+static const lv_image_dsc_t icon_13_52 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=52, .h=52, .stride=52},
+    .data_size=2704, .data=icon_13_bytes + 3120,
+};
+
+static const lv_image_dsc_t icon_13_56 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=56, .h=56, .stride=56},
+    .data_size=3136, .data=icon_13_bytes + 5824,
+};
+
+static const lv_image_dsc_t icon_13_64 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=64, .h=64, .stride=64},
+    .data_size=4096, .data=icon_13_bytes + 8960,
+};
+
+static const lv_image_dsc_t icon_13_80 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=80, .h=80, .stride=80},
+    .data_size=6400, .data=icon_13_bytes + 13056,
+};
+
+static const lv_image_dsc_t icon_13_128 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=128, .h=128, .stride=128},
+    .data_size=16384, .data=icon_13_bytes + 19456,
+};
+
 static const unsigned icon_sizes[] = {20, 28, 44, 52, 56, 64, 80, 128};
-static const lv_image_dsc_t *const images[13][8] = {
+static const lv_image_dsc_t *const images[14][8] = {
     {&icon_0_20, &icon_0_28, &icon_0_44, &icon_0_52, &icon_0_56, &icon_0_64, &icon_0_80, &icon_0_128},
     {&icon_1_20, &icon_1_28, &icon_1_44, &icon_1_52, &icon_1_56, &icon_1_64, &icon_1_80, &icon_1_128},
     {&icon_2_20, &icon_2_28, &icon_2_44, &icon_2_52, &icon_2_56, &icon_2_64, &icon_2_80, &icon_2_128},
@@ -653,10 +702,11 @@ static const lv_image_dsc_t *const images[13][8] = {
     {&icon_10_20, &icon_10_28, &icon_10_44, &icon_10_52, &icon_10_56, &icon_10_64, &icon_10_80, &icon_10_128},
     {&icon_11_20, &icon_11_28, &icon_11_44, &icon_11_52, &icon_11_56, &icon_11_64, &icon_11_80, &icon_11_128},
     {&icon_12_20, &icon_12_28, &icon_12_44, &icon_12_52, &icon_12_56, &icon_12_64, &icon_12_80, &icon_12_128},
+    {&icon_13_20, &icon_13_28, &icon_13_44, &icon_13_52, &icon_13_56, &icon_13_64, &icon_13_80, &icon_13_128},
 };
 const lv_image_dsc_t *ui_icon_asset(unsigned icon, unsigned size)
 {
-    if (icon >= 13) icon = 0;
+    if (icon >= 14) icon = 0;
     unsigned closest = 0, difference = 0xffffffffu;
     for (unsigned i = 0; i < 8; i++) {
         unsigned d = size > icon_sizes[i] ? size - icon_sizes[i] : icon_sizes[i] - size;

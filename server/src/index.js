@@ -1,6 +1,7 @@
 // 실습실 출입통제 시스템 - Cloudflare Worker (API)
 // 정적 화면(public/)은 Workers Static Assets가 서빙하고, /api/* 만 이 코드가 처리한다.
 import { hashPassword, hmac, randomHex, safeEqual, sha256Hex } from './crypto.js';
+import { attachManualCode, resolveManualCode, releaseManualAttempt } from './manual-codes.js';
 
 // QR 토큰의 숫자 칸(t)은 발급 시각을 10초 단위로 센 값. 발급 후 5분간 유효하고, 한 번 쓰면 끝.
 // 화면은 5초마다 같은 t로 다시 물어보고, 쓰였거나 만료가 가까우면 새 t로 바꾼다.
@@ -12,6 +13,13 @@ const DUPLICATE_SCAN_MS = 15_000; // 통과 직후 같은 QR 재인식은 거부
 const STATIC_MASTER_DEDUP_MS = 10_000; // 인쇄용 마스터 QR: 같은 장면이 연달아 읽히는 것 무시
 const SESSION_DAYS = 14;
 const KST_OFFSET_MS = 9 * 3600_000;
+const SPECIAL_DURATION_MS = 30 * 60_000;
+const SPECIAL_ACTIVATION_MS = 24 * 3600_000;
+// 가입 정보만 있는 계정에 한해 학번을 해제한다. 신청·승인·출입·마스터 발급 이력은 보존한다.
+const USER_NO_HISTORY = `NOT EXISTS (SELECT 1 FROM reservations WHERE user_id = users.id OR decided_by = users.id)
+  AND NOT EXISTS (SELECT 1 FROM access_logs WHERE user_id = users.id)
+  AND NOT EXISTS (SELECT 1 FROM master_keys WHERE created_by = users.id)
+  AND NOT EXISTS (SELECT 1 FROM special_requests WHERE user_id = users.id OR decided_by = users.id)`;
 
 // ---------- 공통 유틸 ----------
 const json = (data, status = 200, headers = {}) =>
@@ -34,6 +42,13 @@ async function body(req) {
   } catch {
     throw new HttpError(400, '잘못된 요청 형식입니다.');
   }
+}
+
+function adminComment(b) {
+  if (b.reason === undefined) return '';
+  if (typeof b.reason !== 'string' || b.reason.trim().length > 200)
+    throw new HttpError(400, '관리자 멘트는 200자 이하로 입력해 주세요.');
+  return b.reason.trim();
 }
 
 // ---------- 실습실 보유 장비 (배치도) ----------
@@ -217,9 +232,9 @@ const kstHour = (ms) => new Date(ms + KST_OFFSET_MS).getUTCHours() + new Date(ms
 const kstDay = (ms) => new Date(ms + KST_OFFSET_MS).toISOString().slice(0, 10);
 
 // ---------- 세션 ----------
-async function makeSession(env, uid) {
+async function makeSession(env, uid, version) {
   const exp = Date.now() + SESSION_DAYS * 86400_000;
-  const payload = `${uid}.${exp}`;
+  const payload = `${uid}.${exp}.${version}`;
   return `${payload}.${await hmac(env.SESSION_SECRET, payload)}`;
 }
 
@@ -231,13 +246,19 @@ async function currentUser(req, env) {
   const cookie = req.headers.get('cookie') || '';
   const m = cookie.match(/(?:^|;\s*)sid=([^;]+)/);
   if (!m) return null;
-  const [uid, exp, sig] = m[1].split('.');
-  if (!uid || !exp || !sig || Number(exp) < Date.now()) return null;
-  if (!safeEqual(sig, await hmac(env.SESSION_SECRET, `${uid}.${exp}`))) return null;
-  const user = await env.DB.prepare('SELECT id, student_no, name, role, status, phone, department FROM users WHERE id = ?')
+  const parts = m[1].split('.');
+  if (![3, 4].includes(parts.length)) return null;
+  const [uid, exp] = parts;
+  const version = parts.length === 4 ? parts[2] : '0';
+  const sig = parts.at(-1);
+  if (!/^[1-9]\d*$/.test(uid) || !/^\d+$/.test(exp) || !/^\d+$/.test(version) || Number(exp) <= Date.now()) return null;
+  if (!safeEqual(sig, await hmac(env.SESSION_SECRET, parts.slice(0, -1).join('.')))) return null;
+  const user = await env.DB.prepare('SELECT id, student_no, name, role, status, phone, department, session_version FROM users WHERE id = ?')
     .bind(Number(uid))
     .first();
-  return user && user.status === 'active' ? user : null;
+  if (!user || user.status !== 'active' || user.session_version !== Number(version)) return null;
+  const { session_version, ...profile } = user;
+  return profile;
 }
 
 function sessionCookie(value, maxAge) {
@@ -258,12 +279,17 @@ async function makeMasterToken(env, mk, step) {
   return `${payload}.${await hmac(env.QR_SECRET, `${payload}.${mk.nonce}`, 12)}`;
 }
 
+async function makeSpecialToken(env, r, step) {
+  const payload = `LA1.S${r.id}.${step}`;
+  return `${payload}.${await hmac(env.QR_SECRET, `${payload}.${r.nonce}`, 12)}`;
+}
+
 function parseQrParts(token) {
   const parts = String(token || '').trim().split('.');
   if (parts.length !== 4 || parts[0] !== 'LA1') return null;
   const [, id, step, sig] = parts;
-  if (!/^M?\d+$/.test(id) || !/^\d+$/.test(step) || !sig) return null;
-  return { master: id[0] === 'M', id: Number(id.replace('M', '')), step: Number(step), sig };
+  if (!/^[MS]?\d+$/.test(id) || !/^\d+$/.test(step) || !sig) return null;
+  return { master: id[0] === 'M', special: id[0] === 'S', id: Number(id.replace(/^[MS]/, '')), step: Number(step), sig };
 }
 
 async function verifyReservationSig(env, p) {
@@ -346,20 +372,28 @@ async function route(req, env, url) {
         .bind(student_no, String(name).trim(), await hashPassword(password, salt), salt, isAdmin ? 'admin' : 'student',
           status, Date.now())
         .run();
-    } catch {
-      throw new HttpError(409, '이미 가입된 학번입니다.');
+    } catch (e) {
+      if (/UNIQUE constraint failed.*student_no/i.test(String(e))) throw new HttpError(409, '이미 가입된 학번입니다.');
+      throw e;
     }
+    await env.DB.prepare('DELETE FROM signup_rejections WHERE student_no = ?').bind(student_no).run();
     return json({ ok: true, status, role: isAdmin ? 'admin' : 'student' });
   }
 
   if (path === '/api/auth/login' && method === 'POST') {
     const { student_no, password } = await body(req);
     const u = await env.DB.prepare('SELECT * FROM users WHERE student_no = ?').bind(student_no || '').first();
+    if (!u) {
+      const rejected = await env.DB.prepare('SELECT * FROM signup_rejections WHERE student_no = ? AND rejected_at > ?')
+        .bind(student_no || '', Date.now() - 30 * 86400_000).first();
+      if (rejected && safeEqual(rejected.pw_hash, await hashPassword(password || '', rejected.pw_salt)))
+        throw new HttpError(403, '가입 신청이 반려되었습니다.' + (rejected.reason ? ` 관리자 멘트: ${rejected.reason}` : '') + ' 정보를 확인한 뒤 다시 가입해 주세요.');
+    }
     if (!u || !safeEqual(u.pw_hash, await hashPassword(password || '', u.pw_salt)))
       throw new HttpError(401, '학번 또는 비밀번호가 틀렸습니다.');
     if (u.status === 'pending') throw new HttpError(403, '관리자의 가입 승인을 기다리는 중입니다.');
     if (u.status !== 'active') throw new HttpError(403, '사용이 정지된 계정입니다. 관리자에게 문의하세요.');
-    const sid = await makeSession(env, u.id);
+    const sid = await makeSession(env, u.id, u.session_version);
     return json(
       { ok: true, user: { id: u.id, student_no: u.student_no, name: u.name, role: u.role } },
       200,
@@ -382,10 +416,72 @@ async function route(req, env, url) {
     });
   }
 
+  if (path === '/api/notifications' && method === 'GET') {
+    const visibility = '(user_id = ? OR (user_id IS NULL AND ? = 1))';
+    const args = [user.id, user.role === 'admin' ? 1 : 0];
+    const read = await env.DB.prepare('SELECT last_read_id FROM notification_reads WHERE user_id = ?').bind(user.id).first();
+    const last_read_id = read?.last_read_id || 0;
+    const { results } = await env.DB.prepare(`SELECT id,title,body,href,created_at FROM notifications WHERE ${visibility} ORDER BY id DESC LIMIT 50`).bind(...args).all();
+    const { unread } = await env.DB.prepare(`SELECT COUNT(*) AS unread FROM notifications WHERE ${visibility} AND id > ?`).bind(...args, last_read_id).first();
+    return json({ notifications: results, unread, last_read_id, latest_id: results[0]?.id || 0 }, 200, { 'cache-control': 'no-store' });
+  }
+  if (path === '/api/notifications/read' && method === 'POST') {
+    const { through_id } = await body(req);
+    if (!Number.isSafeInteger(through_id) || through_id < 0) throw new HttpError(400, '읽음 위치를 확인해 주세요.');
+    const latest = await env.DB.prepare('SELECT MAX(id) AS id FROM notifications WHERE user_id = ? OR (user_id IS NULL AND ? = 1)')
+      .bind(user.id, user.role === 'admin' ? 1 : 0).first();
+    const last = Math.min(through_id, latest.id || 0);
+    await env.DB.prepare(`INSERT INTO notification_reads(user_id,last_read_id) VALUES(?,?)
+      ON CONFLICT(user_id) DO UPDATE SET last_read_id = MAX(last_read_id, excluded.last_read_id)`).bind(user.id, last).run();
+    return json({ ok: true });
+  }
+
   if (path === '/api/rooms' && method === 'GET') {
     const all = user.role === 'admin' && url.searchParams.get('all') === '1';
     const { results } = await env.DB.prepare(`SELECT * FROM rooms ${all ? '' : 'WHERE enabled = 1'} ORDER BY id`).all();
     return json({ rooms: results });
+  }
+
+  // --- 특별 출입: 예약과 별도로 수동 승인 ---
+  if (path === '/api/special-requests' && method === 'POST') {
+    const b = await body(req);
+    const purpose = typeof b.purpose === 'string' ? b.purpose.trim() : '';
+    if (!purpose || purpose.length > 200) throw new HttpError(400, '특별 출입 사유를 1~200자로 적어 주세요.');
+    const room = await env.DB.prepare('SELECT id FROM rooms WHERE id = ? AND enabled = 1').bind(Number(b.room_id) || 0).first();
+    if (!room) throw new HttpError(404, '신청할 수 있는 실습실이 아닙니다.');
+    const now = Date.now();
+    const r = await env.DB.prepare(`INSERT INTO special_requests (user_id, room_id, purpose, created_at)
+      SELECT ?, ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM special_requests WHERE user_id = ? AND room_id = ?
+        AND (status = 'pending' OR (status = 'approved' AND COALESCE(expires_at, activation_deadline) > ?)))`)
+      .bind(user.id, room.id, purpose, now, user.id, room.id, now).run();
+    if (!r.meta.changes) throw new HttpError(409, '이 실습실에 대기 중이거나 유효한 특별 출입신청이 있습니다.');
+    return json({ ok: true, id: r.meta.last_row_id });
+  }
+  if (path === '/api/special-requests' && method === 'GET') {
+    const { results } = await env.DB.prepare(`SELECT r.*, rm.name AS room_name FROM special_requests r
+      JOIN rooms rm ON rm.id = r.room_id WHERE r.user_id = ? ORDER BY r.created_at DESC, r.id DESC LIMIT 100`)
+      .bind(user.id).all();
+    return json({ requests: results.map(({ nonce, ...r }) => r), server_time: Date.now() });
+  }
+  if ((m = path.match(/^\/api\/special-requests\/(\d+)\/cancel$/)) && method === 'POST') {
+    const r = await env.DB.prepare(`UPDATE special_requests SET status = 'cancelled'
+      WHERE id = ? AND user_id = ? AND status IN ('pending','approved')`).bind(id(m[1]), user.id).run();
+    if (!r.meta.changes) throw new HttpError(409, '취소할 수 없는 특별 출입신청입니다.');
+    return json({ ok: true });
+  }
+  if ((m = path.match(/^\/api\/special-requests\/(\d+)\/qr$/)) && method === 'GET') {
+    const r = await env.DB.prepare(`SELECT r.*, rm.enabled FROM special_requests r JOIN rooms rm ON rm.id = r.room_id
+      WHERE r.id = ? AND r.user_id = ?`).bind(id(m[1]), user.id).first();
+    if (!r) throw new HttpError(404, '특별 출입신청을 찾을 수 없습니다.');
+    if (r.status !== 'approved') throw new HttpError(403, '승인된 특별 출입신청만 QR을 받을 수 있습니다.');
+    const s = await getSettings(env), now = Date.now();
+    if (s.lockdown) throw new HttpError(423, '실습실이 임시로 잠겨 있습니다.');
+    if (!r.enabled) throw new HttpError(403, '이 실습실은 현재 운영하지 않습니다.');
+    const end = r.expires_at ?? r.activation_deadline;
+    if (now >= end) throw new HttpError(403, '특별 출입증이 만료되었습니다. 새로 신청해 주세요.');
+    const q = await issueQr(env, r.id, url.searchParams.get('keep'), (t) => makeSpecialToken(env, r, t), true);
+    return json({ ...q, expires_at: Math.min(q.expires_at, end), first_used_at: r.first_used_at,
+      access_expires_at: r.expires_at, activation_deadline: r.activation_deadline });
   }
 
   // --- 학생: 실습실 이용 신청 ---
@@ -509,6 +605,32 @@ async function adminRoute(req, env, path, method, admin, url) {
   let m;
   const now = Date.now();
 
+  if (path === '/api/admin/special-requests' && method === 'GET') {
+    const status = url.searchParams.get('status') || 'pending';
+    if (!['pending','approved','rejected','cancelled','revoked'].includes(status)) throw new HttpError(400, '신청 상태를 확인해 주세요.');
+    const { results } = await env.DB.prepare(`SELECT r.*, u.name, u.student_no, rm.name AS room_name
+      FROM special_requests r JOIN users u ON u.id = r.user_id JOIN rooms rm ON rm.id = r.room_id
+      WHERE r.status = ? ORDER BY r.created_at DESC, r.id DESC LIMIT 500`).bind(status).all();
+    return json({ requests: results.map(({ nonce, ...r }) => r), server_time: now });
+  }
+  if ((m = path.match(/^\/api\/admin\/special-requests\/(\d+)\/(approve|reject|revoke)$/)) && method === 'POST') {
+    let r;
+    if (m[2] === 'approve') {
+      r = await env.DB.prepare(`UPDATE special_requests SET status = 'approved', decided_by = ?, decided_at = ?,
+        nonce = ?, activation_deadline = ? WHERE id = ? AND status = 'pending'
+        AND EXISTS (SELECT 1 FROM rooms WHERE id = special_requests.room_id AND enabled = 1)
+        AND EXISTS (SELECT 1 FROM users WHERE id = special_requests.user_id AND status = 'active')`)
+        .bind(admin.id, now, randomHex(16), now + SPECIAL_ACTIVATION_MS, id(m[1])).run();
+    } else {
+      const b = await req.json().catch(() => ({}));
+      r = await env.DB.prepare(`UPDATE special_requests SET status = ?, decided_by = ?, decided_at = ?, reject_reason = ?
+        WHERE id = ? AND status = ?`).bind(m[2] === 'reject' ? 'rejected' : 'revoked', admin.id, now,
+        adminComment(b), id(m[1]), m[2] === 'reject' ? 'pending' : 'approved').run();
+    }
+    if (!r.meta.changes) throw new HttpError(409, '처리할 수 없는 신청입니다. 신청 상태와 사용자·실습실 상태를 확인해 주세요.');
+    return json({ ok: true });
+  }
+
   // --- 현황 요약 ---
   if (path === '/api/admin/overview' && method === 'GET') {
     const dayStart = new Date(kstDay(now) + 'T00:00:00+09:00').getTime();
@@ -522,7 +644,9 @@ async function adminRoute(req, env, path, method, admin, url) {
       env.DB.prepare('SELECT d.id, d.name, d.last_seen_at, rm.name room_name FROM devices d JOIN rooms rm ON rm.id = d.room_id WHERE d.active = 1').all(),
       getSettings(env),
     ]);
+    const special = await one("SELECT COUNT(*) n FROM special_requests WHERE status = 'pending'");
     return json({
+      pending_special: special.n,
       pending_reservations: pr.n,
       pending_users: pu.n,
       granted_today: g.n,
@@ -570,13 +694,13 @@ async function adminRoute(req, env, path, method, admin, url) {
   }
 
   if ((m = path.match(/^\/api\/admin\/reservations\/(\d+)\/(approve|reject)$/)) && method === 'POST') {
-    const { reason } = await req.json().catch(() => ({}));
+    const reason = adminComment(await req.json().catch(() => ({})));
     const status = m[2] === 'approve' ? 'approved' : 'rejected';
     const r = await env.DB.prepare(
       `UPDATE reservations SET status = ?, decided_by = ?, decided_at = ?, reject_reason = ?
        WHERE id = ? AND status IN ('pending','approved')`,
     )
-      .bind(status, admin.id, now, status === 'rejected' ? String(reason || '').slice(0, 200) : null, id(m[1]))
+      .bind(status, admin.id, now, status === 'rejected' ? reason : null, id(m[1]))
       .run();
     if (!r.meta.changes) throw new HttpError(404, '처리할 수 있는 신청이 없습니다.');
     return json({ ok: true });
@@ -585,20 +709,88 @@ async function adminRoute(req, env, path, method, admin, url) {
   // --- 사용자 ---
   if (path === '/api/admin/users' && method === 'GET') {
     const status = url.searchParams.get('status') || 'pending';
+    if (!['all', 'pending', 'active', 'blocked'].includes(status)) throw new HttpError(400, '사용자 상태를 확인해 주세요.');
+    const q = (url.searchParams.get('q') || '').trim();
+    if (q.length > 100) throw new HttpError(400, '검색어는 100자 이하로 입력해 주세요.');
+    const rawPage = url.searchParams.get('page') || '1';
+    if (!/^[1-9]\d*$/.test(rawPage) || !Number.isSafeInteger(Number(rawPage))) throw new HttpError(400, '페이지를 확인해 주세요.');
+    const where = [], vals = [];
+    if (status !== 'all') { where.push('status = ?'); vals.push(status); }
+    if (q) { where.push('(instr(lower(student_no), lower(?)) > 0 OR instr(lower(name), lower(?)) > 0)'); vals.push(q, q); }
+    const filter = where.length ? 'WHERE ' + where.join(' AND ') : '';
+    const { total } = await env.DB.prepare(`SELECT COUNT(*) AS total FROM users ${filter}`).bind(...vals).first();
+    const page_size = 50, pages = Math.max(1, Math.ceil(total / page_size)), page = Math.min(Number(rawPage), pages);
     const { results } = await env.DB.prepare(
-      'SELECT id, student_no, name, role, status, created_at FROM users WHERE status = ? ORDER BY created_at DESC LIMIT 500',
+      `SELECT id, student_no, name, phone, department, role, status, created_at,
+       (role = 'student' AND status = 'blocked' AND ${USER_NO_HISTORY}) AS can_release
+       FROM users ${filter} ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?`,
     )
-      .bind(status)
+      .bind(...vals, page_size, (page - 1) * page_size)
       .all();
-    return json({ users: results });
+    return json({ users: results, total, page, pages, page_size });
   }
 
-  if ((m = path.match(/^\/api\/admin\/users\/(\d+)\/(activate|block|make-admin|make-student)$/)) && method === 'POST') {
+  if ((m = path.match(/^\/api\/admin\/users\/(\d+)\/password$/)) && method === 'POST') {
+    const b = await body(req);
+    if (typeof b.password !== 'string' || b.password.length < 8 || b.password.length > 128)
+      throw new HttpError(400, '새 비밀번호는 8~128자로 입력해 주세요.');
+    const salt = randomHex(16), hash = await hashPassword(b.password, salt);
+    const r = await env.DB.prepare('UPDATE users SET pw_hash = ?, pw_salt = ?, session_version = session_version + 1 WHERE id = ?')
+      .bind(hash, salt, id(m[1])).run();
+    if (!r.meta.changes) throw new HttpError(404, '사용자를 찾을 수 없습니다.');
+    return json({ ok: true }, 200, { 'cache-control': 'no-store',
+      ...(id(m[1]) === admin.id ? { 'set-cookie': sessionCookie('', 0) } : {}) });
+  }
+
+  if ((m = path.match(/^\/api\/admin\/users\/(\d+)$/)) && method === 'PATCH') {
+    const target = id(m[1]);
+    const previous = await env.DB.prepare('SELECT id FROM users WHERE id = ?').bind(target).first();
+    if (!previous) throw new HttpError(404, '사용자를 찾을 수 없습니다.');
+    const b = await body(req);
+    const sets = [], vals = [];
+    for (const [field, max] of [['student_no', 20], ['name', 30], ['phone', 30], ['department', 80]]) {
+      if (!(field in b)) continue;
+      if (typeof b[field] !== 'string') throw new HttpError(400, '입력한 정보를 확인해 주세요.');
+      const value = b[field].trim();
+      if (value.length > max || (field === 'name' && !value) || (field === 'student_no' && !/^[0-9A-Za-z]{4,20}$/.test(value)))
+        throw new HttpError(400, '학번은 영문/숫자 4~20자, 이름은 1~30자입니다. 연락처와 학부(과)의 길이도 확인해 주세요.');
+      sets.push(`${field} = ?`); vals.push(value);
+    }
+    if (!sets.length) throw new HttpError(400, '변경할 항목이 없습니다.');
+    try {
+      await env.DB.prepare(`UPDATE users SET ${sets.join(', ')} WHERE id = ?`).bind(...vals, target).run();
+    } catch (e) {
+      if (/UNIQUE constraint failed.*student_no/i.test(String(e))) throw new HttpError(409, '이미 사용 중인 학번입니다.');
+      throw e;
+    }
+    return json({ ok: true });
+  }
+
+  if ((m = path.match(/^\/api\/admin\/users\/(\d+)\/(activate|block|reject|release|make-admin|make-student)$/)) && method === 'POST') {
     const target = id(m[1]);
     if (target === admin.id && m[2] !== 'activate') throw new HttpError(400, '자기 계정의 권한이나 상태는 바꿀 수 없습니다.');
+    const existing = await env.DB.prepare('SELECT status FROM users WHERE id = ?').bind(target).first();
+    if (!existing) throw new HttpError(404, '사용자를 찾을 수 없습니다.');
+    // 예전 화면의 대기 계정 block 요청도 가입 반려로 처리한다.
+    if (['reject', 'release'].includes(m[2]) || (m[2] === 'block' && existing.status === 'pending')) {
+      const expectedStatus = m[2] === 'release' ? 'blocked' : 'pending';
+      const remove = env.DB.prepare(`DELETE FROM users WHERE id = ? AND role = 'student'
+        AND status = ? AND ${USER_NO_HISTORY}`).bind(target, expectedStatus);
+      let r;
+      if (expectedStatus === 'pending') {
+        const reason = adminComment(await req.json().catch(() => ({})));
+        const archive = env.DB.prepare(`INSERT INTO signup_rejections(student_no,pw_hash,pw_salt,reason,rejected_at)
+          SELECT student_no,pw_hash,pw_salt,?,? FROM users WHERE id = ? AND role = 'student' AND status = 'pending' AND ${USER_NO_HISTORY}
+          ON CONFLICT(student_no) DO UPDATE SET pw_hash=excluded.pw_hash,pw_salt=excluded.pw_salt,reason=excluded.reason,rejected_at=excluded.rejected_at`)
+          .bind(reason, now, target);
+        [, r] = await env.DB.batch([archive, remove]);
+      } else r = await remove.run();
+      if (!r.meta.changes) throw new HttpError(409, '이용 이력이 있거나 상태가 바뀐 계정은 삭제할 수 없습니다. 목록을 새로 확인해 주세요.');
+      return json({ ok: true, released: true });
+    }
     const sql = {
       activate: "UPDATE users SET status = 'active' WHERE id = ?",
-      block: "UPDATE users SET status = 'blocked' WHERE id = ?",
+      block: "UPDATE users SET status = 'blocked' WHERE id = ? AND status = 'active'",
       'make-admin': "UPDATE users SET role = 'admin' WHERE id = ? AND status = 'active'",
       'make-student': "UPDATE users SET role = 'student' WHERE id = ?",
     }[m[2]];
@@ -644,13 +836,48 @@ async function adminRoute(req, env, path, method, admin, url) {
 
   // --- 출입 기록 ---
   if (path === '/api/admin/logs' && method === 'GET') {
-    const { results } = await env.DB.prepare(
-      `SELECT l.*, u.student_no, u.name, d.name AS device_name, mk.label AS master_label FROM access_logs l
-       LEFT JOIN users u ON u.id = l.user_id LEFT JOIN devices d ON d.id = l.device_id
-       LEFT JOIN master_keys mk ON mk.id = l.master_id
-       ORDER BY l.at DESC LIMIT 200`,
-    ).all();
-    return json({ logs: results });
+    const p = url.searchParams, where = [], vals = [];
+    const result = p.get('result');
+    if (result) {
+      if (!['granted', 'denied'].includes(result)) throw new HttpError(400, '출입 결과를 확인해 주세요.');
+      where.push('l.result = ?'); vals.push(result);
+    }
+    for (const field of ['room_id', 'device_id']) if (p.get(field)) {
+      if (!/^[1-9]\d*$/.test(p.get(field))) throw new HttpError(400, '실습실 또는 단말을 확인해 주세요.');
+      where.push(`l.${field} = ?`); vals.push(Number(p.get(field)));
+    }
+    const dates = {};
+    for (const field of ['from', 'to']) if (p.get(field)) {
+      const value = p.get(field);
+      const ms = Date.parse(`${value}T00:00:00+09:00`);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(value) || !Number.isFinite(ms) || kstDay(ms) !== value)
+        throw new HttpError(400, '조회 날짜를 확인해 주세요.');
+      dates[field] = ms;
+      where.push(field === 'from' ? 'l.at >= ?' : 'l.at < ?');
+      vals.push(ms + (field === 'to' ? 86400_000 : 0));
+    }
+    if (dates.from > dates.to) throw new HttpError(400, '시작일은 종료일보다 늦을 수 없습니다.');
+    const q = (p.get('q') || '').trim();
+    if (q.length > 100) throw new HttpError(400, '검색어는 100자 이하로 입력해 주세요.');
+    if (q) {
+      where.push("(instr(lower(COALESCE(u.name, '')), lower(?)) > 0 OR instr(lower(COALESCE(u.student_no, '')), lower(?)) > 0 OR instr(lower(COALESCE(mk.label, '')), lower(?)) > 0)");
+      vals.push(q, q, q);
+    }
+    const order = p.get('order') || 'desc';
+    if (!['asc', 'desc'].includes(order)) throw new HttpError(400, '정렬 순서를 확인해 주세요.');
+    const rawPage = p.get('page') || '1';
+    if (!/^[1-9]\d*$/.test(rawPage) || !Number.isSafeInteger(Number(rawPage))) throw new HttpError(400, '페이지를 확인해 주세요.');
+    const joins = `FROM access_logs l LEFT JOIN users u ON u.id = l.user_id
+      LEFT JOIN devices d ON d.id = l.device_id LEFT JOIN master_keys mk ON mk.id = l.master_id
+      LEFT JOIN rooms rm ON rm.id = l.room_id ${where.length ? 'WHERE ' + where.join(' AND ') : ''}`;
+    const { total } = await env.DB.prepare(`SELECT COUNT(*) AS total ${joins}`).bind(...vals).first();
+    const page_size = 50, pages = Math.max(1, Math.ceil(total / page_size));
+    const page = Math.min(Number(rawPage), pages);
+    const { results } = await env.DB.prepare(`SELECT l.*, u.student_no, u.name, d.name AS device_name,
+      mk.label AS master_label, rm.name AS room_name ${joins}
+      ORDER BY l.at ${order.toUpperCase()}, l.id ${order.toUpperCase()} LIMIT ? OFFSET ?`)
+      .bind(...vals, page_size, (page - 1) * page_size).all();
+    return json({ logs: results, total, page, pages, page_size });
   }
 
   // --- 출입 단말 ---
@@ -663,6 +890,20 @@ async function adminRoute(req, env, path, method, admin, url) {
   }
 
   // 새 출입 단말 등록: 응답의 key를 펌웨어 설정(menuconfig)에 넣는다 (한 번만 보여줌)
+  if ((m = path.match(/^\/api\/admin\/devices\/(\d+)$/)) && method === 'PATCH') {
+    const b = await body(req);
+    const dev = await env.DB.prepare('SELECT * FROM devices WHERE id = ?').bind(id(m[1])).first();
+    if (!dev) throw new HttpError(404, '단말을 찾을 수 없습니다.');
+    const name = 'name' in b ? b.name : dev.name;
+    const roomId = 'room_id' in b ? Number(b.room_id) : dev.room_id;
+    if (typeof name !== 'string' || !name.trim() || name.trim().length > 40 || !Number.isSafeInteger(roomId) || roomId < 1)
+      throw new HttpError(400, '단말 이름(1~40자)과 실습실을 확인해 주세요.');
+    const room = await env.DB.prepare('SELECT id FROM rooms WHERE id = ?').bind(roomId).first();
+    if (!room) throw new HttpError(404, '실습실을 찾을 수 없습니다.');
+    await env.DB.prepare('UPDATE devices SET name = ?, room_id = ? WHERE id = ?').bind(name.trim(), roomId, dev.id).run();
+    return json({ ok: true });
+  }
+
   if (path === '/api/admin/devices' && method === 'POST') {
     const { name, room_id } = await body(req);
     const room = await env.DB.prepare('SELECT id FROM rooms WHERE id = ?').bind(id(room_id)).first();
@@ -742,11 +983,12 @@ async function adminRoute(req, env, path, method, admin, url) {
 
 // QR 발급 공통: keep(t)이 아직 쓸 만하고 쓰이지 않았으면 같은 t를 다시 서명, 아니면 새 t.
 //   useKey: token_uses.reservation_id 값 (학생 = 예약 id, 마스터 = -마스터 id)
-async function issueQr(env, useKey, keepRaw, sign) {
+async function issueQr(env, useKey, keepRaw, sign, special = false) {
   const now = Date.now();
   const cur = Math.floor(now / QR_TICK_MS);
   const isUsed = async (t) =>
-    !!(await env.DB.prepare('SELECT 1 FROM token_uses WHERE reservation_id = ? AND step = ?').bind(useKey, t).first());
+    !!(await env.DB.prepare(special ? 'SELECT 1 FROM special_token_uses WHERE request_id = ? AND step = ?'
+      : 'SELECT 1 FROM token_uses WHERE reservation_id = ? AND step = ?').bind(useKey, t).first());
   let t = null;
   let usedPrev = false;
   const keep = /^\d+$/.test(keepRaw || '') ? Number(keepRaw) : null;
@@ -758,7 +1000,7 @@ async function issueQr(env, useKey, keepRaw, sign) {
   for (let c = Math.max(cur, usedPrev ? keep + 1 : cur); t === null && c <= cur + 1; c++) if (!(await isUsed(c))) t = c;
   if (t === null) throw new HttpError(429, '잠시 후 다시 시도해 주세요.');
   const expires_at = t * QR_TICK_MS + QR_VALID_MS;
-  return {
+  return attachManualCode(env, {
     token: await sign(t),
     t,
     used_prev: usedPrev,
@@ -766,7 +1008,7 @@ async function issueQr(env, useKey, keepRaw, sign) {
     valid_ms: QR_VALID_MS,
     poll_ms: QR_POLL_MS,
     server_time: now,
-  };
+  });
 }
 const qrTimeOk = (t, now) => t * QR_TICK_MS <= now + QR_TICK_MS && now - t * QR_TICK_MS <= QR_VALID_MS + QR_GRACE_MS;
 
@@ -784,34 +1026,78 @@ async function deviceAuth(req, env) {
 // 응답 형식은 펌웨어(server.c)가 읽는 그대로 유지: {ok, reason} / {ok, name, open_ms, end_at}
 async function deviceVerify(req, env) {
   const dev = await deviceAuth(req, env);
-  const { token } = await body(req);
+  const input = await body(req);
+  if (!input || typeof input !== 'object' || Array.isArray(input)) throw new HttpError(400, '잘못된 요청 형식입니다.');
+  let token = input.token;
   const now = Date.now();
   const s = await getSettings(env);
 
-  const log = (result, reason, { resId = null, userId = null, masterId = null } = {}) =>
+  const log = (result, reason, { resId = null, userId = null, masterId = null, specialId = null } = {}) =>
     env.DB.prepare(
-      'INSERT INTO access_logs (device_id, reservation_id, user_id, master_id, result, reason, at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO access_logs (device_id, reservation_id, user_id, master_id, result, reason, at, room_id, special_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
     )
-      .bind(dev.id, resId, userId, masterId, result, reason, now)
+      .bind(dev.id, resId, userId, masterId, result, reason, now, dev.room_id, specialId)
       .run();
   const deny = async (reason, ids) => {
     // duplicate_scan: 방금 통과한 QR 화면이 카메라에 남아 다시 읽힌 것 → 기록하지 않음 (보드는 조용히 무시)
     if (reason !== 'duplicate_scan') await log('denied', reason, ids);
     return json({ ok: false, reason });
   };
+  const manual = Object.hasOwn(input, 'code');
+  let manualBucket;
+  if (manual) {
+    const resolved = await resolveManualCode(env, dev.id, input.token === undefined ? input.code : null, now);
+    if (resolved.reason) return deny(resolved.reason);
+    token = resolved.token;
+    manualBucket = resolved.bucket;
+  }
+  const allow = async (data) => {
+    if (manual) await releaseManualAttempt(env, dev.id, manualBucket);
+    return json(data);
+  };
   // 일회용 QR 사용 처리. 이미 쓴 QR이면 방금(15초 안) 쓴 것은 duplicate_scan, 아니면 token_reused.
-  const consume = async (useKey, step) => {
-    const use = await env.DB.prepare('INSERT OR IGNORE INTO token_uses (reservation_id, step, used_at) VALUES (?, ?, ?)')
+  const consume = async (useKey, step, special = false) => {
+    const use = await env.DB.prepare(special ? 'INSERT OR IGNORE INTO special_token_uses (request_id, step, used_at) VALUES (?, ?, ?)'
+      : 'INSERT OR IGNORE INTO token_uses (reservation_id, step, used_at) VALUES (?, ?, ?)')
       .bind(useKey, step, now)
       .run();
     if (use.meta.changes) return null;
-    const prev = await env.DB.prepare('SELECT used_at FROM token_uses WHERE reservation_id = ? AND step = ?').bind(useKey, step).first();
+    const prev = await env.DB.prepare(special ? 'SELECT used_at FROM special_token_uses WHERE request_id = ? AND step = ?'
+      : 'SELECT used_at FROM token_uses WHERE reservation_id = ? AND step = ?').bind(useKey, step).first();
     return prev && now - prev.used_at < DUPLICATE_SCAN_MS ? 'duplicate_scan' : 'token_reused';
   };
 
   const p = parseQrParts(token);
   if (!p) return deny('invalid_token');
   const room = await env.DB.prepare('SELECT enabled FROM rooms WHERE id = ?').bind(dev.room_id).first();
+
+  // 특별 출입은 마스터 권한이 아니며 긴급 잠금과 사용자 정지, 실습실 운영 상태를 따른다.
+  if (p.special) {
+    const r = await env.DB.prepare(`SELECT r.*, u.name, u.status AS user_status FROM special_requests r
+      JOIN users u ON u.id = r.user_id WHERE r.id = ?`).bind(p.id).first();
+    if (!r || !r.nonce || !safeEqual(p.sig, await hmac(env.QR_SECRET, `LA1.S${p.id}.${p.step}.${r.nonce}`, 12)))
+      return deny('invalid_token');
+    const ids = { specialId: r.id, userId: r.user_id };
+    if (s.lockdown) return deny('lockdown', ids);
+    if (!room || !room.enabled) return deny('room_closed', ids);
+    if (r.user_status !== 'active') return deny('user_blocked', ids);
+    if (r.room_id !== dev.room_id) return deny('wrong_room', ids);
+    if (r.status !== 'approved') return deny('special_revoked', ids);
+    if (now >= (r.expires_at ?? r.activation_deadline)) return deny('special_expired', ids);
+    if (!qrTimeOk(p.step, now)) return deny('expired_token', ids);
+    const bad = await consume(r.id, p.step, true);
+    if (bad) return deny(bad, ids);
+    // 최초 사용 시각과 만료 시각을 한 번만 확정한다. 재출입과 동시 스캔으로 연장하지 않는다.
+    const activated = await env.DB.prepare(`UPDATE special_requests
+      SET first_used_at = COALESCE(first_used_at, ?), expires_at = COALESCE(expires_at, ?)
+      WHERE id = ? AND status = 'approved' AND COALESCE(expires_at, activation_deadline) > ?
+      AND EXISTS (SELECT 1 FROM users WHERE id = special_requests.user_id AND status = 'active')
+      AND EXISTS (SELECT 1 FROM rooms WHERE id = special_requests.room_id AND enabled = 1)
+      RETURNING expires_at`).bind(now, now + SPECIAL_DURATION_MS, r.id, now).first();
+    if (!activated) return deny('special_expired', ids);
+    await log('granted', 'special', ids);
+    return allow({ ok: true, name: r.name, open_ms: s.door_open_ms, end_at: activated.expires_at });
+  }
 
   // --- 마스터 QR ---
   if (p.master) {
@@ -835,7 +1121,7 @@ async function deviceVerify(req, env) {
       .bind(now, mk.id)
       .run();
     await log('granted', 'master', ids);
-    return json({ ok: true, name: `마스터 ${mk.label}`, open_ms: s.door_open_ms, end_at: mk.expires_at });
+    return allow({ ok: true, name: `마스터 ${mk.label}`, open_ms: s.door_open_ms, end_at: mk.expires_at });
   }
 
   // --- 학생 예약 QR ---
@@ -862,5 +1148,5 @@ async function deviceVerify(req, env) {
   if (bad) return deny(bad, ids);
 
   await log('granted', null, ids);
-  return json({ ok: true, name: r.name, open_ms: s.door_open_ms, end_at: r.end_at });
+  return allow({ ok: true, name: r.name, open_ms: s.door_open_ms, end_at: r.end_at });
 }

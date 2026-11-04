@@ -7,7 +7,7 @@ SOURCE = ROOT / 'assets/source'
 OUT = ROOT / 'main/assets'
 ICONS = ('scan-qr-code', 'house', 'settings', 'circle-help', 'smartphone', 'user-round',
          'calendar-check-2', 'circle-check', 'circle-x', 'wifi', 'wifi-off',
-         'chevron-right', 'fingerprint')
+         'chevron-right', 'fingerprint', 'keyboard')
 ICON_SIZE = 128
 ICON_SIZES = (20, 28, 44, 52, 56, 64, 80, 128)
 
@@ -41,10 +41,10 @@ def main():
             jpg.paste(Image.new('RGB', jpg.size, foreground), (0, 0), alpha)
             jpg.save(SOURCE / f'{name}.jpg', quality=98, subsampling=0)
     code += ['static const unsigned icon_sizes[] = {' + ', '.join(map(str, ICON_SIZES)) + '};',
-             'static const lv_image_dsc_t *const images[13][8] = {']
+             f'static const lv_image_dsc_t *const images[{len(ICONS)}][8] = {{']
     code += ['    {' + ', '.join(f'&icon_{i}_{size}' for size in ICON_SIZES) + '},' for i in range(len(ICONS))]
     code += ['};', 'const lv_image_dsc_t *ui_icon_asset(unsigned icon, unsigned size)', '{',
-             '    if (icon >= 13) icon = 0;',
+             f'    if (icon >= {len(ICONS)}) icon = 0;',
              '    unsigned closest = 0, difference = 0xffffffffu;',
              '    for (unsigned i = 0; i < 8; i++) {',
              '        unsigned d = size > icon_sizes[i] ? size - icon_sizes[i] : icon_sizes[i] - size;',

@@ -112,6 +112,12 @@ npm run deploy                             # lab.audreaming.com 도메인과 인
 
 로컬 테스트: `npm run db:migrate:local && npm run dev` (비밀값은 `.dev.vars`, 운영에서는 쓰지 마세요).
 
+### 라즈베리파이에서 운영 (이 브랜치: `deploy/raspberry-pi`)
+
+같은 서버 코드를 라즈베리파이 3B+에서 Node.js + SQLite로 돌릴 수 있습니다. 학생 신청·관리자 화면은 Cloudflare Tunnel로 외부에 공개하고, 보드의 QR 확인은 학내망 포트(8788)로 직접 처리해 인터넷이 끊겨도 출입이 됩니다. 설치 순서는 [docs/raspberry-pi.md](docs/raspberry-pi.md).
+
+다른 배포 방식: `deploy/windows-minipc` (Windows 미니PC), `deploy/cloudflare` (Cloudflare Worker + D1).
+
 ## 하드웨어 연결
 
 **릴레이:** 1채널 릴레이 모듈(옵토커플러 내장, High/Low 트리거 선택 점퍼 있는 5V 모듈 권장)을 2x13 헤더에 직접 연결합니다.

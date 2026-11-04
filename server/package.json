@@ -7,10 +7,17 @@
     "deploy": "wrangler deploy",
     "db:migrate:local": "wrangler d1 migrations apply lab-access --local",
     "db:migrate": "wrangler d1 migrations apply lab-access --remote",
-    "test": "node --test test/*.test.js"
+    "test": "node --test test/*.test.js",
+    "pi:start": "node --disable-warning=ExperimentalWarning pi/server.js",
+    "pi:backup": "node --disable-warning=ExperimentalWarning pi/backup.js",
+    "pi:import": "node --disable-warning=ExperimentalWarning pi/import-d1.js",
+    "pi:test": "node --disable-warning=ExperimentalWarning --test pi/test/*.test.js"
   },
   "devDependencies": {
     "qrcode-generator": "^1.4.4",
     "wrangler": "^4.0.0"
+  },
+  "engines": {
+    "node": ">=22.13"
   }
 }

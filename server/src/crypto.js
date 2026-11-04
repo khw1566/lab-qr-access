@@ -46,6 +46,11 @@ export async function hmac(secret, msg, truncBytes = 32) {
   return b64url(new Uint8Array(sig).slice(0, truncBytes));
 }
 
+// 단말 응답 서명용: HMAC-SHA256 전체를 16진수로 (펌웨어에서 비교하기 쉽게)
+export async function hmacHex(secret, msg) {
+  return hex(await crypto.subtle.sign('HMAC', await hmacKey(secret), enc.encode(msg)));
+}
+
 // 타이밍 공격 방지용 상수 시간 비교
 export function safeEqual(a, b) {
   if (typeof a !== 'string' || typeof b !== 'string' || a.length !== b.length) return false;

@@ -1,6 +1,6 @@
 // 실습실 출입통제 시스템 - Cloudflare Worker (API)
 // 정적 화면(public/)은 Workers Static Assets가 서빙하고, /api/* 만 이 코드가 처리한다.
-import { hashPassword, hmac, randomHex, safeEqual, sha256Hex } from './crypto.js';
+import { hashPassword, hmac, hmacHex, randomHex, safeEqual, sha256Hex } from './crypto.js';
 import { attachManualCode, resolveManualCode, releaseManualAttempt } from './manual-codes.js';
 
 // QR 토큰의 숫자 칸(t)은 발급 시각을 10초 단위로 센 값. 발급 후 5분간 유효하고, 한 번 쓰면 끝.
@@ -337,10 +337,9 @@ async function route(req, env, url) {
   let m;
 
   // ===== 보드(출입 단말) API =====
-  if (path === '/api/device/verify' && method === 'POST') return deviceVerify(req, env);
+  if (path === '/api/device/verify' && method === 'POST') return deviceSigned(req, env, deviceVerify);
   if (path === '/api/device/ping' && method === 'POST') {
-    const dev = await deviceAuth(req, env);
-    return json({ ok: true, device: dev.name, server_time: Date.now() });
+    return deviceSigned(req, env, async (_req, _env, dev) => json({ ok: true, device: dev.name, server_time: Date.now() }));
   }
 
   // ===== 로그인 전 화면용 공개 설정 =====
@@ -1020,12 +1019,25 @@ async function deviceAuth(req, env) {
   const dev = await env.DB.prepare('SELECT * FROM devices WHERE key_hash = ? AND active = 1').bind(await sha256Hex(key)).first();
   if (!dev) throw new HttpError(401, 'unknown device');
   await env.DB.prepare('UPDATE devices SET last_seen_at = ? WHERE id = ?').bind(Date.now(), dev.id).run();
-  return dev;
+  return { dev, key };
+}
+
+// 응답 서명: 보드가 X-Lab-Nonce(임의 16진수)를 보내면 서버는 X-Lab-Sig = HMAC-SHA256(단말 키, "<nonce>.<응답 본문>")을 붙인다.
+// 개방형 Wi-Fi에서 누군가 서버인 척 "열어라" 응답을 꾸며도, 단말 키를 모르면 서명을 만들 수 없어 보드가 무시한다.
+// nonce가 매번 바뀌므로 예전 응답을 녹화해 다시 보내는 것도 통하지 않는다.
+async function deviceSigned(req, env, handler) {
+  const { dev, key } = await deviceAuth(req, env);
+  const res = await handler(req, env, dev);
+  const nonce = req.headers.get('x-lab-nonce') || '';
+  if (!/^[0-9a-f]{16,64}$/.test(nonce)) return res;
+  const text = await res.text();
+  const headers = new Headers(res.headers);
+  headers.set('x-lab-sig', await hmacHex(key, `${nonce}.${text}`));
+  return new Response(text, { status: res.status, headers });
 }
 
 // 응답 형식은 펌웨어(server.c)가 읽는 그대로 유지: {ok, reason} / {ok, name, open_ms, end_at}
-async function deviceVerify(req, env) {
-  const dev = await deviceAuth(req, env);
+async function deviceVerify(req, env, dev) {
   const input = await body(req);
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new HttpError(400, '잘못된 요청 형식입니다.');
   let token = input.token;

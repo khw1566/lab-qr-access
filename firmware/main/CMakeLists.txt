@@ -11,5 +11,6 @@ idf_component_register(
                 "assets/icon_3.a8" "assets/icon_4.a8" "assets/icon_5.a8"
                 "assets/icon_6.a8" "assets/icon_7.a8" "assets/icon_8.a8"
                 "assets/icon_9.a8" "assets/icon_10.a8" "assets/icon_11.a8"
-                "assets/icon_12.a8"
+                "assets/icon_12.a8" "assets/icon_13.a8"
+                "assets/logo_art.a8"
 )

@@ -123,17 +123,10 @@ static bool json_find(const char *json, const char *key, char *val, size_t len)
     return true;
 }
 
-verify_result_t server_verify(const char *token)
+static verify_result_t verify_payload(const char *body)
 {
     verify_result_t r = { 0 };
-    // 토큰은 [A-Za-z0-9._-] 만 포함하지만, 혹시 모를 따옴표/역슬래시는 차단
-    if (strpbrk(token, "\"\\") || strlen(token) > 80) {
-        strlcpy(r.reason, "bad_format", sizeof(r.reason));
-        r.reachable = true;
-        return r;
-    }
-    char body[128], resp[384], v[32];
-    snprintf(body, sizeof(body), "{\"token\":\"%s\"}", token);
+    char resp[384], v[32];   // 서명 확인에는 본문 전체가 필요하다
     int status = post_json("/api/device/verify", body, resp, sizeof(resp));
     if (status != 200) {
         ESP_LOGE(TAG, "verify HTTP %d", status);
@@ -144,6 +137,30 @@ verify_result_t server_verify(const char *token)
     r.open_ms = json_find(resp, "open_ms", v, sizeof(v)) ? atoi(v) : 3000;
     if (!r.ok) json_find(resp, "reason", r.reason, sizeof(r.reason));
     return r;
+}
+
+verify_result_t server_verify(const char *token)
+{
+    if (strpbrk(token, "\"\\") || strlen(token) > 80) {
+        verify_result_t r = { .reachable = true };
+        strlcpy(r.reason, "bad_format", sizeof(r.reason));
+        return r;
+    }
+    char body[128];
+    snprintf(body, sizeof(body), "{\"token\":\"%s\"}", token);
+    return verify_payload(body);
+}
+
+verify_result_t server_verify_code(const char *code)
+{
+    if (strlen(code) != 8 || strspn(code, "0123456789") != 8) {
+        verify_result_t r = { .reachable = true };
+        strlcpy(r.reason, "manual_invalid", sizeof(r.reason));
+        return r;
+    }
+    char body[32];
+    snprintf(body, sizeof(body), "{\"code\":\"%s\"}", code);
+    return verify_payload(body);
 }
 
 bool server_ping(void)

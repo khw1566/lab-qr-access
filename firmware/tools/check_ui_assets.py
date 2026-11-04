@@ -6,7 +6,7 @@ root = Path(__file__).resolve().parents[1]
 source = (root / 'main/ui_assets.c').read_text(encoding='utf-8')
 sizes = (20, 28, 44, 52, 56, 64, 80, 128)
 checked = 0
-for icon in range(13):
+for icon in range(14):
     blob = (root / f'main/assets/icon_{icon}.a8').read_bytes()
     offset = 0
     for size in sizes:

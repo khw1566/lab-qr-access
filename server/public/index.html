@@ -93,6 +93,7 @@ textarea.input { min-height: 84px; resize: vertical; }
 .pill.approved, .pill.granted, .pill.on { background: var(--ok-soft); color: var(--ok); }
 .pill.pending { background: var(--warn-soft); color: var(--warn); }
 .pill.rejected, .pill.denied, .pill.blocked { background: var(--bad-soft); color: var(--bad); }
+.admin-comment { white-space: pre-wrap; overflow-wrap: anywhere; }
 .pill.cancelled, .pill.off, .pill.expired { background: var(--sunken); color: var(--muted); }
 .pill.master { background: var(--master); color: var(--master-ink); }
 
@@ -228,10 +229,16 @@ textarea.input { min-height: 84px; resize: vertical; }
 /* ---------- QR 전체 화면 ---------- */
 .qr-sheet {
   position: fixed; inset: 0; z-index: 50; background: #fff; color: #141b26; overflow-y: auto;
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; text-align: center;
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 18px; text-align: center;
   padding: calc(24px + env(safe-area-inset-top, 0px)) max(20px, env(safe-area-inset-right, 0px)) calc(24px + env(safe-area-inset-bottom, 0px)) max(20px, env(safe-area-inset-left, 0px));
 }
 .qr-sheet h2 { font-size: 22px; }
+.qr-sheet > * { flex-shrink: 0; }
+.qr-sheet > :first-child { margin-top: auto; }
+.qr-sheet > :last-child { margin-bottom: auto; }
+.manual-code-box { padding: 8px 20px; text-align: center; border: 1px solid #d5e6f5; border-radius: 12px; background: #f5f9ff; color: #152c48; }
+.manual-code-box span { display: block; font-size: 12px; }
+.manual-code-box output { display: block; font-size: 30px; font-weight: 700; letter-spacing: .12em; line-height: 1.4; }
 .qr-sheet .sub { font-family: var(--font-mono); color: #4a5566; font-size: 14px; }
 .qr-frame { position: relative; width: min(78vw, 46vh, 340px); aspect-ratio: 1; max-width: 100%; }
 .qr-frame svg.code { width: 100%; height: 100%; display: block; }
@@ -293,6 +300,8 @@ td.actions .btn + .btn { margin-left: 6px; }
 
 .room-card { padding: 18px; display: grid; gap: 14px; }
 .grid-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; }
+#logForm .grid-fields { grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); }
+#logForm .field, #logForm .input { min-width: 0; }
 
 .master-card { overflow: hidden; display: grid; }
 .master-card .stripe { height: 8px; background: repeating-linear-gradient(-45deg, var(--master) 0 10px, var(--master-ink) 10px 20px); }
@@ -395,7 +404,14 @@ dialog .row.end { justify-content: flex-end; }
   table.resp td { border: 0; padding: 0; }
   table.resp td.actions { text-align: left; margin-top: 6px; }
 }
-@media (max-width: 520px) { .who { display: none; } }
+@media (max-width: 520px) {
+  .who { display: none; }
+  .topbar-in { gap: 6px; }
+  .topbar-in > .btn { flex-shrink: 0; white-space: nowrap; padding-inline: 8px; font-size: 12px; }
+  .topbar-in .brand { flex: 1; font-size: 14px; gap: 6px; }
+  .topbar-in .brand-mark { width: 24px; height: 24px; }
+  .topbar .spacer { display: none; }
+}
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 </style>
 </head>
@@ -426,6 +442,7 @@ dialog .row.end { justify-content: flex-end; }
     <div class="spacer"></div>
     <span class="who" id="whoName" hidden></span>
     <a class="btn secondary sm" id="modeSwitch" href="#admin" hidden>관리자</a>
+    <button class="btn secondary sm" id="notificationsBtn" type="button" hidden aria-label="알림함">알림 <span id="notificationBadge" hidden></span></button>
     <button class="btn quiet sm" id="logoutBtn" type="button" hidden>로그아웃</button>
     <a class="btn sm" id="loginBtn" href="#login">로그인</a>
   </div>
@@ -465,7 +482,7 @@ dialog .row.end { justify-content: flex-end; }
     <p class="small muted" id="homeMeta"></p>
     <p class="small" id="homeLinks"></p>
     <div class="status-chip" id="printStatus"><span class="dot"></span><span>불러오는 중…</span></div>
-    <div class="row"><a class="btn" href="#new">이용 신청하기</a><a class="btn secondary" href="#pass">내 출입증</a></div>
+    <div class="row"><a class="btn" href="#new">이용 신청하기</a><a class="btn secondary" href="#pass">내 출입증</a><a class="btn secondary" href="#special">특별 출입신청</a></div>
   </section>
   <div class="banner info" id="homeNotice" hidden></div>
   <section>
@@ -494,16 +511,24 @@ dialog .row.end { justify-content: flex-end; }
 
     <!-- 출입증 -->
     <section id="s-pass" class="stack">
-      <div id="passCard"></div>
+      <div id="passCard"></div><div id="specialPassList"></div>
       <div>
         <div class="section-title"><h3>다가오는 이용</h3><a class="btn quiet sm" href="#new">이용 신청</a></div>
         <div class="panel list" id="upcomingList"><div class="empty">불러오는 중…</div></div>
       </div>
     </section>
 
+    <section id="s-special" class="stack" hidden>
+      <div><h2>특별 출입신청</h2><p class="small muted">급한 출력물 확인이나 짧은 이용이 필요할 때 신청하세요. 관리자 승인 후 첫 출입부터 30분 동안 재출입할 수 있습니다. 승인 후 24시간 안에 첫 출입해야 합니다.</p></div>
+      <form class="panel stack" id="specialForm" style="padding:18px">
+        <label class="field"><span>실습실</span><select class="input" name="room_id" id="specialRoom" required></select></label>
+        <label class="field"><span>특별 출입 사유</span><textarea class="input" name="purpose" maxlength="200" required placeholder="예: 출력물 상태를 급하게 확인해야 합니다."></textarea></label>
+        <button class="btn" type="submit">관리자에게 특별 출입신청</button>
+      </form><div id="specialRequestList"></div>
+    </section>
     <!-- 이용 신청 -->
     <section id="s-new" class="stack" hidden>
-      <div><h2>실습실 이용 신청</h2><p class="muted small" style="margin-top:4px">승인되면 이용 시작 전부터 출입 QR이 열립니다.</p></div>
+      <div><a class="btn secondary sm" href="#special" style="margin-bottom:12px">급한 확인·짧은 이용은 특별 출입신청</a><h2>실습실 이용 신청</h2><p class="muted small" style="margin-top:4px">승인되면 이용 시작 전부터 출입 QR이 열립니다.</p></div>
       <form class="panel stack" id="reqForm" style="padding:18px" novalidate>
         <label class="field"><span>실습실</span><select class="input" id="room"></select></label>
         <div class="field"><span>날짜</span><div class="cal" id="cal"></div></div>
@@ -531,7 +556,7 @@ dialog .row.end { justify-content: flex-end; }
 
     <!-- 신청 내역 -->
     <section id="s-history" class="stack" hidden>
-      <h2>신청 내역</h2>
+      <h2>신청 내역</h2><div id="specialHistoryList"></div>
       <div class="panel list" id="historyList"><div class="empty">불러오는 중…</div></div>
     </section>
   </div>
@@ -550,6 +575,7 @@ dialog .row.end { justify-content: flex-end; }
   <nav class="side" aria-label="관리자 메뉴">
     <a href="#admin" data-a="overview"><svg><use href="#i-gauge"/></svg>현황</a>
     <a href="#admin-requests" data-a="requests"><svg><use href="#i-check"/></svg>신청 승인<span class="count" id="cntReq" hidden></span></a>
+    <a href="#admin-special" data-a="special"><svg><use href="#i-key"/></svg>특별 출입신청<span class="count" id="cntSpecial" hidden></span></a>
     <a href="#admin-users" data-a="users"><svg><use href="#i-users"/></svg>사용자<span class="count" id="cntUsers" hidden></span></a>
     <a href="#admin-master" data-a="master"><svg><use href="#i-key"/></svg>마스터 QR</a>
     <div class="sep"></div>
@@ -574,6 +600,7 @@ dialog .row.end { justify-content: flex-end; }
     <div id="qrCode"></div>
   </div>
   <p class="count mono" id="qrCount"></p>
+  <div class="manual-code-box" id="manualCodePanel" hidden><span>QR 인식이 어려울 때 · 단말에서 코드 입력</span><output class="mono" id="manualCode" aria-label="직접 입력용 숫자 8자리"></output></div>
   <p class="hint" id="qrHint">출입문 카메라에 화면을 비춰 주세요. QR은 5분 동안 한 번만 쓸 수 있고, 쓰고 나면 새 QR로 바뀝니다.</p>
   <button class="close" id="qrClose" type="button">닫기</button>
 </div>
@@ -581,13 +608,14 @@ dialog .row.end { justify-content: flex-end; }
 <dialog id="dlg"><form method="dialog" id="dlgForm">
   <h3 id="dlgTitle"></h3>
   <p class="muted small" id="dlgText"></p>
-  <label class="field" id="dlgInputWrap" hidden><span id="dlgLabel"></span><input class="input" id="dlgInput"></label>
+  <label class="field" id="dlgInputWrap" for="dlgInput" hidden><span id="dlgLabel"></span><input class="input" id="dlgInput"><textarea class="input" id="dlgComment" rows="4" maxlength="200" hidden></textarea></label>
   <div class="row end"><button class="btn secondary" value="cancel" type="submit" formnovalidate>취소</button><button class="btn" id="dlgOk" value="ok" type="submit">확인</button></div>
 </form></dialog>
 
 <div id="printCard"></div>
 <div id="toast" role="status"></div>
 
+<script src="/notifications.js"></script>
 <script>
 'use strict';
 const $ = (s, el = document) => el.querySelector(s);
@@ -608,6 +636,7 @@ const REASON = {
   invalid_token:'잘못된 QR', expired_token:'만료된 QR', token_reused:'이미 사용한 QR', no_reservation:'없는 신청',
   not_approved:'승인 안 됨', user_blocked:'정지된 사용자', wrong_room:'다른 실습실', out_of_time:'이용 시간 아님',
   lockdown:'긴급 잠금 중', room_closed:'실습실 운영 중지', master:'마스터 QR', master_disabled:'마스터 QR 꺼짐',
+  special:'특별 출입', special_expired:'특별 출입 만료', special_revoked:'특별 출입 승인 취소',
   master_revoked:'폐기된 마스터 QR', master_expired:'기간 끝난 마스터 QR', duplicate_scan:'중복 인식',
 };
 const KST = 9 * 3600e3;
@@ -632,43 +661,74 @@ const fDT = (ms) => `${fDate(ms)} ${fTime(ms)}`;
 const fRange = (a, b) => `${fDate(a)} ${fTime(a)}–${fTime(b)}`;
 const ago = (ms) => { const s = (Date.now() - ms) / 1000; if (s < 60) return '방금'; if (s < 3600) return `${Math.floor(s / 60)}분 전`; if (s < 86400) return `${Math.floor(s / 3600)}시간 전`; return fDT(ms); };
 
-function ask({ title, text = '', label = '', value = '', ok = '확인', danger = false, input = false }) {
+function ask({ title, text = '', label = '', value = '', ok = '확인', danger = false, input = false, multiline = false }) {
   return new Promise((resolve) => {
     const d = $('#dlg');
     $('#dlgTitle').textContent = title; $('#dlgText').textContent = text; $('#dlgText').hidden = !text;
-    $('#dlgInputWrap').hidden = !input; $('#dlgLabel').textContent = label; $('#dlgInput').value = value;
+    $('#dlgInputWrap').hidden = !input; $('#dlgLabel').textContent = label;
+    $('#dlgInputWrap').htmlFor = multiline ? 'dlgComment' : 'dlgInput';
+    $('#dlgInput').hidden = multiline; $('#dlgInput').disabled = multiline || !input;
+    $('#dlgComment').hidden = !multiline; $('#dlgComment').disabled = !multiline || !input;
+    const entry = multiline ? $('#dlgComment') : $('#dlgInput'); entry.value = value;
     const okb = $('#dlgOk'); okb.textContent = ok; okb.className = 'btn' + (danger ? ' danger' : '');
-    d.onclose = () => resolve(d.returnValue === 'ok' ? (input ? $('#dlgInput').value.trim() : true) : null);
-    d.returnValue = ''; d.showModal(); if (input) $('#dlgInput').focus();
+    d.onclose = () => resolve(d.returnValue === 'ok' ? (input ? entry.value.trim() : true) : null);
+    d.returnValue = ''; d.showModal(); if (input) entry.focus();
   });
 }
 async function act(fn, okMsg) { try { await fn(); if (okMsg) toast(okMsg); return true; } catch (e) { toast(e.message); return false; } }
 
+// 정보 편집은 저장 성공 후에만 닫는다. 오류가 나면 입력 내용을 유지한다.
+function editRecord(title, fields, save) {
+  const d = document.createElement('dialog');
+  d.setAttribute('aria-label', title);
+  d.innerHTML = `<form><h3>${esc(title)}</h3>${fields.map((f) => `<label class="field"><span>${esc(f.label)}</span>${f.options
+    ? `<select class="input" name="${f.key}">${f.options.map((o) => `<option value="${o.id}" ${o.id == f.value ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}</select>`
+    : `<input class="input" name="${f.key}" value="${esc(f.value || '')}" maxlength="${f.max}" ${f.required ? 'required' : ''}>`}</label>`).join('')}
+    <p class="small" data-error role="alert" style="color:var(--bad)" hidden></p>
+    <div class="row end"><button class="btn secondary" type="button" data-cancel>취소</button><button class="btn" type="submit">저장</button></div></form>`;
+  document.body.append(d);
+  d.onclose = () => d.remove();
+  $('[data-cancel]', d).onclick = () => d.close();
+  $('form', d).onsubmit = async (e) => {
+    e.preventDefault(); const btn = $('button[type="submit"]', d); btn.disabled = true;
+    try { await save(Object.fromEntries(new FormData(e.target))); d.close(); toast('저장했습니다.'); reload(); }
+    catch (err) { const el = $('[data-error]', d); el.textContent = err.message; el.hidden = false; }
+    finally { btn.disabled = false; }
+  };
+  d.showModal(); $('input, select', d)?.focus();
+}
+
 // ---------- QR 렌더링 ----------
 function qrSvg(text) { const q = qrcode(0, 'M'); q.addData(text); q.make(); return q.createSvgTag({ cellSize: 4, margin: 2, scalable: true }).replace('<svg ', '<svg class="code" role="img" aria-label="QR 코드" '); }
-let qrTimer = null, qrCountTimer = null, wake = null;
-function openQr({ title, sub, master = false, fetcher }) {
+let qrTimer = null, qrCountTimer = null, wake = null, qrGeneration = 0;
+function openQr({ title, sub, master = false, fetcher, hint, detail, countLabel = '' }) {
+  const generation = ++qrGeneration;
+  clearTimeout(qrTimer); clearInterval(qrCountTimer); qrCountTimer = null;
   const sh = $('#qrSheet');
   sh.hidden = false; sh.classList.toggle('master', master); $('#qrHazard').hidden = !master;
   $('#qrTitle').textContent = title; $('#qrSub').textContent = sub || '';
-  $('#qrHint').textContent = master
+  $('#qrHint').textContent = hint || (master
     ? '마스터 QR입니다. 다른 사람에게 보여 주거나 캡처해서 보내지 마세요. 한 번 쓰면 새 QR로 바뀝니다.'
-    : '출입문 카메라에 화면을 비춰 주세요. QR은 5분 동안 한 번만 쓸 수 있고, 쓰고 나면 새 QR로 바뀝니다.';
+    : '출입문 카메라에 화면을 비춰 주세요. QR은 5분 동안 한 번만 쓸 수 있고, 쓰고 나면 새 QR로 바뀝니다.');
   $('#qrCode').innerHTML = ''; $('#qrCount').textContent = '';
+  $('#manualCodePanel').hidden = true; $('#manualCode').textContent = '';
   document.body.style.overflow = 'hidden';
   // 같은 t로 주기적으로 다시 물어봄 → 서버가 '쓰였음/만료 임박'이면 새 QR을 준다
   let cur = null, until = 0, total = 300000;
   const prog = $('#qrProg');
   const upd = () => {
     const left = Math.max(0, until - Date.now());
+    if (!left) { $('#manualCodePanel').hidden = true; $('#manualCode').textContent = ''; }
     prog.style.strokeDashoffset = String(100 - (left / total) * 100);
     const sec = Math.ceil(left / 1000);
-    $('#qrCount').textContent = `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')} 동안 유효`;
+    $('#qrCount').textContent = `${countLabel}${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')} 동안 유효`;
   };
   const tick = async () => {
     clearTimeout(qrTimer);
     try {
       const r = await fetcher(cur ? cur.t : null);
+      if (sh.hidden || generation !== qrGeneration) return;
+      if (detail) $('#qrSub').textContent = detail(r);
       if (!cur || r.token !== cur.token) {
         $('#qrCode').innerHTML = qrSvg(r.token);
         if (r.used_prev) toast(master ? '출입 확인됨 · 새 마스터 QR로 바뀌었습니다.' : '출입 확인됨 · 새 QR로 바뀌었습니다.');
@@ -676,10 +736,15 @@ function openQr({ title, sub, master = false, fetcher }) {
         until = Date.now() + (r.expires_at - r.server_time);
         prog.style.transition = 'none'; upd(); requestAnimationFrame(() => { prog.style.transition = ''; });
       }
+      const manual = typeof r.manual_code === 'string' && /^\d{8}$/.test(r.manual_code) && until > Date.now();
+      $('#manualCodePanel').hidden = !manual;
+      const displayedCode = manual ? r.manual_code.slice(0, 4) + ' ' + r.manual_code.slice(4) : '';
+      if ($('#manualCode').textContent !== displayedCode) $('#manualCode').textContent = displayedCode;
       cur = r;
       if (!qrCountTimer) qrCountTimer = setInterval(upd, 1000);
       qrTimer = setTimeout(tick, r.poll_ms || 5000);
     } catch (e) {
+      if (sh.hidden || generation !== qrGeneration) return;
       // 잠깐의 통신 끊김이나 '잠시 후' 응답이면 지금 QR을 그대로 두고 다시 물어봄
       if (cur && (!e.status || e.status === 429 || e.status >= 500) && until > Date.now()) {
         qrTimer = setTimeout(tick, 3000);
@@ -688,6 +753,7 @@ function openQr({ title, sub, master = false, fetcher }) {
       clearInterval(qrCountTimer); qrCountTimer = null; cur = null;
       $('#qrCode').innerHTML = `<p class="err" style="padding-top:40%">${esc(e.message)}</p>`;
       $('#qrCount').textContent = '';
+      $('#manualCodePanel').hidden = true; $('#manualCode').textContent = '';
     }
   };
   tick();
@@ -695,6 +761,7 @@ function openQr({ title, sub, master = false, fetcher }) {
   $('#qrClose').focus();
 }
 function closeQr() {
+  qrGeneration++; $('#manualCodePanel').hidden = true; $('#manualCode').textContent = '';
   clearTimeout(qrTimer); clearInterval(qrCountTimer); qrCountTimer = null; $('#qrSheet').hidden = true; document.body.style.overflow = '';
   try { wake?.release(); } catch {} wake = null;
 }
@@ -735,7 +802,7 @@ $('#authForm').onsubmit = async (e) => {
 $('#logoutBtn').onclick = async () => { await api('/api/auth/logout', { method: 'POST' }).catch(() => {}); me = null; settings = { ...info }; if (location.hash === '#home') route(); else location.hash = 'home'; };
 
 // ---------- 라우팅 ----------
-const STUDENT_TABS = ['pass', 'new', 'history'];
+const STUDENT_TABS = ['pass', 'new', 'history', 'special'];
 function route() {
   closeQr();
   const h = location.hash.slice(1) || 'home';
@@ -743,6 +810,7 @@ function route() {
   // 상단 바
   $('#loginBtn').hidden = !!me; $('#logoutBtn').hidden = !me; $('#whoName').hidden = !me;
   $('#modeSwitch').hidden = !me || me.role !== 'admin';
+  $('#notificationsBtn').hidden = !me; syncNotificationSession();
   const views = ['#authView', '#homeView', '#studentView', '#adminView'];
   const show = (v) => views.forEach((x) => { $(x).hidden = x !== v; });
   const nav = (tab) => $$('[data-nav]').forEach((a) => { if (a.dataset.nav === tab) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
@@ -765,7 +833,8 @@ function route() {
   if (!STUDENT_TABS.includes(h)) { show('#homeView'); nav('home'); renderHome(); return; }
   show('#studentView'); nav(h);
   STUDENT_TABS.forEach((t) => { $('#s-' + t).hidden = t !== h; });
-  if (h === 'pass' || h === 'history') loadMine();
+  if (h === 'pass' || h === 'history') { loadMine(); loadSpecial(); }
+  if (h === 'special') loadSpecial();
   if (h === 'new') initRequestForm();
 }
 window.addEventListener('hashchange', route);
@@ -863,7 +932,7 @@ function resItem(r, now) {
     <div class="item-head"><b>${esc(r.room_name)}</b><span class="pill ${r.status}">${STATUS[r.status]}</span></div>
     <div class="mono small">${fRange(r.start_at, r.end_at)}${r.printer_type ? ` · ${PT[r.printer_type]}` : ''}</div>
     ${r.purpose ? `<div class="small muted">${esc(r.purpose)}</div>` : ''}
-    ${r.reject_reason ? `<div class="small" style="color:var(--bad)">반려 사유: ${esc(r.reject_reason)}</div>` : ''}
+    ${r.reject_reason ? `<div class="small admin-comment" style="color:var(--bad)">관리자 멘트: ${esc(r.reject_reason)}</div>` : ''}
     ${live || canCancel ? `<div class="item-actions">
       ${live ? `<button class="btn sm" type="button" data-qr="${r.id}">출입 QR 열기</button>` : ''}
       ${canCancel ? `<button class="btn secondary sm" type="button" data-cancel="${r.id}">신청 취소</button>` : ''}
@@ -912,6 +981,63 @@ document.addEventListener('click', async (e) => {
   if (c) {
     if (!(await ask({ title: '이 신청을 취소할까요?', text: '취소하면 출입 QR도 함께 사라집니다.', ok: '신청 취소', danger: true }))) return;
     if (await act(() => api(`/api/reservations/${c.dataset.cancel}/cancel`, { method: 'POST' }), '신청을 취소했습니다.')) loadMine();
+  }
+});
+
+// ---------- 특별 출입 ----------
+let specialMine = [];
+const specialEnd = (r) => r.expires_at ?? r.activation_deadline;
+function specialState(r, now = Date.now() + skew) {
+  if (r.status === 'approved') return now >= specialEnd(r) ? '만료' : r.first_used_at ? '이용 중' : '첫 출입 대기';
+  return { pending: '승인 대기', rejected: '반려', cancelled: '신청 취소', revoked: '승인 취소' }[r.status];
+}
+const specialTime = (r) => r.status === 'approved'
+  ? r.first_used_at ? `첫 출입 ${fDT(r.first_used_at)} · 종료 ${fDT(r.expires_at)}` : `${fDT(r.activation_deadline)}까지 첫 출입 · 첫 출입부터 30분`
+  : `${fDT(r.created_at)} 신청`;
+async function loadSpecial() {
+  const targets = ['#specialPassList', '#specialHistoryList', '#specialRequestList'];
+  try {
+    const { requests, server_time } = await api('/api/special-requests');
+    specialMine = requests; const now = server_time;
+    const cards = (list) => list.map((r) => `<div class="panel stack" style="padding:16px;margin-top:10px">
+      <div class="row"><b>${esc(r.room_name)}</b><span class="pill ${r.status === 'approved' && specialEnd(r) > now ? 'granted' : 'off'}">${specialState(r, now)}</span></div>
+      <p class="small">${esc(r.purpose)}</p><p class="small muted">${specialTime(r)}</p>
+      ${r.reject_reason ? `<p class="small admin-comment">관리자 멘트: ${esc(r.reject_reason)}</p>` : ''}
+      <div class="row">${r.status === 'approved' && specialEnd(r) > now ? `<button class="btn sm" data-special-qr="${r.id}">특별 출입 QR 열기</button>` : ''}
+      ${r.status === 'pending' || (r.status === 'approved' && specialEnd(r) > now) ? `<button class="btn secondary sm" data-special-cancel="${r.id}">신청 취소</button>` : ''}</div></div>`).join('');
+    for (const target of targets) {
+      const list = target === '#specialPassList' ? requests.filter((r) => r.status === 'pending' || (r.status === 'approved' && specialEnd(r) > now)) : requests;
+      $(target).innerHTML = `<div class="section-title"><h3>특별 출입</h3><div class="row"><a href="#special" class="btn quiet sm">특별 출입신청</a><button class="btn quiet sm" data-special-refresh>새로고침</button></div></div>` +
+        (cards(list) || '<p class="small muted">특별 출입신청이 없습니다.</p>');
+    }
+    if (location.hash === '#special') {
+      const { rooms: rs } = await api('/api/rooms');
+      const keep = $('#specialRoom').value;
+      $('#specialRoom').innerHTML = rs.map((r) => `<option value="${r.id}">${esc(r.name)}</option>`).join('');
+      if (rs.some((r) => r.id == keep)) $('#specialRoom').value = keep;
+      $('#specialForm button').disabled = !rs.length;
+    }
+  } catch (e) { for (const target of targets) $(target).innerHTML = `<p class="small">${esc(e.message)}</p>`; }
+}
+$('#specialForm').onsubmit = async (e) => {
+  e.preventDefault(); const btn = $('button', e.target); btn.disabled = true;
+  try {
+    await api('/api/special-requests', { method: 'POST', body: Object.fromEntries(new FormData(e.target)) });
+    $('textarea', e.target).value = ''; toast('특별 출입을 신청했습니다. 관리자 승인을 기다려 주세요.'); await loadSpecial();
+  } catch (err) { toast(err.message); } finally { btn.disabled = false; }
+};
+document.addEventListener('click', async (e) => {
+  const q = e.target.closest('[data-special-qr]'), c = e.target.closest('[data-special-cancel]');
+  if (e.target.closest('[data-special-refresh]')) loadSpecial();
+  if (q) {
+    const r = specialMine.find((x) => x.id == q.dataset.specialQr);
+    openQr({ title: `${r.room_name} · 특별 출입`, sub: specialTime(r), countLabel: '화면 QR · ',
+      hint: '첫 출입부터 30분 동안 재출입할 수 있습니다. 사용한 QR은 새 QR로 바뀌며 이용 시간은 연장되지 않습니다.',
+      detail: (x) => x.first_used_at ? `특별 출입 종료: ${fDT(x.access_expires_at)} · 첫 출입부터 30분` : `첫 출입 대기 · ${fDT(x.activation_deadline)}까지 사용`,
+      fetcher: (keep) => api(`/api/special-requests/${r.id}/qr${keep != null ? '?keep=' + keep : ''}`) });
+  }
+  if (c && await ask({ title: '특별 출입신청을 취소할까요?', text: '발급된 출입증도 즉시 사용할 수 없게 됩니다.', ok: '신청 취소', danger: true })) {
+    if (await act(() => api(`/api/special-requests/${c.dataset.specialCancel}/cancel`, { method: 'POST' }), '취소했습니다.')) loadSpecial();
   }
 });
 
@@ -1069,6 +1195,7 @@ async function refreshCounts() {
   try {
     const o = await api('/api/admin/overview');
     const set = (el, n) => { el.hidden = !n; el.textContent = n; };
+    set($('#cntSpecial'), o.pending_special);
     set($('#cntReq'), o.pending_reservations); set($('#cntUsers'), o.pending_users);
     return o;
   } catch { return null; }
@@ -1102,7 +1229,7 @@ A.requests = async () => {
     <td>${esc(r.room_name)}</td>
     <td class="mono small">${fRange(r.start_at, r.end_at)}<div class="muted">${PT[r.printer_type] || ''}</div></td>
     <td class="small">${esc(r.advisor_name || '-')}${r.has_sig ? ` <button class="btn quiet sm" type="button" data-sig="${r.id}">서명 보기</button>` : ''}</td>
-    <td class="small">${esc(r.purpose)}${r.reject_reason ? `<div style="color:var(--bad)">사유: ${esc(r.reject_reason)}</div>` : ''}${r.status === 'approved' && !r.decided_by ? '<div class="muted">자동 승인</div>' : ''}</td>
+    <td class="small">${esc(r.purpose)}${r.reject_reason ? `<div class="admin-comment" style="color:var(--bad)">관리자 멘트: ${esc(r.reject_reason)}</div>` : ''}${r.status === 'approved' && !r.decided_by ? '<div class="muted">자동 승인</div>' : ''}</td>
     <td class="actions">
       ${r.status === 'pending' ? `<button class="btn ok sm" type="button" data-approve="${r.id}">승인</button>` : ''}
       ${r.status !== 'rejected' ? `<button class="btn secondary sm" type="button" data-reject="${r.id}">${r.status === 'approved' ? '승인 취소' : '반려'}</button>` : ''}
@@ -1115,36 +1242,124 @@ A.requests = async () => {
   });
   $$('[data-approve]').forEach((b) => b.onclick = async () => { if (await act(() => api(`/api/admin/reservations/${b.dataset.approve}/approve`, { method: 'POST' }), '승인했습니다.')) reload(); });
   $$('[data-reject]').forEach((b) => b.onclick = async () => {
-    const reason = await ask({ title: '신청을 반려할까요?', text: '학생에게 반려 사유가 표시됩니다.', input: true, label: '반려 사유', ok: '반려', danger: true });
+    const reason = await ask({ title: '신청을 반려할까요?', text: '학생에게 반려 사유가 표시됩니다.', input: true, multiline: true, label: '관리자 멘트 (선택, 200자 이내)', ok: '반려', danger: true });
     if (reason === null) return;
     if (await act(() => api(`/api/admin/reservations/${b.dataset.reject}/reject`, { method: 'POST', body: { reason } }), '반려했습니다.')) reload();
   });
 };
 
-let userFilter = 'pending';
+let specialFilter = 'pending';
+A.special = async () => {
+  const { requests, server_time } = await api('/api/admin/special-requests?status=' + specialFilter);
+  const seg = `<div class="seg row">${[['pending','승인 대기'],['approved','발급됨'],['rejected','반려'],['cancelled','취소'],['revoked','승인 취소']].map(([v,t]) => `<button data-special-filter="${v}" aria-pressed="${v === specialFilter}">${t}</button>`).join('')}</div>`;
+  const rows = requests.map((r) => `<tr><td><b>${esc(r.name)}</b><div class="mono small muted">${esc(r.student_no)}</div></td>
+    <td>${esc(r.room_name)}</td><td class="small">${esc(r.purpose)}${r.reject_reason ? `<div class="muted admin-comment">관리자 멘트: ${esc(r.reject_reason)}</div>` : ''}</td>
+    <td class="small">${specialState(r, server_time)}<div class="muted">${specialTime(r)}</div></td>
+    <td class="actions">${r.status === 'pending' ? `<button class="btn ok sm" data-special-op="approve" data-id="${r.id}">승인·키 발급</button><button class="btn secondary sm" data-special-op="reject" data-id="${r.id}">반려</button>`
+      : r.status === 'approved' && specialEnd(r) > server_time ? `<button class="btn secondary sm" data-special-op="revoke" data-id="${r.id}">승인 취소</button>` : ''}</td></tr>`).join('');
+  $('#adminMain').innerHTML = head('특별 출입신청', '승인하면 학생에게 전용 출입 QR이 발급됩니다. 승인 후 24시간 안에 첫 출입해야 하며, 첫 출입부터 30분 동안 재출입할 수 있습니다.', '<button class="btn secondary sm" id="specialAdminRefresh">새로고침</button>') + seg +
+    `<div class="panel table-wrap" style="margin-top:16px">${rows ? `<table class="resp"><thead><tr><th>신청자</th><th>실습실</th><th>사유</th><th>상태·시간</th><th></th></tr></thead><tbody>${rows}</tbody></table>` : '<div class="empty">해당하는 특별 출입신청이 없습니다.</div>'}</div>`;
+  $('#specialAdminRefresh').onclick = reload;
+  $$('[data-special-filter]').forEach((b) => b.onclick = () => { specialFilter = b.dataset.specialFilter; reload(); });
+  $$('[data-special-op]').forEach((b) => b.onclick = async () => {
+    const op = b.dataset.specialOp; let reason = '';
+    if (op === 'approve') {
+      if (!(await ask({ title: '특별 출입을 승인할까요?', text: '첫 출입부터 30분간 재출입 가능한 출입증을 발급합니다.', ok: '승인·발급' }))) return;
+    } else {
+      reason = await ask({ title: op === 'reject' ? '특별 출입을 반려할까요?' : '특별 출입 승인을 취소할까요?', text: op === 'reject' ? '입력한 멘트를 신청자에게 전달합니다.' : '취소된 출입증은 즉시 사용할 수 없게 됩니다.', input: true, multiline: true, label: '관리자 멘트 (선택, 200자 이내)', ok: op === 'reject' ? '반려' : '승인 취소', danger: true });
+      if (reason === null) return;
+    }
+    b.disabled = true;
+    if (await act(() => api(`/api/admin/special-requests/${b.dataset.id}/${op}`, { method: 'POST', body: { reason } }), '처리했습니다.')) reload();
+    else b.disabled = false;
+  });
+};
+
+function changeUserPassword(user) {
+  const d = document.createElement('dialog'); d.setAttribute('aria-label', '비밀번호 변경');
+  d.innerHTML = `<form><h3>비밀번호 변경</h3><p class="small"><b>${esc(user.name)}</b> · ${esc(user.student_no)}</p>
+    <p class="small muted">기존 비밀번호는 복원할 수 없는 방식으로 저장되어 열람할 수 없습니다. 변경하면 이 계정의 기존 로그인 세션이 해제됩니다.</p>
+    <input type="hidden" autocomplete="username" value="${esc(user.student_no)}">
+    <label class="field"><span>새 비밀번호 (8~128자)</span><input class="input" type="password" name="password" minlength="8" maxlength="128" required autocomplete="new-password"></label>
+    <label class="field"><span>새 비밀번호 확인</span><input class="input" type="password" name="confirmation" minlength="8" maxlength="128" required autocomplete="new-password"></label>
+    <label class="row small"><input type="checkbox" data-show-password>입력한 새 비밀번호 표시</label>
+    <p class="small" data-error role="alert" style="color:var(--bad)" hidden></p>
+    <div class="row end"><button class="btn secondary" type="button" data-close-password>취소</button><button class="btn" type="submit">변경</button></div></form>`;
+  document.body.append(d); d.onclose = () => { $('form', d).reset(); d.remove(); };
+  $('[data-close-password]', d).onclick = () => d.close();
+  $$('input[name]', d).forEach((i) => i.oninput = () => { $('[data-error]', d).hidden = true; });
+  $('[data-show-password]', d).onchange = (e) => $$('input[name]', d).forEach((i) => i.type = e.target.checked ? 'text' : 'password');
+  $('form', d).onsubmit = async (e) => {
+    e.preventDefault(); const data = new FormData(e.target), err = $('[data-error]', d), btn = $('button[type="submit"]', d);
+    if (data.get('password') !== data.get('confirmation')) { err.textContent = '새 비밀번호가 일치하지 않습니다.'; err.hidden = false; return; }
+    btn.disabled = true;
+    try {
+      await api(`/api/admin/users/${user.id}/password`, { method: 'POST', body: { password: data.get('password') } });
+      d.close();
+      if (user.id === me.id) { me = null; location.hash = 'login'; route(); toast('비밀번호를 변경했습니다. 새 비밀번호로 다시 로그인해 주세요.'); }
+      else toast('비밀번호를 변경했습니다. 사용자는 새 비밀번호로 로그인할 수 있습니다.');
+    } catch (e) { err.textContent = e.message; err.hidden = false; }
+    finally { btn.disabled = false; }
+  };
+  d.showModal(); $('[name="password"]', d).focus();
+}
+
+let userFilter = 'all', userSearch = '', userPage = 1;
 A.users = async () => {
-  const { users } = await api('/api/admin/users?status=' + userFilter);
-  const seg = `<div class="seg" role="group">${[['pending', '가입 대기'], ['active', '사용 중'], ['blocked', '정지']].map(([k, l]) => `<button type="button" data-uf="${k}" aria-pressed="${k === userFilter}">${l}</button>`).join('')}</div>`;
+  const { users, total, page, pages, page_size } = await api('/api/admin/users?' + new URLSearchParams({ status: userFilter, q: userSearch, page: userPage }));
+  userPage = page;
+  const seg = `<div class="seg" role="group">${[['all', '전체'], ['pending', '가입 대기'], ['active', '사용 중'], ['blocked', '정지']].map(([k, l]) => `<button type="button" data-uf="${k}" aria-pressed="${k === userFilter}">${l}</button>`).join('')}</div>`;
   const rows = users.map((u) => {
     const self = u.id === me.id;
-    const btns = [];
+    const btns = [`<button class="btn secondary sm" type="button" data-uedit="${u.id}">정보 수정</button>`, `<button class="btn secondary sm" type="button" data-upassword="${u.id}">비밀번호 변경</button>`];
     if (u.status !== 'active') btns.push(`<button class="btn ok sm" type="button" data-u="${u.id}" data-op="activate">${u.status === 'pending' ? '가입 승인' : '정지 해제'}</button>`);
     if (u.status === 'active' && !self) btns.push(u.role === 'admin'
       ? `<button class="btn secondary sm" type="button" data-u="${u.id}" data-op="make-student">관리자 해제</button>`
       : `<button class="btn secondary sm" type="button" data-u="${u.id}" data-op="make-admin">관리자로 지정</button>`);
-    if (u.status !== 'blocked' && !self) btns.push(`<button class="btn secondary sm" type="button" data-u="${u.id}" data-op="block">${u.status === 'pending' ? '거절' : '정지'}</button>`);
+    if (u.status !== 'blocked' && !self) btns.push(`<button class="btn secondary sm" type="button" data-u="${u.id}" data-op="${u.status === 'pending' ? 'reject' : 'block'}">${u.status === 'pending' ? '가입 반려' : '정지'}</button>`);
+    if (u.can_release && !self) btns.push(`<button class="btn secondary sm" type="button" data-u="${u.id}" data-op="release">가입 정보 삭제</button>`);
     return `<tr><td><b>${esc(u.name)}</b>${self ? ' <span class="small muted">(나)</span>' : ''}</td><td class="mono">${esc(u.student_no)}</td>
-      <td>${u.role === 'admin' ? '<span class="pill master">관리자</span>' : '<span class="small muted">학생</span>'}</td>
-      <td class="small muted">${fDate(u.created_at)} 가입</td><td class="actions">${btns.join('')}</td></tr>`;
+      <td class="small">${esc(u.department || '-')}<div class="muted">${esc(u.phone || '-')}</div></td><td>${u.role === 'admin' ? '<span class="pill master">관리자</span>' : '<span class="small muted">학생</span>'}</td>
+      <td class="small">${({pending:"가입 대기",active:"사용 중",blocked:"정지"})[u.status]}<div class="muted">${fDate(u.created_at)} 가입</div></td><td class="actions">${btns.join('')}</td></tr>`;
   }).join('');
-  $('#adminMain').innerHTML = head('사용자', '가입 승인, 정지, 관리자 지정을 합니다.', seg) +
-    `<div class="panel table-wrap">${rows ? `<table class="resp"><thead><tr><th>이름</th><th>학번</th><th>권한</th><th>가입일</th><th></th></tr></thead><tbody>${rows}</tbody></table>` : '<div class="empty">해당하는 사용자가 없습니다.</div>'}</div>`;
-  $$('[data-uf]').forEach((b) => b.onclick = () => { userFilter = b.dataset.uf; reload(); });
+  $('#adminMain').innerHTML = head('사용자', '학번·이름으로 검색하고 계정 정보와 비밀번호를 관리합니다.', seg) +
+    `<form class="panel stack" id="userSearchForm" style="padding:16px;margin-bottom:16px">
+      <label class="field"><span>학번·이름 검색</span><input class="input" name="q" maxlength="100" value="${esc(userSearch)}" placeholder="학번 또는 이름의 일부 입력"></label>
+      <div class="row"><button class="btn sm" type="submit">검색</button><button class="btn secondary sm" id="userSearchReset" type="button">초기화</button><span class="small muted">총 ${total}명</span></div></form>` +
+    (userFilter === 'blocked' ? '<p class="small muted" style="margin-bottom:14px">이전에 반려한 가입 정보는 이용 이력이 없으면 삭제할 수 있습니다. 삭제하면 해당 학번으로 다시 가입할 수 있습니다.</p>' : '') +
+    `<div class="panel table-wrap">${rows ? `<table class="resp"><thead><tr><th>이름</th><th>학번</th><th>학부(과)·연락처</th><th>권한</th><th>상태·가입일</th><th></th></tr></thead><tbody>${rows}</tbody></table>` : '<div class="empty">해당하는 사용자가 없습니다.</div>'}</div>`;
+  $('#adminMain').insertAdjacentHTML('beforeend', `<div class="row" style="justify-content:flex-end;margin-top:14px"><span class="small">${page} / ${pages} 페이지 · ${page_size}명씩</span><button class="btn secondary sm" id="userPrev" ${page <= 1 ? 'disabled' : ''}>이전</button><button class="btn secondary sm" id="userNext" ${page >= pages ? 'disabled' : ''}>다음</button></div>`);
+  $('#userSearchForm').onsubmit = (e) => { e.preventDefault(); userSearch = new FormData(e.target).get('q').trim(); userPage = 1; reload(); };
+  $('#userSearchReset').onclick = () => { userSearch = ''; userFilter = 'all'; userPage = 1; reload(); };
+  $('#userPrev').onclick = () => { userPage--; reload(); };
+  $('#userNext').onclick = () => { userPage++; reload(); };
+  $$('[data-upassword]').forEach((b) => b.onclick = () => changeUserPassword(users.find((u) => u.id == b.dataset.upassword)));
+  $$('[data-uedit]').forEach((b) => b.onclick = () => {
+    const u = users.find((x) => x.id == b.dataset.uedit);
+    editRecord('사용자 정보 수정', [
+      { key: 'name', label: '이름', value: u.name, max: 30, required: true },
+      { key: 'student_no', label: '학번', value: u.student_no, max: 20, required: true },
+      { key: 'department', label: '학부(과)', value: u.department, max: 80 },
+      { key: 'phone', label: '연락처', value: u.phone, max: 30 },
+    ], async (body) => {
+      await api(`/api/admin/users/${u.id}`, { method: 'PATCH', body });
+      if (u.id === me.id) { Object.assign(me, body); applyChrome(); }
+    });
+  });
+  $$('[data-uf]').forEach((b) => b.onclick = () => { userFilter = b.dataset.uf; userPage = 1; reload(); });
   $$('[data-u]').forEach((b) => b.onclick = async () => {
     const op = b.dataset.op;
+    let reason;
+    if (op === 'reject' || op === 'release') {
+      const u = users.find((x) => x.id == b.dataset.u);
+      reason = await ask({ title: op === 'reject' ? '가입을 반려할까요?' : '가입 정보를 삭제할까요?',
+        text: `${u.name} (${u.student_no})의 가입 정보를 삭제합니다. 해당 학번으로 다시 가입할 수 있습니다.${op === 'reject' ? ' 신청자가 기존 비밀번호로 로그인하면 관리자 멘트를 확인할 수 있습니다.' : ''}`,
+        input: op === 'reject', multiline: op === 'reject', label: '관리자 멘트 (선택, 200자 이내)', ok: op === 'reject' ? '반려' : '삭제', danger: true });
+      if (reason === null) return;
+    }
     if (op === 'block' && !(await ask({ title: '이 사용자를 정지할까요?', text: '정지하면 로그인과 출입 QR이 모두 막힙니다.', ok: '정지', danger: true }))) return;
     if (op === 'make-admin' && !(await ask({ title: '관리자로 지정할까요?', text: '관리자는 모든 설정을 바꾸고 마스터 QR을 발급할 수 있습니다.', ok: '지정' }))) return;
-    if (await act(() => api(`/api/admin/users/${b.dataset.u}/${op}`, { method: 'POST' }), '변경했습니다.')) reload();
+    if (await act(() => api(`/api/admin/users/${b.dataset.u}/${op}`, { method: 'POST', body: op === 'reject' ? { reason } : undefined }), ['reject', 'release'].includes(op) ? '가입 정보를 삭제했습니다. 해당 학번으로 다시 가입할 수 있습니다.' : '변경했습니다.')) reload();
   });
 };
 
@@ -1301,7 +1516,7 @@ A.devices = async () => {
     return `<tr><td><b>${esc(d.name)}</b></td><td>${esc(d.room_name)}</td>
       <td>${d.active ? `<span class="pill ${online ? 'on' : 'off'}">${online ? '연결됨' : '연결 끊김'}</span>` : '<span class="pill denied">키 폐기</span>'}</td>
       <td class="small muted">${d.last_seen_at ? ago(d.last_seen_at) : '연결된 적 없음'}</td>
-      <td class="actions">${d.active ? `<button class="btn secondary sm" type="button" data-drevoke="${d.id}">키 폐기</button>` : ''}</td></tr>`;
+      <td class="actions"><button class="btn secondary sm" type="button" data-dedit="${d.id}">정보 수정</button>${d.active ? `<button class="btn secondary sm" type="button" data-drevoke="${d.id}">키 폐기</button>` : ''}</td></tr>`;
   }).join('');
   $('#adminMain').innerHTML = head('출입 단말', '출입문 보드(JC1060P470)를 등록하고 단말 키를 발급합니다. 보드는 1분마다 신호를 보냅니다.') + `
     <div class="panel table-wrap" style="margin-bottom:22px">${rows ? `<table class="resp"><thead><tr><th>이름</th><th>실습실</th><th>상태</th><th>마지막 신호</th><th></th></tr></thead><tbody>${rows}</tbody></table>` : '<div class="empty">등록된 단말이 없습니다.</div>'}</div>
@@ -1324,22 +1539,59 @@ A.devices = async () => {
       $('#copyKey').onclick = async () => { try { await navigator.clipboard.writeText(key); toast('복사했습니다.'); } catch { const s = getSelection(); s.selectAllChildren($('#keyText')); toast('키를 선택했습니다. 직접 복사하세요.'); } };
     } catch (err) { toast(err.message); }
   };
+  $$('[data-dedit]').forEach((b) => b.onclick = () => {
+    const d = devices.find((x) => x.id == b.dataset.dedit);
+    editRecord('단말 정보 수정', [
+      { key: 'name', label: '단말 이름', value: d.name, max: 40, required: true },
+      { key: 'room_id', label: '소속 실습실', value: d.room_id, options: rs },
+    ], (body) => api(`/api/admin/devices/${d.id}`, { method: 'PATCH', body }));
+  });
   $$('[data-drevoke]').forEach((b) => b.onclick = async () => {
     if (!(await ask({ title: '단말 키를 폐기할까요?', text: '이 보드는 더 이상 서버에 접속할 수 없습니다. 다시 쓰려면 새로 등록해 키를 넣어야 합니다.', ok: '키 폐기', danger: true }))) return;
     if (await act(() => api(`/api/admin/devices/${b.dataset.drevoke}/revoke`, { method: 'POST' }), '폐기했습니다.')) reload();
   });
 };
 
+const logDefaults = { from: '', to: '', result: '', room_id: '', device_id: '', q: '', order: 'desc', page: 1 };
+let logFilter = { ...logDefaults };
 A.logs = async () => {
-  const { logs } = await api('/api/admin/logs');
+  const [data, { rooms: rs }, { devices }] = await Promise.all([
+    api('/api/admin/logs?' + new URLSearchParams(logFilter)), api('/api/rooms?all=1'), api('/api/admin/devices'),
+  ]);
+  const { logs, total, page, pages, page_size } = data;
+  logFilter.page = page;
+  const select = (key, label, options) => `<label class="field"><span>${label}</span><select class="input" name="${key}">${options.map(([v, text]) => `<option value="${esc(v)}" ${String(logFilter[key]) === String(v) ? 'selected' : ''}>${esc(text)}</option>`).join('')}</select></label>`;
   const rows = logs.map((l) => `<tr>
-    <td class="mono small">${fDT(l.at)}</td>
+    <td class="mono small">${kd(l.at).toISOString().slice(0, 10)} ${fTime(l.at)}:${pad(kd(l.at).getUTCSeconds())}</td>
     <td><span class="pill ${l.result}">${l.result === 'granted' ? '허용' : '거부'}</span></td>
-    <td>${l.master_id ? `<span class="pill master">마스터</span> ${esc(l.master_label || '')}` : l.name ? `<b>${esc(l.name)}</b> <span class="mono small muted">${esc(l.student_no)}</span>` : '<span class="muted">-</span>'}</td>
+    <td>${l.special_id ? '<span class="pill master">특별 출입</span> ' : ''}${l.master_id ? `<span class="pill master">마스터</span> ${esc(l.master_label || '')}` : l.name ? `<b>${esc(l.name)}</b> <span class="mono small muted">${esc(l.student_no)}</span>` : '<span class="muted">-</span>'}</td>
     <td class="small">${l.reason && l.reason !== 'master' ? esc(REASON[l.reason] || l.reason) : ''}</td>
-    <td class="small muted">${esc(l.device_name || '')}</td></tr>`).join('');
-  $('#adminMain').innerHTML = head('출입 기록', '최근 200건') +
-    `<div class="panel table-wrap">${rows ? `<table class="resp"><thead><tr><th>시각</th><th>결과</th><th>대상</th><th>사유</th><th>단말</th></tr></thead><tbody>${rows}</tbody></table>` : '<div class="empty">아직 출입 기록이 없습니다.</div>'}</div>`;
+    <td class="small">${esc(l.room_name || '-')}<div class="muted">${esc(l.device_name || '-')}</div></td></tr>`).join('');
+  $('#adminMain').innerHTML = head('출입 기록', '한국 시간 기준으로 조회합니다. 최신순이 기본이며, 과거 기록도 페이지를 넘겨 볼 수 있습니다.') + `
+    <form class="panel stack" id="logForm" style="padding:18px;margin-bottom:18px">
+      <div class="grid-fields">
+        <label class="field"><span>시작일</span><input class="input" type="date" name="from" value="${esc(logFilter.from)}"></label>
+        <label class="field"><span>종료일</span><input class="input" type="date" name="to" value="${esc(logFilter.to)}"></label>
+        ${select('result', '출입 결과', [['', '전체 결과'], ['granted', '허용'], ['denied', '거부']])}
+        ${select('room_id', '실습실', [['', '전체 실습실'], ...rs.map((r) => [r.id, r.name])])}
+        ${select('device_id', '단말', [['', '전체 단말'], ...devices.map((d) => [d.id, d.name + (d.active ? '' : ' (키 폐기)')])])}
+        ${select('order', '시각 정렬', [['desc', '최신순 (내림차순)'], ['asc', '오래된순 (오름차순)']])}
+      </div>
+      <label class="field"><span>이름·학번·마스터 QR 이름</span><input class="input" name="q" maxlength="100" value="${esc(logFilter.q)}" placeholder="검색어 입력"></label>
+      <div class="row"><button class="btn sm" type="submit">조회</button><button class="btn secondary sm" type="button" id="logReset">초기화</button></div>
+    </form>
+    <div class="row" style="justify-content:space-between;margin-bottom:12px"><span class="small muted">총 ${total}건${total ? ` · ${(page - 1) * page_size + 1}–${Math.min(page * page_size, total)}건` : ''}</span><div class="row">
+      <button class="btn secondary sm" id="logPrev" ${page <= 1 ? 'disabled' : ''}>이전</button><span class="small">${page} / ${pages} 페이지</span><button class="btn secondary sm" id="logNext" ${page >= pages ? 'disabled' : ''}>다음</button></div></div>
+    <div class="panel table-wrap">${rows ? `<table class="resp"><thead><tr><th aria-sort="${logFilter.order === 'asc' ? 'ascending' : 'descending'}">시각 ${logFilter.order === 'asc' ? '↑' : '↓'}</th><th>결과</th><th>대상</th><th>사유</th><th>실습실·단말</th></tr></thead><tbody>${rows}</tbody></table>` : '<div class="empty">조건에 맞는 출입 기록이 없습니다.</div>'}</div>`;
+  $('#logForm').onsubmit = (e) => {
+    e.preventDefault();
+    const values = Object.fromEntries(new FormData(e.target));
+    if (values.from && values.to && values.from > values.to) { toast('시작일은 종료일보다 늦을 수 없습니다.'); return; }
+    logFilter = { ...values, page: 1 }; reload();
+  };
+  $('#logReset').onclick = () => { logFilter = { ...logDefaults }; reload(); };
+  $('#logPrev').onclick = () => { logFilter.page--; reload(); };
+  $('#logNext').onclick = () => { logFilter.page++; reload(); };
 };
 
 A.features = async () => {

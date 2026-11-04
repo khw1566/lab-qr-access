@@ -62,7 +62,7 @@ cd lab-qr-access/server
 ## 설치
 
 ```bash
-git clone -b deploy/raspberry-pi https://github.com/khw1566/lab-qr-access.git
+git clone -b deploy/raspberry-pi https://github.com/khw1566/lab-qr-access.git   # 위에서 받았다면 생략
 cd lab-qr-access/server
 bash pi/setup.sh          # 처음 실행하면 .env 를 만들고 멈춤
 nano .env                 # SESSION_SECRET, QR_SECRET, ADMIN_SETUP_CODE 입력

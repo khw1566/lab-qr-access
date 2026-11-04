@@ -11,6 +11,3 @@ firmware/tools/.google_tts_key
 /output/
 /firmware/.vscode/
 
-# 라즈베리파이 서버
-server/.env
-server/data/

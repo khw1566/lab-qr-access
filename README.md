@@ -101,9 +101,11 @@ npm run deploy                             # lab.audreaming.com 도메인과 인
 
 로컬 테스트: `npm run db:migrate:local && npm run dev` (비밀값은 `.dev.vars`, 운영에서는 쓰지 마세요).
 
-### 라즈베리파이에서 운영 (선택)
+### Windows 미니PC에서 운영 (이 브랜치: `deploy/windows-minipc`)
 
-같은 서버 코드를 라즈베리파이 3B+에서 Node.js + SQLite로 돌릴 수 있습니다. 학생 신청·관리자 화면은 Cloudflare Tunnel로 외부에 공개하고, 보드의 QR 확인은 학내망 포트(8788)로 직접 처리해 인터넷이 끊겨도 출입이 됩니다. 설치 순서는 [docs/raspberry-pi.md](docs/raspberry-pi.md).
+같은 서버 코드를 Windows 미니PC에서 Node.js + SQLite로 돌립니다. 학생 신청·관리자 화면은 Cloudflare Tunnel로 외부에 공개하고, 보드의 QR 확인은 학내망 포트(8788)로 직접 처리해 인터넷이 끊겨도 출입이 됩니다. 설치 순서는 [docs/windows-minipc.md](docs/windows-minipc.md).
+
+다른 배포 방식: `deploy/raspberry-pi` (라즈베리파이), `deploy/cloudflare` (Cloudflare Worker + D1).
 
 ## 하드웨어 연결
 

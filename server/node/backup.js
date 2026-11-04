@@ -1,5 +1,5 @@
 // DB 백업: 실행 중에도 안전한 VACUUM INTO 로 복사본을 만들고, BACKUP_KEEP_DAYS 보다 오래된 것은 지운다.
-// systemd 타이머(lab-access-backup.timer)가 매일 새벽 3시에 실행한다.
+// 작업 스케줄러(LabAccessBackup)가 매일 새벽 3시에 실행한다.
 import { mkdirSync, readdirSync, statSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';

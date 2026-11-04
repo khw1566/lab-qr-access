@@ -1,6 +1,6 @@
-// Cloudflare D1 에서 내보낸 SQL 파일을 파이의 SQLite DB 로 가져온다.
+// Cloudflare D1 에서 내보낸 SQL 파일을 미니PC의 SQLite DB 로 가져온다.
 //   (PC에서)  npx wrangler d1 export lab-access --remote --output lab-access.sql
-//   (파이에서) npm run pi:import -- lab-access.sql
+//   (미니PC에서) npm run local:import -- lab-access.sql
 // 이미 DB가 있으면 지우지 않고 멈춘다. 덮어쓰려면 --force (기존 파일은 .bak 으로 남김)
 import { existsSync, readFileSync, renameSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
@@ -11,12 +11,12 @@ import { migrate } from './migrate.js';
 const args = process.argv.slice(2);
 const file = args.find((a) => !a.startsWith('--'));
 if (!file) {
-  console.error('사용법: npm run pi:import -- <d1-export.sql> [--force]');
+  console.error('사용법: npm run local:import -- <d1-export.sql> [--force]');
   process.exit(1);
 }
 if (existsSync(config.dbFile)) {
   if (!args.includes('--force')) {
-    console.error(`${config.dbFile} 가 이미 있습니다. 덮어쓰려면 --force 를 붙이세요. (서버를 먼저 멈추세요: sudo systemctl stop lab-access)`);
+    console.error(`${config.dbFile} 가 이미 있습니다. 덮어쓰려면 --force 를 붙이세요. (서버를 먼저 멈추세요: Stop-ScheduledTask LabAccessServer)`);
     process.exit(1);
   }
   const bak = `${config.dbFile}.${Date.now()}.bak`;

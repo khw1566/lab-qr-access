@@ -1,4 +1,4 @@
-// 설정은 server/.env (없으면 환경 변수)에서 읽는다. 예시는 server/pi/env.example
+// 설정은 server/.env (없으면 환경 변수)에서 읽는다. 예시는 server/node/env.example
 import { existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -14,7 +14,7 @@ export const config = {
   backupKeepDays: Number(e.BACKUP_KEEP_DAYS || 14),
   migrationsDir: join(SERVER_DIR, 'migrations'),
   publicDir: join(SERVER_DIR, 'public'),
-  // 외부용: Cloudflare Tunnel(cloudflared)만 붙는 포트. 파이 밖에서는 열리지 않게 127.0.0.1 에만 연다.
+  // 외부용: Cloudflare Tunnel(cloudflared)만 붙는 포트. 이 PC 밖에서는 열리지 않게 127.0.0.1 에만 연다.
   publicHost: e.PUBLIC_HOST || '127.0.0.1',
   publicPort: Number(e.PUBLIC_PORT || 8787),
   // 내부용: 보드(출입 단말)가 학내망으로 직접 붙는 포트. /api/device/* 만 받는다.

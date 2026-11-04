@@ -1,4 +1,4 @@
-// 파이 서버 통합 테스트: 임시 DB로 서버를 띄워 포트 분리, 단말 응답 서명, 정적 화면, 백업을 확인한다.
+// 자체 호스팅 서버 통합 테스트: 임시 DB로 서버를 띄워 포트 분리, 단말 응답 서명, 정적 화면, 백업을 확인한다.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, execFileSync } from 'node:child_process';
@@ -17,7 +17,7 @@ const env = {
 let proc;
 
 before(async () => {
-  proc = spawn(process.execPath, ['--disable-warning=ExperimentalWarning', 'pi/server.js'], { env, stdio: ['ignore', 'pipe', 'inherit'] });
+  proc = spawn(process.execPath, ['--disable-warning=ExperimentalWarning', 'node/server.js'], { env, stdio: ['ignore', 'pipe', 'inherit'] });
   await new Promise((resolve) => {
     let out = '';
     proc.stdout.on('data', (c) => { out += c; if (out.includes(String(DEV))) resolve(); });
@@ -81,6 +81,6 @@ test('정적 화면과 SPA 주소', async () => {
 });
 
 test('백업 파일이 만들어진다', () => {
-  execFileSync(process.execPath, ['--disable-warning=ExperimentalWarning', 'pi/backup.js'], { env });
+  execFileSync(process.execPath, ['--disable-warning=ExperimentalWarning', 'node/backup.js'], { env });
   assert.equal(readdirSync(env.BACKUP_DIR).filter((f) => f.endsWith('.sqlite')).length, 1);
 });

@@ -1,4 +1,4 @@
-// 라즈베리파이용 서버: Cloudflare Worker 코드(src/index.js)를 그대로 Node.js에서 돌린다.
+// 미니PC(Windows)용 서버: Cloudflare Worker 코드(src/index.js)를 그대로 Node.js에서 돌린다.
 //  - 외부 포트(기본 127.0.0.1:8787): Cloudflare Tunnel 전용. 학생 신청·QR 발급·관리자 화면. 단말 API는 막음.
 //  - 내부 포트(기본 0.0.0.0:8788): 학내망의 보드 전용. /api/device/* 만 받음. 인터넷이 끊겨도 출입은 동작.
 import http from 'node:http';

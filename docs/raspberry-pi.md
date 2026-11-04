@@ -51,10 +51,8 @@ hostname -I        # 파이 IP 확인 → 공유기에서 이 IP를 labpi 에 �
 ### 3. 코드 받기
 
 ```bash
-git clone https://github.com/khw1566/lab-qr-access.git
-cd lab-qr-access
-git checkout claude/project-thread-4yga4i   # 파이 버전이 main에 합쳐지기 전까지만 필요
-cd server
+git clone -b deploy/raspberry-pi https://github.com/khw1566/lab-qr-access.git
+cd lab-qr-access/server
 ```
 
 저장소가 비공개라 비밀번호를 물으면, GitHub 비밀번호 대신 GitHub > Settings > Developer settings > Personal access tokens 에서 만든 토큰을 넣습니다.
@@ -64,7 +62,7 @@ cd server
 ## 설치
 
 ```bash
-git clone https://github.com/khw1566/lab-qr-access.git
+git clone -b deploy/raspberry-pi https://github.com/khw1566/lab-qr-access.git
 cd lab-qr-access/server
 bash pi/setup.sh          # 처음 실행하면 .env 를 만들고 멈춤
 nano .env                 # SESSION_SECRET, QR_SECRET, ADMIN_SETUP_CODE 입력

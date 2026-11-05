@@ -35,7 +35,8 @@ static void on_event(void *arg, esp_event_base_t base, int32_t id, void *data)
     } else if (base == WIFI_EVENT && id == WIFI_EVENT_STA_DISCONNECTED) {
         xEventGroupClearBits(s_evt, BIT_CONNECTED);
         if (s_paused) return;
-        ESP_LOGW(TAG, "연결 끊김, 재시도");
+        wifi_event_sta_disconnected_t *e = data;
+        ESP_LOGW(TAG, "연결 끊김 (SSID %s, reason %d, RSSI %d), 재시도", s_ssid, e ? e->reason : -1, e ? e->rssi : 0);
         show_connecting();
         esp_wifi_connect();
     } else if (base == IP_EVENT && id == IP_EVENT_STA_GOT_IP) {
@@ -104,6 +105,7 @@ void wifi_start(void)
     ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, on_event, NULL));
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(config_apply());
+    ESP_LOGI(TAG, "접속 시도: SSID %s (%s)", s_ssid, s_password[0] ? "비밀번호 있음" : "개방형");
     show_connecting();
     ESP_ERROR_CHECK(esp_wifi_start());
 }

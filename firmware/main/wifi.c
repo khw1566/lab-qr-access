@@ -8,6 +8,8 @@
 #include "esp_log.h"
 #include "esp_netif.h"
 #include "esp_timer.h"
+#include "esp_netif_sntp.h"
+#include <sys/time.h>
 #include "esp_system.h"
 #include "freertos/task.h"
 #include "freertos/FreeRTOS.h"
@@ -24,7 +26,8 @@ static EventGroupHandle_t s_evt;
 static char s_ssid[33], s_password[65];
 static volatile bool s_paused;  // 검색 중에는 자동 재접속을 멈춘다
 static esp_timer_handle_t s_dhcp_timer;
-#define DHCP_TIMEOUT_US (20 * 1000 * 1000)  // AP에 붙고도 이 시간 안에 IP를 못 받으면 다시 접속한다
+static void sntp_start_once(void);
+#define DHCP_TIMEOUT_US (8 * 1000 * 1000)   // 정상이면 1~2초 안에 IP가 온다. 못 받으면 Wi-Fi를 다시 켠다
 
 static volatile bool s_dhcp_stuck;
 static int s_dhcp_failures;
@@ -44,7 +47,7 @@ void wifi_recover(void)
     if (!s_dhcp_stuck || s_paused) return;
     s_dhcp_stuck = false;
     s_dhcp_failures++;
-    ESP_LOGW(TAG, "AP 연결 후 20초 동안 IP를 받지 못함 (SSID %s, %d번째)", s_ssid, s_dhcp_failures);
+    ESP_LOGW(TAG, "AP 연결 후 8초 동안 IP를 받지 못함 (SSID %s, %d번째)", s_ssid, s_dhcp_failures);
     if (s_dhcp_failures >= DHCP_FAILURES_BEFORE_REBOOT) {
         ESP_LOGE(TAG, "IP를 계속 받지 못해 단말을 다시 시작합니다");
         vTaskDelay(pdMS_TO_TICKS(200));
@@ -89,7 +92,25 @@ static void on_event(void *arg, esp_event_base_t base, int32_t id, void *data)
         snprintf(text, sizeof(text), "Wi-Fi: " IPSTR, IP2STR(&e->ip_info.ip));
         ui_status(text);
         xEventGroupSetBits(s_evt, BIT_CONNECTED);
+        sntp_start_once();
     }
+}
+
+// 시계는 서버 응답과 별개로 NTP로도 맞춘다. 서버에 못 붙어도 상단 시계가 나온다.
+static void on_time_sync(struct timeval *tv)
+{
+    ESP_LOGI(TAG, "NTP 시각 동기화");
+    ui_clock_set((int64_t)tv->tv_sec * 1000 + tv->tv_usec / 1000);
+}
+
+static void sntp_start_once(void)
+{
+    static bool started;
+    if (started) return;
+    started = true;
+    esp_sntp_config_t config = ESP_NETIF_SNTP_DEFAULT_CONFIG("pool.ntp.org");
+    config.sync_cb = on_time_sync;
+    if (esp_netif_sntp_init(&config) != ESP_OK) ESP_LOGW(TAG, "NTP 시작 실패");
 }
 
 static void credentials_load(void)

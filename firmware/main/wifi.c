@@ -8,6 +8,8 @@
 #include "esp_log.h"
 #include "esp_netif.h"
 #include "esp_timer.h"
+#include "esp_system.h"
+#include "freertos/task.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 #include "nvs.h"
@@ -24,10 +26,35 @@ static volatile bool s_paused;  // 검색 중에는 자동 재접속을 멈춘�
 static esp_timer_handle_t s_dhcp_timer;
 #define DHCP_TIMEOUT_US (20 * 1000 * 1000)  // AP에 붙고도 이 시간 안에 IP를 못 받으면 다시 접속한다
 
+static volatile bool s_dhcp_stuck;
+static int s_dhcp_failures;
+#define DHCP_FAILURES_BEFORE_REBOOT 3
+
+// esp_timer 문맥에서는 RPC 호출을 하지 않고 표시만 남긴다. 복구는 wifi_recover()가 맡는다.
 static void on_dhcp_timeout(void *arg)
 {
-    ESP_LOGW(TAG, "AP 연결 후 IP를 받지 못해 다시 접속합니다 (SSID %s)", s_ssid);
-    esp_wifi_disconnect();   // DISCONNECTED 이벤트에서 재접속한다
+    s_dhcp_stuck = true;
+}
+
+// ping_task가 IP 없는 동안 주기적으로 부른다.
+// 같은 접속 안에서 다시 붙어도 IP가 안 오는 경우가 있어(부팅마다 달라짐) Wi-Fi를 껐다 켜고,
+// 그래도 안 되면 보드를 다시 시작한다. 재부팅으로는 복구되는 것을 현장에서 확인했다.
+void wifi_recover(void)
+{
+    if (!s_dhcp_stuck || s_paused) return;
+    s_dhcp_stuck = false;
+    s_dhcp_failures++;
+    ESP_LOGW(TAG, "AP 연결 후 20초 동안 IP를 받지 못함 (SSID %s, %d번째)", s_ssid, s_dhcp_failures);
+    if (s_dhcp_failures >= DHCP_FAILURES_BEFORE_REBOOT) {
+        ESP_LOGE(TAG, "IP를 계속 받지 못해 단말을 다시 시작합니다");
+        vTaskDelay(pdMS_TO_TICKS(200));
+        esp_restart();
+    }
+    s_paused = true;
+    esp_wifi_stop();
+    vTaskDelay(pdMS_TO_TICKS(500));
+    s_paused = false;
+    esp_wifi_start();   // STA_START 이벤트에서 다시 접속한다
 }
 
 static void show_connecting(void)
@@ -55,6 +82,7 @@ static void on_event(void *arg, esp_event_base_t base, int32_t id, void *data)
         esp_wifi_connect();
     } else if (base == IP_EVENT && id == IP_EVENT_STA_GOT_IP) {
         esp_timer_stop(s_dhcp_timer);
+        s_dhcp_failures = 0;
         ip_event_got_ip_t *e = data;
         ESP_LOGI(TAG, "IP: " IPSTR, IP2STR(&e->ip_info.ip));
         char text[32];

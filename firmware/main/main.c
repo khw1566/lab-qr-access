@@ -122,6 +122,7 @@ static void ping_task(void *arg)
         // 연결되면 바로 첫 신호를 보내고, 끊겨 있는 동안은 짧게 다시 확인한다
         if (!wifi_is_connected()) {
             ui_server_status(UI_SERVER_CHECKING);   // Wi-Fi가 없으면 서버 상태를 알 수 없다
+            wifi_recover();
             vTaskDelay(pdMS_TO_TICKS(2 * 1000));
             continue;
         }

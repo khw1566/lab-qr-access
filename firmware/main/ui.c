@@ -136,7 +136,6 @@ static void bar_build(lv_obj_t *screen)
     lv_obj_set_style_bg_opa(s_server_led, LV_OPA_COVER, 0);
     lv_obj_set_style_border_color(s_server_led, lv_color_white(), 0);
     lv_obj_set_style_border_width(s_server_led, 2, 0);
-    lv_obj_set_style_shadow_spread(s_server_led, 2, 0);
     lv_obj_set_style_shadow_opa(s_server_led, LV_OPA_70, 0);
     ui_text(screen, "서버", &lab_font_24, STATUS_X + 28, BAR_ROW1_Y + 2, 64, lv_color_white());
     s_status = ui_icon(screen, UI_ICON_WIFI_OFF, STATUS_X, BAR_ROW2_Y + 3, 20, lv_color_white());
@@ -149,7 +148,9 @@ static void server_led_paint(ui_server_t state)
                        state == UI_SERVER_OFFLINE ? UI_LED_OFF : UI_GRAY;
     lv_obj_set_style_bg_color(s_server_led, color, 0);
     lv_obj_set_style_shadow_color(s_server_led, color, 0);
-    lv_obj_set_style_shadow_width(s_server_led, state == UI_SERVER_CHECKING ? 0 : 14, 0);
+    bool glow = state != UI_SERVER_CHECKING;   // 확인 중에는 그림자를 아예 그리지 않는다
+    lv_obj_set_style_shadow_width(s_server_led, glow ? 14 : 0, 0);
+    lv_obj_set_style_shadow_spread(s_server_led, glow ? 2 : 0, 0);
 }
 
 static void home_build(lv_obj_t *screen)

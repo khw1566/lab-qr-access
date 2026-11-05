@@ -53,6 +53,7 @@ typedef struct {
 } wifi_ap_t;
 void wifi_start(void);
 bool wifi_is_connected(void);
+void wifi_recover(void);    // IP를 못 받고 멈춘 경우 복구 (ping_task에서 호출)
 const char *wifi_current_ssid(void);
 int wifi_scan(wifi_ap_t *out, int max);     // 찾은 개수, 실패하면 -1
 void wifi_connect_to(const char *ssid, const char *password);

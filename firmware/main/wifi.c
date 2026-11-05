@@ -7,6 +7,7 @@
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_netif.h"
+#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 #include "nvs.h"
@@ -20,6 +21,14 @@ static EventGroupHandle_t s_evt;
 
 static char s_ssid[33], s_password[65];
 static volatile bool s_paused;  // 검색 중에는 자동 재접속을 멈춘다
+static esp_timer_handle_t s_dhcp_timer;
+#define DHCP_TIMEOUT_US (20 * 1000 * 1000)  // AP에 붙고도 이 시간 안에 IP를 못 받으면 다시 접속한다
+
+static void on_dhcp_timeout(void *arg)
+{
+    ESP_LOGW(TAG, "AP 연결 후 IP를 받지 못해 다시 접속합니다 (SSID %s)", s_ssid);
+    esp_wifi_disconnect();   // DISCONNECTED 이벤트에서 재접속한다
+}
 
 static void show_connecting(void)
 {
@@ -32,7 +41,12 @@ static void on_event(void *arg, esp_event_base_t base, int32_t id, void *data)
 {
     if (base == WIFI_EVENT && id == WIFI_EVENT_STA_START) {
         esp_wifi_connect();
+    } else if (base == WIFI_EVENT && id == WIFI_EVENT_STA_CONNECTED) {
+        ESP_LOGI(TAG, "AP 연결됨, IP 기다리는 중");
+        esp_timer_stop(s_dhcp_timer);
+        esp_timer_start_once(s_dhcp_timer, DHCP_TIMEOUT_US);
     } else if (base == WIFI_EVENT && id == WIFI_EVENT_STA_DISCONNECTED) {
+        esp_timer_stop(s_dhcp_timer);
         xEventGroupClearBits(s_evt, BIT_CONNECTED);
         if (s_paused) return;
         wifi_event_sta_disconnected_t *e = data;
@@ -40,6 +54,7 @@ static void on_event(void *arg, esp_event_base_t base, int32_t id, void *data)
         show_connecting();
         esp_wifi_connect();
     } else if (base == IP_EVENT && id == IP_EVENT_STA_GOT_IP) {
+        esp_timer_stop(s_dhcp_timer);
         ip_event_got_ip_t *e = data;
         ESP_LOGI(TAG, "IP: " IPSTR, IP2STR(&e->ip_info.ip));
         char text[32];
@@ -95,6 +110,8 @@ const char *wifi_current_ssid(void) { return s_ssid; }
 void wifi_start(void)
 {
     s_evt = xEventGroupCreate();
+    const esp_timer_create_args_t timer_args = { .callback = on_dhcp_timeout, .name = "dhcp_wait" };
+    ESP_ERROR_CHECK(esp_timer_create(&timer_args, &s_dhcp_timer));
     credentials_load();
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());

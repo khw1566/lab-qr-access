@@ -90,8 +90,8 @@ menu "Lab Door Config"
 
     menu "Door relay"
         config LAB_RELAY_GPIO
-            int "Relay control GPIO (헤더의 빈 핀: 1,2,3,4,20,32,33,45,46,47)"
-            default 32
+            int "Relay control GPIO (기본 GPIO27, 5V 1채널 옵토 릴레이 IN)"
+            default 27
         config LAB_RELAY_ACTIVE_HIGH
             bool "Relay is active-high"
             default y

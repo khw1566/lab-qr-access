@@ -31,6 +31,7 @@ void ui_weather_set(int wmo_code, bool is_day, float temp_c);   // wmo_code < 0 
 void ui_busy(const char *text);
 void ui_idle(void);
 void ui_result(bool granted, const char *text);
+void ui_remote_open(void);   // 관리자 원격 열림 안내
 void ui_camera_failed(void);
 uint8_t *ui_preview_buffer(void);   // QR 출입 화면이 아니면 NULL
 void ui_preview_commit(void);
@@ -73,6 +74,14 @@ typedef struct {
 verify_result_t server_verify(const char *token);
 verify_result_t server_verify_code(const char *code);
 bool server_ping(void);
+typedef struct {
+    bool open;      // 관리자가 원격으로 문 열기를 요청함
+    int open_ms;
+} remote_command_t;
+int server_poll_command(remote_command_t *cmd);   // HTTP 상태 코드 (명령이 없어도 200)
+
+// remote.c
+void remote_start(void);
 
 // weather.c
 bool weather_fetch(void);   // 받아서 화면에 반영했으면 true

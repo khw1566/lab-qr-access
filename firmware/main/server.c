@@ -64,6 +64,20 @@ static bool sig_ok(const char *nonce, const char *body, const char *got)
     return diff == 0;
 }
 
+// 상단 바 서버 표시등. 한 번 실패로 깜빡이지 않도록 연속 2번 실패해야 꺼짐으로 바꾼다.
+#define OFFLINE_AFTER_FAILURES 2
+static int s_failures;
+
+static void note_reachability(int status)
+{
+    if (status == 200) {
+        s_failures = 0;
+        ui_server_status(UI_SERVER_ONLINE);
+    } else if (++s_failures >= OFFLINE_AFTER_FAILURES) {
+        ui_server_status(UI_SERVER_OFFLINE);
+    }
+}
+
 // 반환: HTTP 상태 코드, 연결 실패는 -1, 응답 서명이 틀리면 -2 (둘 다 '서버 연결 실패'로 처리)
 static int post_json(const char *path, const char *body, char *out, int out_len)
 {
@@ -105,6 +119,7 @@ static int post_json(const char *path, const char *body, char *out, int out_len)
         status = -2;
     }
 #endif
+    note_reachability(status);
     return status;
 }
 

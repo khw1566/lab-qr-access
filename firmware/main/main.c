@@ -6,7 +6,12 @@
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "nvs_flash.h"
+#include "sdkconfig.h"
 #include "app.h"
+
+#ifndef CONFIG_LAB_WEATHER_REFRESH_MIN
+#define CONFIG_LAB_WEATHER_REFRESH_MIN 15
+#endif
 
 static const char *TAG = "lab_door";
 
@@ -107,15 +112,31 @@ static void verify_task(void *arg)
     }
 }
 
+#define WEATHER_RETRY_MS  (60 * 1000)
+#define WEATHER_STALE_MS  (3 * 3600 * 1000LL)   // 이보다 오래 못 받으면 낡은 날씨는 숨긴다
+
 static void ping_task(void *arg)
 {
+    int64_t weather_due = 0, weather_ok_at = 0;
     for (;;) {
         // 연결되면 바로 첫 신호를 보내고, 끊겨 있는 동안은 짧게 다시 확인한다
-        if (wifi_is_connected()) {
-            vTaskDelay(pdMS_TO_TICKS(server_ping() ? 60 * 1000 : 5 * 1000));
-        } else {
+        if (!wifi_is_connected()) {
+            ui_server_status(UI_SERVER_CHECKING);   // Wi-Fi가 없으면 서버 상태를 알 수 없다
             vTaskDelay(pdMS_TO_TICKS(2 * 1000));
+            continue;
         }
+        bool online = server_ping();
+        int64_t now = esp_timer_get_time() / 1000;
+        if (now >= weather_due) {
+            if (weather_fetch()) {
+                weather_ok_at = now;
+                weather_due = now + CONFIG_LAB_WEATHER_REFRESH_MIN * 60 * 1000LL;
+            } else {
+                weather_due = now + WEATHER_RETRY_MS;
+                if (weather_ok_at && now - weather_ok_at > WEATHER_STALE_MS) ui_weather_set(-1, true, 0);
+            }
+        }
+        vTaskDelay(pdMS_TO_TICKS(online ? 60 * 1000 : 5 * 1000));
     }
 }
 

@@ -24,6 +24,9 @@ void display_unlock(void);
 void ui_build(void);
 void ui_status(const char *text);
 void ui_clock_set(int64_t unix_ms);
+typedef enum { UI_SERVER_CHECKING, UI_SERVER_ONLINE, UI_SERVER_OFFLINE } ui_server_t;
+void ui_server_status(ui_server_t state);     // 상단 바의 서버 표시등
+void ui_weather_set(int wmo_code, bool is_day, float temp_c);   // wmo_code < 0 이면 날씨를 숨긴다
 #define UI_RESULT_SHOW_MS 3000
 void ui_busy(const char *text);
 void ui_idle(void);
@@ -69,6 +72,9 @@ typedef struct {
 verify_result_t server_verify(const char *token);
 verify_result_t server_verify_code(const char *code);
 bool server_ping(void);
+
+// weather.c
+bool weather_fetch(void);   // 받아서 화면에 반영했으면 true
 
 // camera_qr.c
 typedef void (*qr_callback_t)(const char *payload);

@@ -24,7 +24,10 @@ typedef enum { TAB_HOME, TAB_SCAN, TAB_GUIDE, TAB_CODE } tab_t;
 static lv_obj_t *s_status, *s_home, *s_scan, *s_guide, *s_hint;
 static lv_obj_t *s_code, *s_code_input, *s_code_error;
 static volatile bool s_manual_visible;
-static lv_obj_t *s_clock, *s_date;
+static lv_obj_t *s_clock, *s_date, *s_weekday;
+static lv_obj_t *s_weather, *s_weather_icon, *s_weather_temp, *s_weather_desc;
+static lv_obj_t *s_server_led;
+static ui_server_t s_server_state;
 static lv_obj_t *s_preview, *s_result, *s_result_label, *s_result_hint, *s_spinner;
 static lv_obj_t *s_result_mark, *s_result_rail;
 static lv_timer_t *s_result_timer;
@@ -86,14 +89,67 @@ static void footer(lv_obj_t *page, bool home)
     ui_icon_button(page, UI_ICON_SETTINGS, "설정", 860, 430, 128, 64, false, on_settings, 0);
 }
 
+// 상단 바 오른쪽: [날씨] | [시:분][날짜/요일] | [서버 표시등/Wi-Fi]
+// 모든 글자는 흰색이다. 큰 시계 숫자의 윗선(y≈19)과 바닥선(y≈73)에 맞춰
+// 오른쪽 세 묶음의 윗줄(28px)과 아랫줄(24px)을 같은 높이로 둔다.
+#define BAR_ROW1_Y     18
+#define BAR_ROW2_Y     50
+#define BAR_CLOCK_Y    16
+#define WEATHER_X      384
+#define CLOCK_X        556
+#define DATE_X         752
+#define STATUS_X       916
+#define LED_SIZE       14
+
+static lv_obj_t *bar_divider(lv_obj_t *screen, int x)
+{
+    lv_obj_t *line = ui_panel(screen, x, 22, 1, UI_BAR_H - 44);
+    lv_obj_set_style_bg_color(line, lv_color_white(), 0);
+    lv_obj_set_style_bg_opa(line, LV_OPA_40, 0);
+    return line;
+}
+
 static void bar_build(lv_obj_t *screen)
 {
     ui_header(screen, "");
-    ui_text(screen, "실습실 출입단말", &lab_font_40, 82, 22, 490, lv_color_white());
-    s_clock = ui_text(screen, "--:--", &lab_font_64, 588, 7, 196, lv_color_black());
-    lv_obj_set_style_text_align(s_clock, LV_TEXT_ALIGN_CENTER, 0);
-    s_date = ui_text(screen, "", &lab_font_28, 792, 50, 224, lv_color_black());
-    s_status = ui_icon(screen, UI_ICON_WIFI_OFF, 992, 10, 20, lv_color_black());
+    ui_text(screen, "실습실 출입단말", &lab_font_40, 82, 22, 280, lv_color_white());
+
+    // 날씨는 처음 받기 전까지 숨긴다
+    s_weather = ui_panel(screen, WEATHER_X, 0, 152, UI_BAR_H);
+    s_weather_icon = ui_icon(s_weather, UI_ICON_CLOUD, 0, 20, 52, lv_color_white());
+    s_weather_temp = ui_text(s_weather, "", &lab_font_28, 58, BAR_ROW1_Y, 94, lv_color_white());
+    s_weather_desc = ui_text(s_weather, "", &lab_font_24, 58, BAR_ROW2_Y, 94, lv_color_white());
+    lv_obj_set_style_text_opa(s_weather_desc, LV_OPA_80, 0);
+    lv_obj_add_flag(s_weather, LV_OBJ_FLAG_HIDDEN);
+    bar_divider(screen, 544);
+
+    s_clock = ui_text(screen, "--:--", &lab_font_64, CLOCK_X, BAR_CLOCK_Y, 184, lv_color_white());
+    lv_obj_set_style_text_align(s_clock, LV_TEXT_ALIGN_RIGHT, 0);
+    s_date = ui_text(screen, "", &lab_font_28, DATE_X, BAR_ROW1_Y, 136, lv_color_white());
+    s_weekday = ui_text(screen, "", &lab_font_24, DATE_X, BAR_ROW2_Y, 136, lv_color_white());
+    lv_obj_set_style_text_opa(s_weekday, LV_OPA_80, 0);
+    bar_divider(screen, 900);
+
+    // 서버 표시등: 초록 작동 중, 빨강 응답 없음, 회색 확인 중(Wi-Fi 없음 포함)
+    s_server_led = ui_panel(screen, STATUS_X + 3, BAR_ROW1_Y + 8, LED_SIZE, LED_SIZE);
+    lv_obj_set_style_radius(s_server_led, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_opa(s_server_led, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_color(s_server_led, lv_color_white(), 0);
+    lv_obj_set_style_border_width(s_server_led, 2, 0);
+    lv_obj_set_style_shadow_spread(s_server_led, 2, 0);
+    lv_obj_set_style_shadow_opa(s_server_led, LV_OPA_70, 0);
+    ui_text(screen, "서버", &lab_font_24, STATUS_X + 28, BAR_ROW1_Y + 2, 64, lv_color_white());
+    s_status = ui_icon(screen, UI_ICON_WIFI_OFF, STATUS_X, BAR_ROW2_Y + 3, 20, lv_color_white());
+    ui_text(screen, "Wi-Fi", &lab_font_24, STATUS_X + 28, BAR_ROW2_Y, 64, lv_color_white());
+}
+
+static void server_led_paint(ui_server_t state)
+{
+    lv_color_t color = state == UI_SERVER_ONLINE ? UI_LED_ON :
+                       state == UI_SERVER_OFFLINE ? UI_LED_OFF : UI_GRAY;
+    lv_obj_set_style_bg_color(s_server_led, color, 0);
+    lv_obj_set_style_shadow_color(s_server_led, color, 0);
+    lv_obj_set_style_shadow_width(s_server_led, state == UI_SERVER_CHECKING ? 0 : 14, 0);
 }
 
 static void home_build(lv_obj_t *screen)
@@ -320,7 +376,8 @@ static void clock_update(void)
     struct tm t;
     gmtime_r(&seconds, &t);
     lv_label_set_text_fmt(s_clock, "%02d:%02d", t.tm_hour, t.tm_min);
-    lv_label_set_text_fmt(s_date, "%d월 %d일 %s요일", t.tm_mon + 1, t.tm_mday, days[t.tm_wday]);
+    lv_label_set_text_fmt(s_date, "%d월 %d일", t.tm_mon + 1, t.tm_mday);
+    lv_label_set_text_fmt(s_weekday, "%s요일", days[t.tm_wday]);
 }
 
 static void on_tick(lv_timer_t *timer)
@@ -353,6 +410,8 @@ void ui_build(void)
     lv_obj_set_style_bg_opa(screen, LV_OPA_COVER, 0);
     lv_obj_remove_flag(screen, LV_OBJ_FLAG_SCROLLABLE);
     bar_build(screen);
+    server_led_paint(UI_SERVER_CHECKING);
+    s_server_state = UI_SERVER_CHECKING;
     home_build(screen);
     scan_build(screen);
     guide_build(screen);
@@ -372,7 +431,46 @@ void ui_status(const char *text)
 {
     if (!s_status || !display_lock(LOCK_WAIT_MS)) return;
     ui_icon_set(s_status, strncmp(text, "Wi-Fi: ", 7) == 0 ? UI_ICON_WIFI : UI_ICON_WIFI_OFF,
-                 lv_color_black());
+                 lv_color_white());
+    display_unlock();
+}
+
+void ui_server_status(ui_server_t state)
+{
+    if (!s_server_led || state == s_server_state || !display_lock(LOCK_WAIT_MS)) return;
+    s_server_state = state;
+    server_led_paint(state);
+    display_unlock();
+}
+
+// WMO 날씨 코드 → 아이콘과 짧은 한글 설명
+static ui_icon_t weather_icon(int code, bool day, const char **text)
+{
+    if (code == 0) { *text = "맑음"; return day ? UI_ICON_SUN : UI_ICON_MOON; }
+    if (code <= 2) { *text = "구름조금"; return day ? UI_ICON_CLOUD_SUN : UI_ICON_CLOUD_MOON; }
+    if (code == 45 || code == 48) { *text = "안개"; return UI_ICON_FOG; }
+    if (code >= 51 && code <= 57) { *text = "이슬비"; return UI_ICON_DRIZZLE; }
+    if (code >= 61 && code <= 67) { *text = "비"; return UI_ICON_RAIN; }
+    if ((code >= 71 && code <= 77) || code == 85 || code == 86) { *text = "눈"; return UI_ICON_SNOW; }
+    if (code >= 80 && code <= 82) { *text = "소나기"; return UI_ICON_RAIN; }
+    if (code >= 95) { *text = "뇌우"; return UI_ICON_THUNDER; }
+    *text = "흐림";
+    return UI_ICON_CLOUD;
+}
+
+void ui_weather_set(int wmo_code, bool is_day, float temp_c)
+{
+    if (!s_weather || !display_lock(LOCK_WAIT_MS)) return;
+    if (wmo_code < 0) {
+        lv_obj_add_flag(s_weather, LV_OBJ_FLAG_HIDDEN);
+    } else {
+        const char *text;
+        ui_icon_set(s_weather_icon, weather_icon(wmo_code, is_day, &text), lv_color_white());
+        int rounded = (int)(temp_c < 0 ? temp_c - 0.5f : temp_c + 0.5f);
+        lv_label_set_text_fmt(s_weather_temp, "%d°C", rounded);
+        lv_label_set_text(s_weather_desc, text);
+        lv_obj_remove_flag(s_weather, LV_OBJ_FLAG_HIDDEN);
+    }
     display_unlock();
 }
 

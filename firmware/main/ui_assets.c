@@ -687,8 +687,498 @@ static const lv_image_dsc_t icon_13_128 = {
     .data_size=16384, .data=icon_13_bytes + 19456,
 };
 
+extern const uint8_t icon_14_bytes[] asm("_binary_icon_14_a8_start");
+static const lv_image_dsc_t icon_14_20 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=20, .h=20, .stride=20},
+    .data_size=400, .data=icon_14_bytes + 0,
+};
+
+static const lv_image_dsc_t icon_14_28 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=28, .h=28, .stride=28},
+    .data_size=784, .data=icon_14_bytes + 400,
+};
+
+static const lv_image_dsc_t icon_14_44 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=44, .h=44, .stride=44},
+    .data_size=1936, .data=icon_14_bytes + 1184,
+};
+
+static const lv_image_dsc_t icon_14_52 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=52, .h=52, .stride=52},
+    .data_size=2704, .data=icon_14_bytes + 3120,
+};
+
+static const lv_image_dsc_t icon_14_56 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=56, .h=56, .stride=56},
+    .data_size=3136, .data=icon_14_bytes + 5824,
+};
+
+static const lv_image_dsc_t icon_14_64 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=64, .h=64, .stride=64},
+    .data_size=4096, .data=icon_14_bytes + 8960,
+};
+
+static const lv_image_dsc_t icon_14_80 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=80, .h=80, .stride=80},
+    .data_size=6400, .data=icon_14_bytes + 13056,
+};
+
+static const lv_image_dsc_t icon_14_128 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=128, .h=128, .stride=128},
+    .data_size=16384, .data=icon_14_bytes + 19456,
+};
+
+extern const uint8_t icon_15_bytes[] asm("_binary_icon_15_a8_start");
+static const lv_image_dsc_t icon_15_20 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=20, .h=20, .stride=20},
+    .data_size=400, .data=icon_15_bytes + 0,
+};
+
+static const lv_image_dsc_t icon_15_28 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=28, .h=28, .stride=28},
+    .data_size=784, .data=icon_15_bytes + 400,
+};
+
+static const lv_image_dsc_t icon_15_44 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=44, .h=44, .stride=44},
+    .data_size=1936, .data=icon_15_bytes + 1184,
+};
+
+static const lv_image_dsc_t icon_15_52 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=52, .h=52, .stride=52},
+    .data_size=2704, .data=icon_15_bytes + 3120,
+};
+
+static const lv_image_dsc_t icon_15_56 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=56, .h=56, .stride=56},
+    .data_size=3136, .data=icon_15_bytes + 5824,
+};
+
+static const lv_image_dsc_t icon_15_64 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=64, .h=64, .stride=64},
+    .data_size=4096, .data=icon_15_bytes + 8960,
+};
+
+static const lv_image_dsc_t icon_15_80 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=80, .h=80, .stride=80},
+    .data_size=6400, .data=icon_15_bytes + 13056,
+};
+
+static const lv_image_dsc_t icon_15_128 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=128, .h=128, .stride=128},
+    .data_size=16384, .data=icon_15_bytes + 19456,
+};
+
+extern const uint8_t icon_16_bytes[] asm("_binary_icon_16_a8_start");
+static const lv_image_dsc_t icon_16_20 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=20, .h=20, .stride=20},
+    .data_size=400, .data=icon_16_bytes + 0,
+};
+
+static const lv_image_dsc_t icon_16_28 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=28, .h=28, .stride=28},
+    .data_size=784, .data=icon_16_bytes + 400,
+};
+
+static const lv_image_dsc_t icon_16_44 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=44, .h=44, .stride=44},
+    .data_size=1936, .data=icon_16_bytes + 1184,
+};
+
+static const lv_image_dsc_t icon_16_52 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=52, .h=52, .stride=52},
+    .data_size=2704, .data=icon_16_bytes + 3120,
+};
+
+static const lv_image_dsc_t icon_16_56 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=56, .h=56, .stride=56},
+    .data_size=3136, .data=icon_16_bytes + 5824,
+};
+
+static const lv_image_dsc_t icon_16_64 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=64, .h=64, .stride=64},
+    .data_size=4096, .data=icon_16_bytes + 8960,
+};
+
+static const lv_image_dsc_t icon_16_80 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=80, .h=80, .stride=80},
+    .data_size=6400, .data=icon_16_bytes + 13056,
+};
+
+static const lv_image_dsc_t icon_16_128 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=128, .h=128, .stride=128},
+    .data_size=16384, .data=icon_16_bytes + 19456,
+};
+
+extern const uint8_t icon_17_bytes[] asm("_binary_icon_17_a8_start");
+static const lv_image_dsc_t icon_17_20 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=20, .h=20, .stride=20},
+    .data_size=400, .data=icon_17_bytes + 0,
+};
+
+static const lv_image_dsc_t icon_17_28 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=28, .h=28, .stride=28},
+    .data_size=784, .data=icon_17_bytes + 400,
+};
+
+static const lv_image_dsc_t icon_17_44 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=44, .h=44, .stride=44},
+    .data_size=1936, .data=icon_17_bytes + 1184,
+};
+
+static const lv_image_dsc_t icon_17_52 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=52, .h=52, .stride=52},
+    .data_size=2704, .data=icon_17_bytes + 3120,
+};
+
+static const lv_image_dsc_t icon_17_56 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=56, .h=56, .stride=56},
+    .data_size=3136, .data=icon_17_bytes + 5824,
+};
+
+static const lv_image_dsc_t icon_17_64 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=64, .h=64, .stride=64},
+    .data_size=4096, .data=icon_17_bytes + 8960,
+};
+
+static const lv_image_dsc_t icon_17_80 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=80, .h=80, .stride=80},
+    .data_size=6400, .data=icon_17_bytes + 13056,
+};
+
+static const lv_image_dsc_t icon_17_128 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=128, .h=128, .stride=128},
+    .data_size=16384, .data=icon_17_bytes + 19456,
+};
+
+extern const uint8_t icon_18_bytes[] asm("_binary_icon_18_a8_start");
+static const lv_image_dsc_t icon_18_20 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=20, .h=20, .stride=20},
+    .data_size=400, .data=icon_18_bytes + 0,
+};
+
+static const lv_image_dsc_t icon_18_28 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=28, .h=28, .stride=28},
+    .data_size=784, .data=icon_18_bytes + 400,
+};
+
+static const lv_image_dsc_t icon_18_44 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=44, .h=44, .stride=44},
+    .data_size=1936, .data=icon_18_bytes + 1184,
+};
+
+static const lv_image_dsc_t icon_18_52 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=52, .h=52, .stride=52},
+    .data_size=2704, .data=icon_18_bytes + 3120,
+};
+
+static const lv_image_dsc_t icon_18_56 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=56, .h=56, .stride=56},
+    .data_size=3136, .data=icon_18_bytes + 5824,
+};
+
+static const lv_image_dsc_t icon_18_64 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=64, .h=64, .stride=64},
+    .data_size=4096, .data=icon_18_bytes + 8960,
+};
+
+static const lv_image_dsc_t icon_18_80 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=80, .h=80, .stride=80},
+    .data_size=6400, .data=icon_18_bytes + 13056,
+};
+
+static const lv_image_dsc_t icon_18_128 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=128, .h=128, .stride=128},
+    .data_size=16384, .data=icon_18_bytes + 19456,
+};
+
+extern const uint8_t icon_19_bytes[] asm("_binary_icon_19_a8_start");
+static const lv_image_dsc_t icon_19_20 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=20, .h=20, .stride=20},
+    .data_size=400, .data=icon_19_bytes + 0,
+};
+
+static const lv_image_dsc_t icon_19_28 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=28, .h=28, .stride=28},
+    .data_size=784, .data=icon_19_bytes + 400,
+};
+
+static const lv_image_dsc_t icon_19_44 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=44, .h=44, .stride=44},
+    .data_size=1936, .data=icon_19_bytes + 1184,
+};
+
+static const lv_image_dsc_t icon_19_52 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=52, .h=52, .stride=52},
+    .data_size=2704, .data=icon_19_bytes + 3120,
+};
+
+static const lv_image_dsc_t icon_19_56 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=56, .h=56, .stride=56},
+    .data_size=3136, .data=icon_19_bytes + 5824,
+};
+
+static const lv_image_dsc_t icon_19_64 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=64, .h=64, .stride=64},
+    .data_size=4096, .data=icon_19_bytes + 8960,
+};
+
+static const lv_image_dsc_t icon_19_80 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=80, .h=80, .stride=80},
+    .data_size=6400, .data=icon_19_bytes + 13056,
+};
+
+static const lv_image_dsc_t icon_19_128 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=128, .h=128, .stride=128},
+    .data_size=16384, .data=icon_19_bytes + 19456,
+};
+
+extern const uint8_t icon_20_bytes[] asm("_binary_icon_20_a8_start");
+static const lv_image_dsc_t icon_20_20 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=20, .h=20, .stride=20},
+    .data_size=400, .data=icon_20_bytes + 0,
+};
+
+static const lv_image_dsc_t icon_20_28 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=28, .h=28, .stride=28},
+    .data_size=784, .data=icon_20_bytes + 400,
+};
+
+static const lv_image_dsc_t icon_20_44 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=44, .h=44, .stride=44},
+    .data_size=1936, .data=icon_20_bytes + 1184,
+};
+
+static const lv_image_dsc_t icon_20_52 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=52, .h=52, .stride=52},
+    .data_size=2704, .data=icon_20_bytes + 3120,
+};
+
+static const lv_image_dsc_t icon_20_56 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=56, .h=56, .stride=56},
+    .data_size=3136, .data=icon_20_bytes + 5824,
+};
+
+static const lv_image_dsc_t icon_20_64 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=64, .h=64, .stride=64},
+    .data_size=4096, .data=icon_20_bytes + 8960,
+};
+
+static const lv_image_dsc_t icon_20_80 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=80, .h=80, .stride=80},
+    .data_size=6400, .data=icon_20_bytes + 13056,
+};
+
+static const lv_image_dsc_t icon_20_128 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=128, .h=128, .stride=128},
+    .data_size=16384, .data=icon_20_bytes + 19456,
+};
+
+extern const uint8_t icon_21_bytes[] asm("_binary_icon_21_a8_start");
+static const lv_image_dsc_t icon_21_20 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=20, .h=20, .stride=20},
+    .data_size=400, .data=icon_21_bytes + 0,
+};
+
+static const lv_image_dsc_t icon_21_28 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=28, .h=28, .stride=28},
+    .data_size=784, .data=icon_21_bytes + 400,
+};
+
+static const lv_image_dsc_t icon_21_44 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=44, .h=44, .stride=44},
+    .data_size=1936, .data=icon_21_bytes + 1184,
+};
+
+static const lv_image_dsc_t icon_21_52 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=52, .h=52, .stride=52},
+    .data_size=2704, .data=icon_21_bytes + 3120,
+};
+
+static const lv_image_dsc_t icon_21_56 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=56, .h=56, .stride=56},
+    .data_size=3136, .data=icon_21_bytes + 5824,
+};
+
+static const lv_image_dsc_t icon_21_64 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=64, .h=64, .stride=64},
+    .data_size=4096, .data=icon_21_bytes + 8960,
+};
+
+static const lv_image_dsc_t icon_21_80 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=80, .h=80, .stride=80},
+    .data_size=6400, .data=icon_21_bytes + 13056,
+};
+
+static const lv_image_dsc_t icon_21_128 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=128, .h=128, .stride=128},
+    .data_size=16384, .data=icon_21_bytes + 19456,
+};
+
+extern const uint8_t icon_22_bytes[] asm("_binary_icon_22_a8_start");
+static const lv_image_dsc_t icon_22_20 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=20, .h=20, .stride=20},
+    .data_size=400, .data=icon_22_bytes + 0,
+};
+
+static const lv_image_dsc_t icon_22_28 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=28, .h=28, .stride=28},
+    .data_size=784, .data=icon_22_bytes + 400,
+};
+
+static const lv_image_dsc_t icon_22_44 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=44, .h=44, .stride=44},
+    .data_size=1936, .data=icon_22_bytes + 1184,
+};
+
+static const lv_image_dsc_t icon_22_52 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=52, .h=52, .stride=52},
+    .data_size=2704, .data=icon_22_bytes + 3120,
+};
+
+static const lv_image_dsc_t icon_22_56 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=56, .h=56, .stride=56},
+    .data_size=3136, .data=icon_22_bytes + 5824,
+};
+
+static const lv_image_dsc_t icon_22_64 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=64, .h=64, .stride=64},
+    .data_size=4096, .data=icon_22_bytes + 8960,
+};
+
+static const lv_image_dsc_t icon_22_80 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=80, .h=80, .stride=80},
+    .data_size=6400, .data=icon_22_bytes + 13056,
+};
+
+static const lv_image_dsc_t icon_22_128 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=128, .h=128, .stride=128},
+    .data_size=16384, .data=icon_22_bytes + 19456,
+};
+
+extern const uint8_t icon_23_bytes[] asm("_binary_icon_23_a8_start");
+static const lv_image_dsc_t icon_23_20 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=20, .h=20, .stride=20},
+    .data_size=400, .data=icon_23_bytes + 0,
+};
+
+static const lv_image_dsc_t icon_23_28 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=28, .h=28, .stride=28},
+    .data_size=784, .data=icon_23_bytes + 400,
+};
+
+static const lv_image_dsc_t icon_23_44 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=44, .h=44, .stride=44},
+    .data_size=1936, .data=icon_23_bytes + 1184,
+};
+
+static const lv_image_dsc_t icon_23_52 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=52, .h=52, .stride=52},
+    .data_size=2704, .data=icon_23_bytes + 3120,
+};
+
+static const lv_image_dsc_t icon_23_56 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=56, .h=56, .stride=56},
+    .data_size=3136, .data=icon_23_bytes + 5824,
+};
+
+static const lv_image_dsc_t icon_23_64 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=64, .h=64, .stride=64},
+    .data_size=4096, .data=icon_23_bytes + 8960,
+};
+
+static const lv_image_dsc_t icon_23_80 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=80, .h=80, .stride=80},
+    .data_size=6400, .data=icon_23_bytes + 13056,
+};
+
+static const lv_image_dsc_t icon_23_128 = {
+    .header = {.magic=LV_IMAGE_HEADER_MAGIC, .cf=LV_COLOR_FORMAT_A8,
+               .w=128, .h=128, .stride=128},
+    .data_size=16384, .data=icon_23_bytes + 19456,
+};
+
 static const unsigned icon_sizes[] = {20, 28, 44, 52, 56, 64, 80, 128};
-static const lv_image_dsc_t *const images[14][8] = {
+static const lv_image_dsc_t *const images[24][8] = {
     {&icon_0_20, &icon_0_28, &icon_0_44, &icon_0_52, &icon_0_56, &icon_0_64, &icon_0_80, &icon_0_128},
     {&icon_1_20, &icon_1_28, &icon_1_44, &icon_1_52, &icon_1_56, &icon_1_64, &icon_1_80, &icon_1_128},
     {&icon_2_20, &icon_2_28, &icon_2_44, &icon_2_52, &icon_2_56, &icon_2_64, &icon_2_80, &icon_2_128},
@@ -703,10 +1193,20 @@ static const lv_image_dsc_t *const images[14][8] = {
     {&icon_11_20, &icon_11_28, &icon_11_44, &icon_11_52, &icon_11_56, &icon_11_64, &icon_11_80, &icon_11_128},
     {&icon_12_20, &icon_12_28, &icon_12_44, &icon_12_52, &icon_12_56, &icon_12_64, &icon_12_80, &icon_12_128},
     {&icon_13_20, &icon_13_28, &icon_13_44, &icon_13_52, &icon_13_56, &icon_13_64, &icon_13_80, &icon_13_128},
+    {&icon_14_20, &icon_14_28, &icon_14_44, &icon_14_52, &icon_14_56, &icon_14_64, &icon_14_80, &icon_14_128},
+    {&icon_15_20, &icon_15_28, &icon_15_44, &icon_15_52, &icon_15_56, &icon_15_64, &icon_15_80, &icon_15_128},
+    {&icon_16_20, &icon_16_28, &icon_16_44, &icon_16_52, &icon_16_56, &icon_16_64, &icon_16_80, &icon_16_128},
+    {&icon_17_20, &icon_17_28, &icon_17_44, &icon_17_52, &icon_17_56, &icon_17_64, &icon_17_80, &icon_17_128},
+    {&icon_18_20, &icon_18_28, &icon_18_44, &icon_18_52, &icon_18_56, &icon_18_64, &icon_18_80, &icon_18_128},
+    {&icon_19_20, &icon_19_28, &icon_19_44, &icon_19_52, &icon_19_56, &icon_19_64, &icon_19_80, &icon_19_128},
+    {&icon_20_20, &icon_20_28, &icon_20_44, &icon_20_52, &icon_20_56, &icon_20_64, &icon_20_80, &icon_20_128},
+    {&icon_21_20, &icon_21_28, &icon_21_44, &icon_21_52, &icon_21_56, &icon_21_64, &icon_21_80, &icon_21_128},
+    {&icon_22_20, &icon_22_28, &icon_22_44, &icon_22_52, &icon_22_56, &icon_22_64, &icon_22_80, &icon_22_128},
+    {&icon_23_20, &icon_23_28, &icon_23_44, &icon_23_52, &icon_23_56, &icon_23_64, &icon_23_80, &icon_23_128},
 };
 const lv_image_dsc_t *ui_icon_asset(unsigned icon, unsigned size)
 {
-    if (icon >= 14) icon = 0;
+    if (icon >= 24) icon = 0;
     unsigned closest = 0, difference = 0xffffffffu;
     for (unsigned i = 0; i < 8; i++) {
         unsigned d = size > icon_sizes[i] ? size - icon_sizes[i] : icon_sizes[i] - size;

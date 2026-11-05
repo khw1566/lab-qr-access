@@ -30,6 +30,28 @@ menu "Lab Door Config"
             default ""
     endmenu
 
+    menu "Weather (상단 바 날씨)"
+        config LAB_WEATHER_ENABLE
+            bool "상단 바에 현재 날씨 표시 (Open-Meteo, API 키 없음)"
+            default y
+            help
+                보드가 api.open-meteo.com 에서 현재 기온과 날씨 코드를 받아 상단 바에 보여 준다.
+                출입 검증과는 관계없어서 날씨를 못 받아도 출입 기능은 그대로 동작한다.
+        config LAB_WEATHER_LAT
+            string "위도 (실습실 위치)"
+            depends on LAB_WEATHER_ENABLE
+            default "37.5665"
+        config LAB_WEATHER_LON
+            string "경도 (실습실 위치)"
+            depends on LAB_WEATHER_ENABLE
+            default "126.9780"
+        config LAB_WEATHER_REFRESH_MIN
+            int "날씨 갱신 주기 (분)"
+            depends on LAB_WEATHER_ENABLE
+            range 5 180
+            default 15
+    endmenu
+
     menu "Board pins (JC1060P470C)"
         config LAB_I2C_SDA
             int "Shared I2C SDA (touch / camera / 4P I2C)"

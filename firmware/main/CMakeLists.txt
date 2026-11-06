@@ -1,6 +1,6 @@
 idf_component_register(
     SRCS "display.c" "ui.c" "ui_settings.c" "lab_font.c" "panel_init.c" "main.c" "board.c" "wifi.c" "camera_qr.c" "door.c" "server.c"
-         "voice.c" "ui_assets.c" "ui_art.c"
+         "voice.c" "ui_assets.c" "ui_art.c" "weather.c" "remote.c"
     INCLUDE_DIRS "."
     REQUIRES esp_wifi esp_netif esp_event nvs_flash esp_http_client esp-tls mbedtls
              esp_driver_gpio esp_driver_i2c esp_driver_i2s esp_driver_ledc esp_lcd esp_timer esp_hw_support
@@ -11,6 +11,9 @@ idf_component_register(
                 "assets/icon_3.a8" "assets/icon_4.a8" "assets/icon_5.a8"
                 "assets/icon_6.a8" "assets/icon_7.a8" "assets/icon_8.a8"
                 "assets/icon_9.a8" "assets/icon_10.a8" "assets/icon_11.a8"
-                "assets/icon_12.a8" "assets/icon_13.a8"
+                "assets/icon_12.a8" "assets/icon_13.a8" "assets/icon_14.a8"
+                "assets/icon_15.a8" "assets/icon_16.a8" "assets/icon_17.a8"
+                "assets/icon_18.a8" "assets/icon_19.a8" "assets/icon_20.a8"
+                "assets/icon_21.a8" "assets/icon_22.a8" "assets/icon_23.a8"
                 "assets/logo_art.a8"
 )

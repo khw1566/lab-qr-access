@@ -64,8 +64,23 @@ static bool sig_ok(const char *nonce, const char *body, const char *got)
     return diff == 0;
 }
 
+// 상단 바 서버 표시등. 한 번 실패로 깜빡이지 않도록 연속 2번 실패해야 꺼짐으로 바꾼다.
+#define OFFLINE_AFTER_FAILURES 2
+static int s_failures;
+
+static void note_reachability(int status)
+{
+    if (status == 200) {
+        s_failures = 0;
+        ui_server_status(UI_SERVER_ONLINE);
+    } else if (++s_failures >= OFFLINE_AFTER_FAILURES) {
+        ui_server_status(UI_SERVER_OFFLINE);
+    }
+}
+
 // 반환: HTTP 상태 코드, 연결 실패는 -1, 응답 서명이 틀리면 -2 (둘 다 '서버 연결 실패'로 처리)
-static int post_json(const char *path, const char *body, char *out, int out_len)
+// track_failures가 false면 성공만 표시등에 반영한다 (원격 명령 대기는 실패 판정을 ping에 맡김)
+static int post_json_ex(const char *path, const char *body, char *out, int out_len, int timeout_ms, bool track_failures)
 {
     char url[192];
     snprintf(url, sizeof(url), "%s%s", api_base(), path);
@@ -73,7 +88,7 @@ static int post_json(const char *path, const char *body, char *out, int out_len)
     esp_http_client_config_t cfg = {
         .url = url,
         .method = HTTP_METHOD_POST,
-        .timeout_ms = 12000,    // 인터넷 경유 TLS 연결은 4초 이상 걸려 넉넉히 둔다 (내부망 http는 훨씬 빠름)
+        .timeout_ms = timeout_ms,
         .event_handler = http_event,
         .user_data = sig,
     };
@@ -105,7 +120,14 @@ static int post_json(const char *path, const char *body, char *out, int out_len)
         status = -2;
     }
 #endif
+    if (track_failures || status == 200) note_reachability(status);
     return status;
+}
+
+static int post_json(const char *path, const char *body, char *out, int out_len)
+{
+    // 인터넷 경유 TLS 연결은 4초 이상 걸려 넉넉히 둔다 (내부망 http는 훨씬 빠름)
+    return post_json_ex(path, body, out, out_len, 12000, true);
 }
 
 // 간단한 JSON 값 추출 (응답 형식이 고정이라 cJSON 없이 처리)
@@ -174,4 +196,25 @@ bool server_ping(void)
         ui_clock_set(strtoll(server_time, NULL, 10));
     }
     return s == 200;
+}
+
+// 관리자 원격 열기 명령 대기 (롱 폴링). 서버는 명령이 생기면 바로, 없으면 REMOTE_WAIT_MS 뒤에 응답한다.
+// 응답도 nonce 서명을 확인하므로 개방형 Wi-Fi에서 가짜 '열어라' 응답으로는 문이 열리지 않는다.
+#define REMOTE_WAIT_MS 20000
+int server_poll_command(remote_command_t *cmd)
+{
+    char resp[192], v[16];
+    memset(cmd, 0, sizeof(*cmd));
+    int s = post_json_ex("/api/device/commands", "{\"wait_ms\":20000}", resp, sizeof(resp), REMOTE_WAIT_MS + 12000, false);
+    if (s != 200) return s;
+    cmd->open = json_find(resp, "command", v, sizeof(v)) && strcmp(v, "open") == 0;
+#if !CONFIG_LAB_VERIFY_RESPONSE_SIG
+    // 서명 확인을 끄면 응답을 지켜 주는 것은 HTTPS 인증서 확인뿐이다. http 주소에서는 원격 열기를 받지 않는다.
+    if (cmd->open && strncmp(api_base(), "https://", 8) != 0) {
+        ESP_LOGE(TAG, "서명 확인이 꺼진 상태의 http 서버라 원격 열기를 무시합니다");
+        cmd->open = false;
+    }
+#endif
+    cmd->open_ms = json_find(resp, "open_ms", v, sizeof(v)) ? atoi(v) : 3000;
+    return s;
 }

@@ -7,7 +7,9 @@ SOURCE = ROOT / 'assets/source'
 OUT = ROOT / 'main/assets'
 ICONS = ('scan-qr-code', 'house', 'settings', 'circle-help', 'smartphone', 'user-round',
          'calendar-check-2', 'circle-check', 'circle-x', 'wifi', 'wifi-off',
-         'chevron-right', 'fingerprint', 'keyboard')
+         'chevron-right', 'fingerprint', 'keyboard',
+         'sun', 'moon', 'cloud-sun', 'cloud-moon', 'cloud', 'cloud-fog',
+         'cloud-drizzle', 'cloud-rain', 'cloud-snow', 'cloud-lightning')
 ICON_SIZE = 128
 ICON_SIZES = (20, 28, 44, 52, 56, 64, 80, 128)
 

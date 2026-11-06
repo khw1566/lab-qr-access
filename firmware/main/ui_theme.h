@@ -13,6 +13,8 @@
 #define UI_GREEN      lv_color_hex(0x08764d)
 #define UI_RED        lv_color_hex(0xb73734)
 #define UI_AMBER      lv_color_hex(0x955c13)
+#define UI_LED_ON     lv_color_hex(0x3ee07a)
+#define UI_LED_OFF    lv_color_hex(0xff5a52)
 #define UI_BAR_H      92
 
 extern const lv_font_t lab_font_24, lab_font_28, lab_font_40, lab_font_48, lab_font_56, lab_font_64;

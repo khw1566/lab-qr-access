@@ -15,6 +15,9 @@ const SESSION_DAYS = 14;
 const KST_OFFSET_MS = 9 * 3600_000;
 const SPECIAL_DURATION_MS = 30 * 60_000;
 const SPECIAL_ACTIVATION_MS = 24 * 3600_000;
+const REMOTE_OPEN_TTL_MS = 20_000; // 원격 열기 명령은 이 안에 보드가 가져가야 실행된다
+const COMMAND_WAIT_MAX_MS = 25_000; // 보드 롱 폴링 최대 대기 (펌웨어 HTTP 제한 시간보다 짧게)
+const COMMAND_CHECK_MS = 1_000; // 롱 폴링 중 새 명령 확인 주기
 // 가입 정보만 있는 계정에 한해 학번을 해제한다. 신청·승인·출입·마스터 발급 이력은 보존한다.
 const USER_NO_HISTORY = `NOT EXISTS (SELECT 1 FROM reservations WHERE user_id = users.id OR decided_by = users.id)
   AND NOT EXISTS (SELECT 1 FROM access_logs WHERE user_id = users.id)
@@ -338,7 +341,8 @@ export default {
 const id = (v) => Number(v);
 
 // 화면에 보이는 데이터를 바꾸지 않는 쓰기 요청 (버전을 올리면 모든 화면이 쓸데없이 새로 불러옴)
-const QUIET_WRITES = new Set(['/api/device/ping', '/api/auth/login', '/api/auth/logout', '/api/notifications/read']);
+// /api/device/commands는 20초마다 오는 롱 폴링이라 제외하고, 명령을 전달했을 때만 deviceCommands에서 직접 올린다
+const QUIET_WRITES = new Set(['/api/device/ping', '/api/device/commands', '/api/auth/login', '/api/auth/logout', '/api/notifications/read']);
 async function bumpDataVersion(env) {
   const v = `${Date.now().toString(36)}.${crypto.randomUUID().slice(0, 8)}`;
   try {
@@ -358,6 +362,7 @@ async function route(req, env, url) {
   if (path === '/api/device/ping' && method === 'POST') {
     return deviceSigned(req, env, async (_req, _env, dev) => json({ ok: true, device: dev.name, server_time: Date.now() }));
   }
+  if (path === '/api/device/commands' && method === 'POST') return deviceSigned(req, env, deviceCommands);
 
   // ===== 데이터 버전 (웹 화면이 주기적으로 물어보고, 바뀌었을 때만 목록을 새로 불러옴) =====
   if (path === '/api/version' && method === 'GET') {
@@ -937,6 +942,28 @@ async function adminRoute(req, env, path, method, admin, url) {
     return json({ ok: true, key });
   }
 
+  // 원격 출입문 열기: 명령을 넣어 두면 보드가 롱 폴링으로 가져가 릴레이를 켜고 화면에 안내한다.
+  // 마스터 QR처럼 관리자 권한이라 긴급 잠금 중에도 열 수 있다.
+  if ((m = path.match(/^\/api\/admin\/devices\/(\d+)\/open$/)) && method === 'POST') {
+    const dev = await env.DB.prepare('SELECT id, active FROM devices WHERE id = ?').bind(id(m[1])).first();
+    if (!dev) throw new HttpError(404, '단말을 찾을 수 없습니다.');
+    if (!dev.active) throw new HttpError(409, '키가 폐기된 단말입니다.');
+    const s = await getSettings(env);
+    // 아직 보드가 가져가지 않은 명령이 있으면 겹쳐 쌓지 않고 그 명령을 돌려준다
+    const waiting = await env.DB.prepare(`SELECT id, expires_at FROM door_commands
+      WHERE device_id = ? AND delivered_at IS NULL AND expires_at > ? ORDER BY id DESC LIMIT 1`).bind(dev.id, now).first();
+    if (waiting) return json({ ok: true, id: waiting.id, expires_at: waiting.expires_at });
+    const r = await env.DB.prepare(`INSERT INTO door_commands (device_id, admin_id, open_ms, created_at, expires_at)
+      VALUES (?, ?, ?, ?, ?)`).bind(dev.id, admin.id, s.door_open_ms, now, now + REMOTE_OPEN_TTL_MS).run();
+    return json({ ok: true, id: r.meta.last_row_id, expires_at: now + REMOTE_OPEN_TTL_MS });
+  }
+  if ((m = path.match(/^\/api\/admin\/door-commands\/(\d+)$/)) && method === 'GET') {
+    const c = await env.DB.prepare('SELECT * FROM door_commands WHERE id = ?').bind(id(m[1])).first();
+    if (!c) throw new HttpError(404, '원격 열기 요청을 찾을 수 없습니다.');
+    const state = c.delivered_at ? 'delivered' : c.expires_at <= now ? 'expired' : 'pending';
+    return json({ id: c.id, state, delivered_at: c.delivered_at, expires_at: c.expires_at });
+  }
+
   if ((m = path.match(/^\/api\/admin\/devices\/(\d+)\/revoke$/)) && method === 'POST') {
     // 키 해시를 무작위 값으로 덮어 예전 키를 영구히 무효화 (기록은 남김)
     await env.DB.prepare('UPDATE devices SET active = 0, key_hash = ? WHERE id = ?')
@@ -1057,6 +1084,31 @@ async function deviceSigned(req, env, handler) {
   const headers = new Headers(res.headers);
   headers.set('x-lab-sig', await hmacHex(key, `${nonce}.${text}`));
   return new Response(text, { status: res.status, headers });
+}
+
+// 보드 롱 폴링: 기다릴 명령이 생기면 바로, 없으면 wait_ms 뒤에 {ok, command:null}을 돌려준다.
+// 응답은 deviceSigned로 nonce 서명되므로, 개방형 Wi-Fi에서 가짜 '열어라' 응답을 꾸며도 보드가 무시한다.
+// 명령은 UPDATE ... WHERE delivered_at IS NULL로 한 번만 가져갈 수 있다.
+async function deviceCommands(req, env, dev) {
+  const input = await body(req);
+  const wait = Math.min(Math.max(Number(input?.wait_ms) || 0, 0), COMMAND_WAIT_MAX_MS);
+  const until = Date.now() + wait;
+  for (;;) {
+    const now = Date.now();
+    const c = await env.DB.prepare(`UPDATE door_commands SET delivered_at = ?
+      WHERE id = (SELECT id FROM door_commands WHERE device_id = ? AND delivered_at IS NULL AND expires_at > ? ORDER BY id LIMIT 1)
+        AND delivered_at IS NULL
+      RETURNING id, admin_id, open_ms`).bind(now, dev.id, now).first();
+    if (c) {
+      await env.DB.prepare(
+        'INSERT INTO access_logs (device_id, user_id, result, reason, at, room_id) VALUES (?, ?, ?, ?, ?, ?)',
+      ).bind(dev.id, c.admin_id, 'granted', 'remote', now, dev.room_id).run();
+      await bumpDataVersion(env);
+      return json({ ok: true, command: 'open', id: c.id, open_ms: c.open_ms });
+    }
+    if (now + COMMAND_CHECK_MS > until) return json({ ok: true, command: null, server_time: now });
+    await new Promise((r) => setTimeout(r, COMMAND_CHECK_MS));
+  }
 }
 
 // 응답 형식은 펌웨어(server.c)가 읽는 그대로 유지: {ok, reason} / {ok, name, open_ms, end_at}

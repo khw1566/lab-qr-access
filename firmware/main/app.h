@@ -24,10 +24,14 @@ void display_unlock(void);
 void ui_build(void);
 void ui_status(const char *text);
 void ui_clock_set(int64_t unix_ms);
+typedef enum { UI_SERVER_CHECKING, UI_SERVER_ONLINE, UI_SERVER_OFFLINE } ui_server_t;
+void ui_server_status(ui_server_t state);     // 상단 바의 서버 표시등
+void ui_weather_set(int wmo_code, bool is_day, float temp_c);   // wmo_code < 0 이면 날씨를 숨긴다
 #define UI_RESULT_SHOW_MS 3000
 void ui_busy(const char *text);
 void ui_idle(void);
 void ui_result(bool granted, const char *text);
+void ui_remote_open(void);   // 관리자 원격 열림 안내
 void ui_camera_failed(void);
 uint8_t *ui_preview_buffer(void);   // QR 출입 화면이 아니면 NULL
 void ui_preview_commit(void);
@@ -50,6 +54,7 @@ typedef struct {
 } wifi_ap_t;
 void wifi_start(void);
 bool wifi_is_connected(void);
+void wifi_recover(void);    // IP를 못 받고 멈춘 경우 복구 (ping_task에서 호출)
 const char *wifi_current_ssid(void);
 int wifi_scan(wifi_ap_t *out, int max);     // 찾은 개수, 실패하면 -1
 void wifi_connect_to(const char *ssid, const char *password);
@@ -69,6 +74,17 @@ typedef struct {
 verify_result_t server_verify(const char *token);
 verify_result_t server_verify_code(const char *code);
 bool server_ping(void);
+typedef struct {
+    bool open;      // 관리자가 원격으로 문 열기를 요청함
+    int open_ms;
+} remote_command_t;
+int server_poll_command(remote_command_t *cmd);   // HTTP 상태 코드 (명령이 없어도 200)
+
+// remote.c
+void remote_start(void);
+
+// weather.c
+bool weather_fetch(void);   // 받아서 화면에 반영했으면 true
 
 // camera_qr.c
 typedef void (*qr_callback_t)(const char *payload);

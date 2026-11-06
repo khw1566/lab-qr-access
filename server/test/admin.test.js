@@ -428,3 +428,52 @@ test('data version changes only after successful data writes, so web screens ref
  assert.equal((await request('/api/admin/settings')).settings.data_version,undefined,'version is not a setting');
  db.close();
 });
+
+test('admin remote open is delivered once to the device, logged, and expires if not picked up', async () => {
+  const {db,request,key} = await fixture();
+  const poll = (wait_ms=0) => request('/api/device/commands',{method:'POST',body:{wait_ms},headers:{authorization:`Bearer ${key}`},uid:null});
+  assert.equal((await poll()).command,null);
+  assert.equal((await request('/api/admin/devices/1/open',{method:'POST',uid:2})).status,403);
+  const c = await request('/api/admin/devices/1/open',{method:'POST'});
+  assert.equal(c.status,200);
+  assert.equal((await request('/api/admin/devices/1/open',{method:'POST'})).id,c.id);
+  assert.equal((await request(`/api/admin/door-commands/${c.id}`)).state,'pending');
+  const got = await poll();
+  assert.equal(got.command,'open'); assert.equal(got.id,c.id); assert.equal(got.open_ms,3000);
+  assert.equal((await poll()).command,null);
+  assert.equal((await request(`/api/admin/door-commands/${c.id}`)).state,'delivered');
+  const log = db.prepare("SELECT * FROM access_logs WHERE reason='remote'").get();
+  assert.equal(log.user_id,1); assert.equal(log.result,'granted'); assert.equal(log.device_id,1);
+
+  const old = await request('/api/admin/devices/1/open',{method:'POST'});
+  db.prepare('UPDATE door_commands SET expires_at=1 WHERE id=?').run(old.id);
+  assert.equal((await poll()).command,null);
+  assert.equal((await request(`/api/admin/door-commands/${old.id}`)).state,'expired');
+  assert.equal((await request('/api/admin/devices/99/open',{method:'POST'})).status,404);
+  assert.equal((await request('/api/device/commands',{method:'POST',body:{},uid:null})).status,401);
+  db.close();
+});
+
+test('device command long poll returns a command created while waiting', async () => {
+  const {db,request,key} = await fixture();
+  const waiting = request('/api/device/commands',{method:'POST',body:{wait_ms:3000},headers:{authorization:`Bearer ${key}`},uid:null});
+  await new Promise((r)=>setTimeout(r,300));
+  const c = await request('/api/admin/devices/1/open',{method:'POST'});
+  const got = await waiting;
+  assert.equal(got.command,'open'); assert.equal(got.id,c.id);
+  db.close();
+});
+
+test('idle remote-open polling does not refresh web screens, a delivered command does', async () => {
+  const {db,request,key} = await fixture();
+  const ver=async()=>(await request('/api/version',{uid:null})).v;
+  const poll = () => request('/api/device/commands',{method:'POST',body:{wait_ms:0},headers:{authorization:`Bearer ${key}`},uid:null});
+  const v0 = await ver();
+  await poll();
+  assert.equal(await ver(),v0);
+  await request('/api/admin/devices/1/open',{method:'POST'});
+  const v1 = await ver();
+  assert.equal((await poll()).command,'open');
+  assert.notEqual(await ver(),v1);
+  db.close();
+});

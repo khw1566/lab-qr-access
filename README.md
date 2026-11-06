@@ -153,7 +153,7 @@ npm run deploy                             # lab.audreaming.com 도메인과 인
 2. QR 디코더 quirc(ISC 라이선스)는 `firmware/components/quirc`에 이미 포함되어 있습니다.
 3. `idf.py set-target esp32p4 && idf.py menuconfig`
    - Lab Door Config: Wi-Fi, 서버 URL, 단말 키, 릴레이 GPIO, 카메라 SCCB 핀
-   - Weather: 상단 바 날씨용 실습실 위도·경도 (기본값 서울 시청). 보드가 api.open-meteo.com(무료, 키 없음)에서 직접 받아 오며, 실패해도 출입 기능에는 영향이 없습니다.
+   - Weather: 상단 바 날씨용 실습실 위도·경도 (기본값 울산 시청). 보드가 api.open-meteo.com(무료, 키 없음)에서 직접 받아 오며, 실패해도 출입 기능에는 영향이 없습니다.
    - 카메라 센서 선택 (Component config > Espressif Camera Sensors)
    - ESP-Hosted: P4 ↔ C6 SDIO 핀 (보드 회로도 기준)
 4. `idf.py build flash monitor`

@@ -326,6 +326,8 @@ dialog { border: 0; padding: 0; border-radius: 16px; background: var(--surface);
 dialog::backdrop { background: rgba(10, 14, 22, .5); }
 dialog form { padding: 22px; display: grid; gap: 16px; }
 dialog .row.end { justify-content: flex-end; }
+dialog .row > .field.grow { flex: 1 1 0; min-width: 0; }
+dialog .row > .field.grow .input { width: 100%; min-width: 0; }
 
 /* ---------- 공개 첫 화면 ---------- */
 .home { max-width: 980px; margin: 0 auto; display: grid; gap: 32px;
@@ -992,6 +994,7 @@ function resItem(r, now) {
   return `<div class="item">
     <div class="item-head"><b>${esc(r.room_name)}</b><span class="pill ${r.status}">${STATUS[r.status]}</span></div>
     <div class="mono small">${fRange(r.start_at, r.end_at)}${r.printer_type ? ` · ${PT[r.printer_type]}` : ''}</div>
+    ${r.granted_by ? '<div class="small muted">관리자가 등록한 출입 기간</div>' : ''}
     ${r.purpose ? `<div class="small muted">${esc(r.purpose)}</div>` : ''}
     ${r.reject_reason ? `<div class="small admin-comment" style="color:var(--bad)">관리자 멘트: ${esc(r.reject_reason)}</div>` : ''}
     ${live || canCancel ? `<div class="item-actions">
@@ -1408,6 +1411,42 @@ function changeUserPassword(user) {
   d.showModal(); $('[name="password"]', d).focus();
 }
 
+// 관리자 출입권한 부여: 학생 대신 기간·시간대를 정해 승인된 이용 건을 만든다
+async function grantAccess(user) {
+  let rs;
+  try { rs = (await cached('/api/rooms?all=1')).rooms.filter((r) => r.enabled); } catch (e) { return toast(e.message); }
+  if (!rs.length) return toast('운영 중인 실습실이 없습니다.');
+  const today = kd(Date.now()).toISOString().slice(0, 10);
+  const d = document.createElement('dialog'); d.setAttribute('aria-label', '출입권한 부여');
+  d.innerHTML = `<form><h3>출입권한 부여</h3><p class="small"><b>${esc(user.name)}</b> · ${esc(user.student_no)}</p>
+    <p class="small muted">이용 신청과 승인을 대신 처리합니다. 기간 안의 날마다 같은 시간대로 승인된 이용 건이 만들어지고, 사용자는 출입증 탭에서 QR을 열 수 있습니다.</p>
+    <label class="field"><span>실습실</span><select class="input" name="room_id">${rs.map((r) => `<option value="${r.id}">${esc(r.name)}</option>`).join('')}</select></label>
+    <div class="row"><label class="field grow"><span>시작 날짜</span><input class="input" type="date" name="from" value="${today}" min="${today}" required></label>
+      <label class="field grow"><span>끝 날짜</span><input class="input" type="date" name="to" value="${today}" min="${today}" required></label></div>
+    <div class="row"><label class="field grow"><span>출입 시작</span><input class="input" type="time" name="start_time" value="09:00" step="600" required></label>
+      <label class="field grow"><span>출입 끝</span><input class="input" type="time" name="end_time" value="22:00" step="600" required></label></div>
+    <label class="row small"><input type="checkbox" name="skip_closed" checked>주말·공휴일·휴관일은 빼기</label>
+    <label class="field"><span>사유 (사용자에게 보임)</span><input class="input" name="purpose" maxlength="200" placeholder="예: 졸업 작품 제작 기간"></label>
+    <p class="small" data-error role="alert" style="color:var(--bad)" hidden></p>
+    <div class="row end"><button class="btn secondary" type="button" data-close-grant>취소</button><button class="btn" type="submit">부여</button></div></form>`;
+  document.body.append(d); d.onclose = () => d.remove();
+  $('[data-close-grant]', d).onclick = () => d.close();
+  $('[name="from"]', d).onchange = (e) => { const to = $('[name="to"]', d); to.min = e.target.value; if (to.value < e.target.value) to.value = e.target.value; };
+  $('form', d).onsubmit = async (e) => {
+    e.preventDefault(); const f = new FormData(e.target), err = $('[data-error]', d), btn = $('button[type="submit"]', d);
+    btn.disabled = true; err.hidden = true;
+    try {
+      const r = await api(`/api/admin/users/${user.id}/grant`, { method: 'POST', body: {
+        room_id: Number(f.get('room_id')), from: f.get('from'), to: f.get('to'), start_time: f.get('start_time'), end_time: f.get('end_time'),
+        skip_closed: f.get('skip_closed') === 'on', purpose: f.get('purpose').trim() } });
+      d.close();
+      toast(`${user.name}님에게 ${r.created}일 출입권한을 부여했습니다.` + (r.skipped.length ? ` (${r.skipped.length}일 제외: ${[...new Set(r.skipped.map((x) => x.why))].join(', ')})` : ''));
+    } catch (e2) { err.textContent = e2.message; err.hidden = false; }
+    finally { btn.disabled = false; }
+  };
+  d.showModal();
+}
+
 let userFilter = 'all', userSearch = '', userPage = 1;
 A.users = async () => {
   const { users, total, page, pages, page_size } = await cached(AP.users());
@@ -1416,6 +1455,7 @@ A.users = async () => {
   const rows = users.map((u) => {
     const self = u.id === me.id;
     const btns = [`<button class="btn secondary sm" type="button" data-uedit="${u.id}">정보 수정</button>`, `<button class="btn secondary sm" type="button" data-upassword="${u.id}">비밀번호 변경</button>`];
+    if (u.status === 'active') btns.push(`<button class="btn ok sm" type="button" data-ugrant="${u.id}">출입권한 부여</button>`);
     if (u.status !== 'active') btns.push(`<button class="btn ok sm" type="button" data-u="${u.id}" data-op="activate">${u.status === 'pending' ? '가입 승인' : '정지 해제'}</button>`);
     if (u.status === 'active' && !self) btns.push(u.role === 'admin'
       ? `<button class="btn secondary sm" type="button" data-u="${u.id}" data-op="make-student">관리자 해제</button>`
@@ -1438,6 +1478,7 @@ A.users = async () => {
   $('#userPrev').onclick = () => { userPage--; reload(); };
   $('#userNext').onclick = () => { userPage++; reload(); };
   $$('[data-upassword]').forEach((b) => b.onclick = () => changeUserPassword(users.find((u) => u.id == b.dataset.upassword)));
+  $$('[data-ugrant]').forEach((b) => b.onclick = () => grantAccess(users.find((u) => u.id == b.dataset.ugrant)));
   $$('[data-uedit]').forEach((b) => b.onclick = () => {
     const u = users.find((x) => x.id == b.dataset.uedit);
     editRecord('사용자 정보 수정', [

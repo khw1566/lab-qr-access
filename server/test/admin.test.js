@@ -494,3 +494,43 @@ test('signup requires privacy consent and records when it was given', async () =
   assert.equal(listed.privacy_consent_at,u.privacy_consent_at);
   db.close();
 });
+
+test('admin grants time-limited access on behalf of a user and the user can open QR', async () => {
+  const {db,request} = await fixture();
+  const kst=(ms)=>new Date(ms+9*3600_000).toISOString().slice(0,10);
+  const from=kst(Date.now()+86400_000), to=kst(Date.now()+10*86400_000);
+  const body={room_id:1,from,to,start_time:'00:00',end_time:'24:00',skip_closed:false,purpose:'졸업 작품'};
+  assert.equal((await request('/api/admin/users/2/grant',{method:'POST',body,uid:2})).status,403);
+  assert.equal((await request('/api/admin/users/2/grant',{method:'POST',body:{...body,end_time:'08:00',start_time:'09:00'}})).status,400);
+  assert.equal((await request('/api/admin/users/2/grant',{method:'POST',body:{...body,to:kst(Date.now()+60*86400_000)}})).status,400);
+  const r=await request('/api/admin/users/2/grant',{method:'POST',body});
+  assert.equal(r.status,200); assert.equal(r.created,10); assert.deepEqual(r.skipped,[]);
+  const rows=db.prepare("SELECT * FROM reservations WHERE user_id=2 ORDER BY start_at").all();
+  assert.equal(rows.length,10); assert.ok(rows.every((x)=>x.status==='approved'&&x.granted_by===1&&x.decided_by===1&&x.end_at-x.start_at===86400_000));
+  assert.equal(kst(rows[0].start_at),from);
+  // 같은 기간 다시 부여하면 겹쳐서 만들 날이 없다
+  assert.equal((await request('/api/admin/users/2/grant',{method:'POST',body})).status,409);
+  // 오늘 지금을 포함하는 부여 → 학생이 QR을 받을 수 있다
+  const today=kst(Date.now());
+  db.exec('DELETE FROM reservations');
+  const now=await request('/api/admin/users/2/grant',{method:'POST',body:{...body,from:today,to:today}});
+  assert.equal(now.created,1);
+  const res=(await request('/api/reservations',{uid:2})).reservations[0];
+  assert.equal(res.granted_by,1);
+  assert.equal((await request(`/api/reservations/${res.id}/qr`,{uid:2})).status,200);
+  // 정지된 계정에는 부여할 수 없다
+  db.exec("UPDATE users SET status='blocked' WHERE id=2");
+  assert.equal((await request('/api/admin/users/2/grant',{method:'POST',body})).status,409);
+  db.close();
+});
+
+test('grant skips weekends and holidays by default', async () => {
+  const {db,request} = await fixture();
+  const r=await request('/api/admin/users/2/grant',{method:'POST',body:{room_id:1,from:'2027-02-05',to:'2027-02-10',start_time:'09:00',end_time:'18:00'}});
+  // 2027-02-05 금, 06~09 설 연휴(토·일 포함), 10 수
+  assert.equal(r.status,200);
+  assert.deepEqual(r.skipped.map((x)=>x.day),['2027-02-06','2027-02-07','2027-02-08','2027-02-09']);
+  assert.equal(r.skipped[0].why,'설날 연휴');
+  assert.equal(r.created,2);
+  db.close();
+});

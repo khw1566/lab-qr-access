@@ -40,11 +40,11 @@ menu "Lab Door Config"
         config LAB_WEATHER_LAT
             string "위도 (실습실 위치)"
             depends on LAB_WEATHER_ENABLE
-            default "37.5665"
+            default "35.5384"
         config LAB_WEATHER_LON
             string "경도 (실습실 위치)"
             depends on LAB_WEATHER_ENABLE
-            default "126.9780"
+            default "129.3114"
         config LAB_WEATHER_REFRESH_MIN
             int "날씨 갱신 주기 (분)"
             depends on LAB_WEATHER_ENABLE

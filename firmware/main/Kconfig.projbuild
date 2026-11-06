@@ -86,6 +86,27 @@ menu "Lab Door Config"
         config LAB_AUDIO_AMP_GPIO
             int "Speaker amplifier enable GPIO"
             default 11
+        config LAB_AUDIO_DIN_GPIO
+            int "ES8311 I2S mic data GPIO (ASDOUT, -1 = 마이크 안 씀)"
+            default 48
+            help
+                ES8311의 마이크 ADC 출력(ASDOUT)이 연결된 P4 핀. 보드 회로도로 확인하지 못한 값이라
+                실시간 보기에서 소리가 안 들리면 회로도를 보고 바꾸거나 -1로 꺼 두세요.
+    endmenu
+
+    menu "Live view (관리자 실시간 보기)"
+        config LAB_LIVE_ENABLE
+            bool "관리자 실시간 보기 (카메라 영상, 소리 듣기, 말하기)"
+            default y
+            help
+                관리자가 웹에서 실시간 보기를 열면 보드가 서버 중계에 wss로 붙어 카메라 영상을 보내고
+                관리자의 말을 스피커로 재생한다. 소리 듣기는 서버 기능 설정에서 허용한 경우만 동작한다.
+                영상과 음성은 보드에도 서버에도 저장하지 않는다.
+        config LAB_LIVE_JPEG_QUALITY
+            int "JPEG 품질 (1~100, 낮을수록 데이터가 적음)"
+            depends on LAB_LIVE_ENABLE
+            range 1 100
+            default 50
     endmenu
 
     menu "Door relay"

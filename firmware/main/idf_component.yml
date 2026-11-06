@@ -10,6 +10,8 @@ dependencies:
   espressif/esp_lcd_touch_gt911: "1.2.1"
   # ES8311 스피커 (음성 안내)
   espressif/esp_codec_dev: "1.2.0"
+  # 관리자 실시간 보기 (서버 중계에 wss로 연결)
+  espressif/esp_websocket_client: "^1.4.0"
   lvgl/lvgl: "9.2.2"
   # MIPI-CSI 카메라 + ISP를 V4L2 방식으로 다루는 드라이버 (센서 드라이버 esp_cam_sensor 포함)
   espressif/esp_video: "*"

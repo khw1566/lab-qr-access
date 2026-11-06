@@ -1,5 +1,6 @@
 // MIPI-CSI 카메라 → (ISP) RGB565 → 그레이스케일 축소 → quirc 로 QR 디코딩
 // esp_video(V4L2 스타일 API) 사용. ESP-IDF 5.5 + espressif/esp_video 1.x 기준.
+// 관리자 실시간 보기 중에는 같은 축소 화면(색 보정, 좌우 반전 없음)을 live.c에 넘겨 JPEG로 보낸다. QR 인식은 그대로 돈다.
 #include <fcntl.h>
 #include <math.h>
 #include <string.h>
@@ -111,8 +112,9 @@ static void color_update(uint32_t r_mean, uint32_t g_mean, uint32_t b_mean)
 }
 
 // RGB565(LE) → 8bit 그레이(가운데 DECODE_W 폭만), s_scale 배 축소.
-// preview가 있으면 색 보정한 거울상으로 같이 채운다. 평균 밝기를 돌려준다.
-static uint32_t downscale(const uint8_t *src, uint8_t *dst, uint16_t *preview)
+// preview가 있으면 색 보정한 거울상으로 같이 채운다. live가 있으면 색 보정한 정상 방향 화면을
+// live_w × live_h(16의 배수로 자른 크기)만큼 채운다. 평균 밝기를 돌려준다.
+static uint32_t downscale(const uint8_t *src, uint8_t *dst, uint16_t *preview, uint16_t *live, uint32_t live_w, uint32_t live_h)
 {
     const uint16_t *px = (const uint16_t *)src;
     uint32_t ow = s_w / s_scale, oh = s_h / s_scale;
@@ -121,6 +123,7 @@ static uint32_t downscale(const uint8_t *src, uint8_t *dst, uint16_t *preview)
     for (uint32_t y = 0; y < oh; y++) {
         const uint16_t *row = px + (y * s_scale) * s_w;
         uint16_t *out = preview ? preview + (y + 1) * ow - 1 : NULL;
+        uint16_t *lrow = (live && y < live_h) ? live + y * live_w : NULL;
         for (uint32_t x = 0; x < ow; x++) {
             uint16_t p = row[x * s_scale];
             uint32_t r5 = p >> 11, g6 = (p >> 5) & 0x3F, b5 = p & 0x1F;
@@ -131,7 +134,11 @@ static uint32_t downscale(const uint8_t *src, uint8_t *dst, uint16_t *preview)
             r_sum += r;
             g_sum += g;
             b_sum += b;
-            if (out) *out-- = s_lut_r[r5] | s_lut_g[g6] | s_lut_b[b5];
+            if (out || lrow) {
+                uint16_t c = s_lut_r[r5] | s_lut_g[g6] | s_lut_b[b5];
+                if (out) *out-- = c;
+                if (lrow && x < live_w) lrow[x] = c;
+            }
         }
     }
     uint32_t pixels = ow * oh;
@@ -187,9 +194,12 @@ static void scan_task(void *arg)
         int w, h;
         uint8_t *gray = quirc_begin(q, &w, &h);
         uint8_t *preview = (s_w / s_scale == UI_PREVIEW_W && s_h / s_scale == UI_PREVIEW_H) ? ui_preview_buffer() : NULL;
-        uint32_t mean = downscale(s_bufs[b.index], gray, (uint16_t *)preview);
+        uint32_t live_w = 0, live_h = 0;
+        uint16_t *live = live_frame_claim(&live_w, &live_h);
+        uint32_t mean = downscale(s_bufs[b.index], gray, (uint16_t *)preview, live, live_w, live_h);
         ioctl(s_fd, VIDIOC_QBUF, &b);  // 변환 끝났으면 버퍼 즉시 반납
         if (preview) ui_preview_commit();
+        if (live) live_frame_ready();
         if (++frames % AE_EVERY_FRAMES == 0) {
             auto_exposure(mean);
             color_update(s_r_mean, s_g_mean, s_b_mean);
@@ -215,6 +225,12 @@ static void scan_task(void *arg)
             s_cb((const char *)data->payload);
         }
     }
+}
+
+void camera_frame_size(uint32_t *w, uint32_t *h)
+{
+    *w = s_scale ? s_w / s_scale : 0;
+    *h = s_scale ? s_h / s_scale : 0;
 }
 
 esp_err_t camera_qr_start(qr_callback_t cb)

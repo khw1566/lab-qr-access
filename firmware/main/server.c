@@ -207,7 +207,10 @@ int server_poll_command(remote_command_t *cmd)
     memset(cmd, 0, sizeof(*cmd));
     int s = post_json_ex("/api/device/commands", "{\"wait_ms\":20000}", resp, sizeof(resp), REMOTE_WAIT_MS + 12000, false);
     if (s != 200) return s;
-    cmd->open = json_find(resp, "command", v, sizeof(v)) && strcmp(v, "open") == 0;
+    bool has = json_find(resp, "command", v, sizeof(v));
+    cmd->open = has && strcmp(v, "open") == 0;
+    cmd->live = has && strcmp(v, "live") == 0;
+    cmd->live_mic = cmd->live && json_find(resp, "mic", v, sizeof(v)) && strcmp(v, "true") == 0;
 #if !CONFIG_LAB_VERIFY_RESPONSE_SIG
     // 서명 확인을 끄면 응답을 지켜 주는 것은 HTTPS 인증서 확인뿐이다. http 주소에서는 원격 열기를 받지 않는다.
     if (cmd->open && strncmp(api_base(), "https://", 8) != 0) {

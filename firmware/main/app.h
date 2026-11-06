@@ -12,6 +12,12 @@ i2c_master_bus_handle_t board_i2c_bus(void);
 typedef enum { VOICE_SCAN, VOICE_CHECKING, VOICE_GRANTED, VOICE_DENIED, VOICE_OFFLINE } voice_clip_t;
 esp_err_t voice_start(void);
 void voice_play(voice_clip_t clip);
+void voice_chime(void);                                  // 실시간 연결 알림음
+bool voice_mic_available(void);                          // 마이크 입력 핀이 설정되어 있음
+int voice_mic_read(int16_t *out, int n);                 // 8 kHz mono n개 (막힘), 실패 -1
+void voice_talk_write(const uint8_t *pcm8k, size_t bytes);  // 관리자 말하기 8 kHz s16le 재생
+void voice_talk_flush(void);
+bool voice_talk_active(void);                            // 방금까지 말하기를 재생했음 (마이크 울림 방지)
 
 // display.c
 esp_err_t display_start(void);
@@ -32,6 +38,7 @@ void ui_busy(const char *text);
 void ui_idle(void);
 void ui_result(bool granted, const char *text);
 void ui_remote_open(void);   // 관리자 원격 열림 안내
+void ui_live(bool on, bool mic);   // 관리자 실시간 보기 연결 중 표시
 void ui_camera_failed(void);
 uint8_t *ui_preview_buffer(void);   // QR 출입 화면이 아니면 NULL
 void ui_preview_commit(void);
@@ -77,6 +84,8 @@ bool server_ping(void);
 typedef struct {
     bool open;      // 관리자가 원격으로 문 열기를 요청함
     int open_ms;
+    bool live;      // 관리자가 실시간 보기를 열었음
+    bool live_mic;  // 기능 설정에서 소리 듣기를 허용함
 } remote_command_t;
 int server_poll_command(remote_command_t *cmd);   // HTTP 상태 코드 (명령이 없어도 200)
 
@@ -89,3 +98,9 @@ bool weather_fetch(void);   // 받아서 화면에 반영했으면 true
 // camera_qr.c
 typedef void (*qr_callback_t)(const char *payload);
 esp_err_t camera_qr_start(qr_callback_t cb);
+void camera_frame_size(uint32_t *w, uint32_t *h);   // 축소한 화면 크기 (시작 전이면 0)
+
+// live.c (관리자 실시간 보기)
+void live_request(bool mic_allowed);
+uint16_t *live_frame_claim(uint32_t *w, uint32_t *h);   // 카메라 태스크: 실시간 보기가 화면을 원하면 채울 버퍼
+void live_frame_ready(void);

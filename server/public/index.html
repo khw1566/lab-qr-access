@@ -651,6 +651,7 @@ dialog .row > .field.grow .input { width: 100%; min-width: 0; }
 <div id="toast" role="status"></div>
 
 <script src="/notifications.js"></script>
+<script src="/live.js"></script>
 <script>
 'use strict';
 const $ = (s, el = document) => el.querySelector(s);
@@ -1292,7 +1293,7 @@ A.overview = async () => {
   const devs = o.devices.length ? o.devices.map((d) => `<tr><td><b>${esc(d.name)}</b><div class="small muted">${esc(d.room_name)}</div></td>
     <td><span class="pill ${d.online ? 'on' : 'off'}">${d.online ? '연결됨' : '연결 끊김'}</span></td>
     <td class="small muted">${d.last_seen_at ? '마지막 신호 ' + ago(d.last_seen_at) : '아직 연결된 적 없음'}</td>
-    <td class="actions"><button class="btn sm" type="button" data-dopen="${d.id}" data-dname="${esc(d.name)}">원격 열기</button></td></tr>`).join('')
+    <td class="actions"><button class="btn sm" type="button" data-dopen="${d.id}" data-dname="${esc(d.name)}">원격 열기</button><button class="btn secondary sm" type="button" data-dlive="${d.id}" data-dname="${esc(d.name)}">실시간 보기</button></td></tr>`).join('')
     : `<tr><td colspan="4"><div class="empty">등록된 출입 단말이 없습니다. <a href="#admin-devices">단말 등록</a></div></td></tr>`;
   $('#adminMain').innerHTML = head('현황', `${fDT(o.server_time)} 기준`) + `
     ${o.lockdown ? `<div class="banner alert" style="margin-bottom:14px">긴급 잠금이 켜져 있어 학생 QR이 모두 거부됩니다. <a href="#admin-features" style="color:inherit">기능 설정</a>에서 해제하세요.</div>` : ''}
@@ -1305,7 +1306,20 @@ A.overview = async () => {
     <h3 class="group-title" style="margin-top:26px">출입 단말</h3>
     <div class="panel table-wrap"><table class="resp"><tbody>${devs}</tbody></table></div>`;
   bindRemoteOpen();
+  bindLiveView();
 };
+
+// 관리자 실시간 보기 (public/live.js). 영상·음성은 저장하지 않고 연결 기록만 남는다.
+async function bindLiveView() {
+  const btns = $$('[data-dlive]');
+  if (!btns.length) return;
+  let s = {};
+  try { s = (await cached('/api/admin/settings')).settings; } catch { /* 기본값 */ }
+  btns.forEach((b) => {
+    if (s.live_view === false) { b.disabled = true; b.title = '기능 설정에서 실시간 보기가 꺼져 있습니다.'; return; }
+    b.onclick = () => window.openLiveView({ id: b.dataset.dlive, name: b.dataset.dname, micAllowed: !!s.live_mic });
+  });
+}
 
 // 관리자 원격 출입문 열기: 명령을 넣고, 보드가 가져갔는지 1초마다 확인한다 (20초 안에 안 가져가면 서버가 취소)
 function bindRemoteOpen() {
@@ -1655,13 +1669,16 @@ A.rooms = async () => {
 };
 
 A.devices = async () => {
-  const [{ devices, server_time }, { rooms: rs }] = await Promise.all([cached('/api/admin/devices'), cached('/api/rooms?all=1')]);
+  const [{ devices, server_time }, { rooms: rs }, { sessions: lives }] = await Promise.all([cached('/api/admin/devices'), cached('/api/rooms?all=1'), cached('/api/admin/live-sessions').catch(() => ({ sessions: [] }))]);
+  const liveRows = lives.map((l) => `<tr><td>${fDT(l.started_at)}</td><td>${esc(l.device_name)}</td><td>${esc(l.admin_name)}</td>
+    <td class="small muted">${l.ended_at ? Math.max(1, Math.round((l.ended_at - l.started_at) / 60000)) + '분' : '연결 중'}</td>
+    <td class="small">${[l.mic_used ? '소리 듣기' : '', l.talk_used ? '말하기' : ''].filter(Boolean).join(', ') || '영상만'}</td></tr>`).join('');
   const rows = devices.map((d) => {
     const online = d.active && d.last_seen_at && server_time - d.last_seen_at < 180000;
     return `<tr><td><b>${esc(d.name)}</b></td><td>${esc(d.room_name)}</td>
       <td>${d.active ? `<span class="pill ${online ? 'on' : 'off'}">${online ? '연결됨' : '연결 끊김'}</span>` : '<span class="pill denied">키 폐기</span>'}</td>
       <td class="small muted">${d.last_seen_at ? ago(d.last_seen_at) : '연결된 적 없음'}</td>
-      <td class="actions">${d.active ? `<button class="btn sm" type="button" data-dopen="${d.id}" data-dname="${esc(d.name)}">원격 열기</button>` : ''}<button class="btn secondary sm" type="button" data-dedit="${d.id}">정보 수정</button>${d.active ? `<button class="btn secondary sm" type="button" data-drevoke="${d.id}">키 폐기</button>` : ''}</td></tr>`;
+      <td class="actions">${d.active ? `<button class="btn sm" type="button" data-dopen="${d.id}" data-dname="${esc(d.name)}">원격 열기</button><button class="btn secondary sm" type="button" data-dlive="${d.id}" data-dname="${esc(d.name)}">실시간 보기</button>` : ''}<button class="btn secondary sm" type="button" data-dedit="${d.id}">정보 수정</button>${d.active ? `<button class="btn secondary sm" type="button" data-drevoke="${d.id}">키 폐기</button>` : ''}</td></tr>`;
   }).join('');
   $('#adminMain').innerHTML = head('출입 단말', '출입문 보드(JC1060P470)를 등록하고 단말 키를 발급합니다. 보드는 1분마다 신호를 보내고, 원격 열기 요청은 바로 받습니다.') + `
     <div class="panel table-wrap" style="margin-bottom:22px">${rows ? `<table class="resp"><thead><tr><th>이름</th><th>실습실</th><th>상태</th><th>마지막 신호</th><th></th></tr></thead><tbody>${rows}</tbody></table>` : '<div class="empty">등록된 단말이 없습니다.</div>'}</div>
@@ -1673,7 +1690,10 @@ A.devices = async () => {
       </div>
       <div><button class="btn" type="submit">등록하고 키 받기</button></div>
       <div id="devKey" hidden></div>
-    </form>`;
+    </form>
+    <h3 class="group-title" style="margin-top:26px">실시간 보기 기록</h3>
+    <p class="small muted" style="margin-bottom:8px">영상과 음성은 저장하지 않고, 누가 언제 연결했는지만 남깁니다 (최근 20건).</p>
+    <div class="panel table-wrap">${liveRows ? `<table class="resp"><thead><tr><th>시작</th><th>단말</th><th>관리자</th><th>시간</th><th>사용</th></tr></thead><tbody>${liveRows}</tbody></table>` : '<div class="empty">아직 기록이 없습니다.</div>'}</div>`;
   $('#devForm').onsubmit = async (e) => {
     e.preventDefault();
     try {
@@ -1692,6 +1712,7 @@ A.devices = async () => {
     ], (body) => api(`/api/admin/devices/${d.id}`, { method: 'PATCH', body }));
   });
   bindRemoteOpen();
+  bindLiveView();
   $$('[data-drevoke]').forEach((b) => b.onclick = async () => {
     if (!(await ask({ title: '단말 키를 폐기할까요?', text: '이 보드는 더 이상 서버에 접속할 수 없습니다. 다시 쓰려면 새로 등록해 키를 넣어야 합니다.', ok: '키 폐기', danger: true }))) return;
     if (await act(() => api(`/api/admin/devices/${b.dataset.drevoke}/revoke`, { method: 'POST' }), '폐기했습니다.')) reload();
@@ -1753,6 +1774,11 @@ A.features = async () => {
       ${sw('master_qr_enabled', '마스터 QR 사용', '끄면 발급된 마스터 QR로도 문이 열리지 않습니다.')}
       ${num('door_open_ms', '문 열림 시간', '출입 허용 시 릴레이를 켜 두는 시간', 'ms', 1000, 15000, 500)}
     </div>
+    <h3 class="group-title">실시간 보기</h3>
+    <div class="panel">
+      ${sw('live_view', '단말 카메라 실시간 보기', '관리자가 출입 단말의 카메라 화면을 보고 단말 스피커로 말할 수 있습니다. 연결 중에는 단말 화면에 표시가 나오고, 영상은 저장하지 않습니다.')}
+      ${sw('live_mic', '단말 소리 듣기', '실시간 보기 중 단말 마이크 소리를 들을 수 있습니다. 녹음·저장하지 않습니다. 켜기 전에 출입문에 안내문을 붙여 주세요.', 'danger')}
+    </div>
     <h3 class="group-title">신청과 가입</h3>
     <div class="panel">
       ${sw('reservations_open', '이용 신청 받기', '끄면 학생이 새 이용 신청을 할 수 없습니다. 이미 승인된 예약은 그대로입니다.')}
@@ -1781,6 +1807,7 @@ A.features = async () => {
     catch (e) { toast(e.message); return false; }
   };
   $$('input[type=checkbox][data-s]').forEach((i) => i.onchange = async () => {
+    if (i.dataset.s === 'live_mic' && i.checked && !(await ask({ title: '단말 소리 듣기를 켤까요?', text: '관리자가 실시간 보기 중 단말 주변 소리를 들을 수 있게 됩니다. 소리는 저장되지 않지만, 출입문에 "관리자가 영상과 음성으로 응대할 수 있음"을 알리는 안내문을 먼저 붙여 주세요.', ok: '켜기' }))) { i.checked = false; return; }
     if (i.dataset.s === 'lockdown' && i.checked && !(await ask({ title: '긴급 잠금을 켤까요?', text: '모든 학생 QR이 즉시 거부됩니다. 마스터 QR만 문을 열 수 있습니다.', ok: '잠금 켜기', danger: true }))) { i.checked = false; return; }
     if (!(await save({ [i.dataset.s]: i.checked }))) i.checked = !i.checked;
   });

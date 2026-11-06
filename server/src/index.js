@@ -2,6 +2,9 @@
 // 정적 화면(public/)은 Workers Static Assets가 서빙하고, /api/* 만 이 코드가 처리한다.
 import { hashPassword, hmac, hmacHex, randomHex, safeEqual, sha256Hex } from './crypto.js';
 import { attachManualCode, resolveManualCode, releaseManualAttempt } from './manual-codes.js';
+import { LiveRelay } from './live.js';
+
+export { LiveRelay };
 
 // QR 토큰의 숫자 칸(t)은 발급 시각을 10초 단위로 센 값. 발급 후 5분간 유효하고, 한 번 쓰면 끝.
 // 화면은 5초마다 같은 t로 다시 물어보고, 쓰였거나 만료가 가까우면 새 t로 바꾼다.
@@ -20,6 +23,7 @@ const PRIVACY_CONSENT_VERSION = '2026-11-06'; // 가입 화면의 개인정보 �
 const REMOTE_OPEN_TTL_MS = 20_000; // 원격 열기 명령은 이 안에 보드가 가져가야 실행된다
 const COMMAND_WAIT_MAX_MS = 25_000; // 보드 롱 폴링 최대 대기 (펌웨어 HTTP 제한 시간보다 짧게)
 const COMMAND_CHECK_MS = 1_000; // 롱 폴링 중 새 명령 확인 주기
+const LIVE_CONNECT_WAIT_MS = 60_000; // 실시간 보기 요청 뒤 단말이 WebSocket으로 붙을 수 있는 시간
 // 가입 정보만 있는 계정에 한해 학번을 해제한다. 신청·승인·출입·마스터 발급 이력은 보존한다.
 const USER_NO_HISTORY = `NOT EXISTS (SELECT 1 FROM reservations WHERE user_id = users.id OR decided_by = users.id)
   AND NOT EXISTS (SELECT 1 FROM access_logs WHERE user_id = users.id)
@@ -167,6 +171,8 @@ const SETTING_DEFS = {
   print_close_hour: { type: 'int', min: 1, max: 24, def: () => 16 },
   rules: { type: 'str', max: 2000, def: () => DEFAULT_RULES },
   printer_down: { type: 'json', def: () => [] }, // 점검 중인 장비 id 목록
+  live_view: { type: 'bool', def: () => true }, // 관리자 단말 카메라 실시간 보기와 말하기
+  live_mic: { type: 'bool', def: () => false }, // 단말 마이크 실시간 듣기 (저장하지 않음). 안내문을 붙인 뒤 켠다.
 };
 
 async function getSettings(env) {
@@ -365,6 +371,7 @@ async function route(req, env, url) {
     return deviceSigned(req, env, async (_req, _env, dev) => json({ ok: true, device: dev.name, server_time: Date.now() }));
   }
   if (path === '/api/device/commands' && method === 'POST') return deviceSigned(req, env, deviceCommands);
+  if (path === '/api/device/live' && method === 'GET') return deviceLive(req, env);
 
   // ===== 데이터 버전 (웹 화면이 주기적으로 물어보고, 바뀌었을 때만 목록을 새로 불러옴) =====
   if (path === '/api/version' && method === 'GET') {
@@ -1000,11 +1007,22 @@ async function adminRoute(req, env, path, method, admin, url) {
     const s = await getSettings(env);
     // 아직 보드가 가져가지 않은 명령이 있으면 겹쳐 쌓지 않고 그 명령을 돌려준다
     const waiting = await env.DB.prepare(`SELECT id, expires_at FROM door_commands
-      WHERE device_id = ? AND delivered_at IS NULL AND expires_at > ? ORDER BY id DESC LIMIT 1`).bind(dev.id, now).first();
+      WHERE device_id = ? AND kind = 'open' AND delivered_at IS NULL AND expires_at > ? ORDER BY id DESC LIMIT 1`).bind(dev.id, now).first();
     if (waiting) return json({ ok: true, id: waiting.id, expires_at: waiting.expires_at });
     const r = await env.DB.prepare(`INSERT INTO door_commands (device_id, admin_id, open_ms, created_at, expires_at)
       VALUES (?, ?, ?, ?, ?)`).bind(dev.id, admin.id, s.door_open_ms, now, now + REMOTE_OPEN_TTL_MS).run();
     return json({ ok: true, id: r.meta.last_row_id, expires_at: now + REMOTE_OPEN_TTL_MS });
+  }
+  // 실시간 보기: 관리자 브라우저가 WebSocket으로 붙는다. 단말에는 롱 폴링으로 'live' 명령을 보내 같은 중계 객체로 붙게 한다.
+  if ((m = path.match(/^\/api\/admin\/devices\/(\d+)\/live$/)) && method === 'GET') {
+    return adminLive(req, env, admin, id(m[1]));
+  }
+  if (path === '/api/admin/live-sessions' && method === 'GET') {
+    const { results } = await env.DB.prepare(`SELECT l.id, l.started_at, l.ended_at, l.mic_used, l.talk_used,
+        d.name AS device_name, u.name AS admin_name
+      FROM live_sessions l JOIN devices d ON d.id = l.device_id JOIN users u ON u.id = l.admin_id
+      ORDER BY l.id DESC LIMIT 20`).all();
+    return json({ sessions: results });
   }
   if ((m = path.match(/^\/api\/admin\/door-commands\/(\d+)$/)) && method === 'GET') {
     const c = await env.DB.prepare('SELECT * FROM door_commands WHERE id = ?').bind(id(m[1])).first();
@@ -1147,7 +1165,12 @@ async function deviceCommands(req, env, dev) {
     const c = await env.DB.prepare(`UPDATE door_commands SET delivered_at = ?
       WHERE id = (SELECT id FROM door_commands WHERE device_id = ? AND delivered_at IS NULL AND expires_at > ? ORDER BY id LIMIT 1)
         AND delivered_at IS NULL
-      RETURNING id, admin_id, open_ms`).bind(now, dev.id, now).first();
+      RETURNING id, admin_id, open_ms, kind`).bind(now, dev.id, now).first();
+    if (c && c.kind === 'live') {
+      // 관리자가 실시간 보기를 열었다: 보드는 /api/device/live 로 WebSocket을 연다
+      const s = await getSettings(env);
+      return json({ ok: true, command: 'live', id: c.id, mic: s.live_mic });
+    }
     if (c) {
       await env.DB.prepare(
         'INSERT INTO access_logs (device_id, user_id, result, reason, at, room_id) VALUES (?, ?, ?, ?, ?, ?)',
@@ -1158,6 +1181,54 @@ async function deviceCommands(req, env, dev) {
     if (now + COMMAND_CHECK_MS > until) return json({ ok: true, command: null, server_time: now });
     await new Promise((r) => setTimeout(r, COMMAND_CHECK_MS));
   }
+}
+
+// ---------- 실시간 보기 (영상·음성 중계) ----------
+// 중계는 단말마다 하나인 Durable Object(LiveRelay)가 한다. 영상과 음성은 저장하지 않는다.
+const liveStub = (env, deviceId) => env.LIVE.get(env.LIVE.idFromName(`device:${deviceId}`));
+
+function forwardLive(req, env, deviceId, headers) {
+  if (!env.LIVE) throw new HttpError(501, '실시간 보기가 설정되지 않은 서버입니다.');
+  if ((req.headers.get('upgrade') || '').toLowerCase() !== 'websocket') throw new HttpError(426, 'WebSocket 연결이 필요합니다.');
+  const h = new Headers(req.headers);
+  for (const [k, v] of Object.entries(headers)) h.set(k, v);
+  return liveStub(env, deviceId).fetch(new Request(req.url, { method: 'GET', headers: h }));
+}
+
+async function adminLive(req, env, admin, deviceId) {
+  // 다른 사이트가 관리자 쿠키로 WebSocket을 여는 것(CSWSH)을 막는다
+  const origin = req.headers.get('origin');
+  if (origin && origin !== new URL(req.url).origin) throw new HttpError(403, '허용되지 않은 출처입니다.');
+  const s = await getSettings(env);
+  if (!s.live_view) throw new HttpError(403, '기능 설정에서 실시간 보기가 꺼져 있습니다.');
+  const dev = await env.DB.prepare('SELECT id, active FROM devices WHERE id = ?').bind(deviceId).first();
+  if (!dev) throw new HttpError(404, '단말을 찾을 수 없습니다.');
+  if (!dev.active) throw new HttpError(409, '키가 폐기된 단말입니다.');
+  const now = Date.now();
+  const r = await env.DB.prepare('INSERT INTO live_sessions (device_id, admin_id, started_at) VALUES (?, ?, ?)')
+    .bind(dev.id, admin.id, now).run();
+  const waiting = await env.DB.prepare(`SELECT id FROM door_commands
+    WHERE device_id = ? AND kind = 'live' AND delivered_at IS NULL AND expires_at > ? LIMIT 1`).bind(dev.id, now).first();
+  if (!waiting) {
+    await env.DB.prepare(`INSERT INTO door_commands (device_id, admin_id, open_ms, created_at, expires_at, kind)
+      VALUES (?, ?, 0, ?, ?, 'live')`).bind(dev.id, admin.id, now, now + REMOTE_OPEN_TTL_MS).run();
+  }
+  return forwardLive(req, env, dev.id, {
+    'x-live-role': 'viewer',
+    'x-live-session': String(r.meta.last_row_id),
+    'x-live-mic': s.live_mic ? '1' : '0',
+  });
+}
+
+// 보드: 'live' 명령을 받은 뒤 Authorization: Bearer <단말 키>로 WebSocket을 연다 (wss라 TLS 인증서로 서버를 확인)
+async function deviceLive(req, env) {
+  const { dev } = await deviceAuth(req, env);
+  const s = await getSettings(env);
+  if (!s.live_view) throw new HttpError(403, 'live view disabled');
+  const recent = await env.DB.prepare('SELECT id FROM live_sessions WHERE device_id = ? AND (ended_at IS NULL OR ended_at > ?) LIMIT 1')
+    .bind(dev.id, Date.now() - LIVE_CONNECT_WAIT_MS).first();
+  if (!recent) throw new HttpError(409, 'no live session');
+  return forwardLive(req, env, dev.id, { 'x-live-role': 'device' });
 }
 
 // 응답 형식은 펌웨어(server.c)가 읽는 그대로 유지: {ok, reason} / {ok, name, open_ms, end_at}

@@ -533,6 +533,18 @@ void ui_result(bool granted, const char *text)
     display_unlock();
 }
 
+void ui_remote_open(void)
+{
+    if (!s_result || !display_lock(LOCK_WAIT_MS)) return;
+    set_hidden(s_result_mark, false);
+    lv_obj_add_flag(s_spinner, LV_OBJ_FLAG_HIDDEN);
+    overlay_show(UI_GREEN, UI_ICON_CHECK, "출입문 열림", "관리자가 문을 열었습니다");
+    lv_timer_set_repeat_count(s_result_timer, 1);
+    lv_timer_reset(s_result_timer);
+    lv_timer_resume(s_result_timer);
+    display_unlock();
+}
+
 void ui_camera_failed(void)
 {
     if (!s_hint || !display_lock(LOCK_WAIT_MS)) return;

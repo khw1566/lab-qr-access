@@ -46,6 +46,14 @@
 - **인쇄용 고정**: 비상용. 유효 기간 최대 1년. "재발급"하면 nonce가 바뀌어 예전 인쇄본이 즉시 무효가 되고, "폐기"하면 영구히 막힙니다.
 - 실습실을 지정하거나 모든 실습실용으로 발급할 수 있고, 사용 횟수와 마지막 사용 시각이 기록됩니다. 긴급 잠금 중에도 마스터 QR은 통과합니다.
 
+## 원격 출입문 열기
+
+- 관리자 화면의 **현황** 또는 **출입 단말**에서 단말 옆 "원격 열기"를 누르면, 보드가 릴레이를 켜고 화면에 "출입문 열림 / 관리자가 문을 열었습니다"를 띄우며 승인 음성을 냅니다.
+- 보드는 `POST /api/device/commands`로 명령을 기다리는 요청(롱 폴링, 20초)을 계속 걸어 둡니다. 관리자가 누르면 보통 1~2초 안에 열립니다.
+- 명령은 20초 안에 보드가 가져가지 않으면 취소됩니다. 연결이 끊긴 보드가 나중에 갑자기 문을 여는 일은 없습니다. 관리자 화면에 "문을 열었습니다" 또는 "단말이 응답하지 않아 취소했습니다"가 나옵니다.
+- 응답은 다른 단말 API처럼 nonce 서명(`X-Lab-Sig`)을 확인하므로, 개방형 Wi-Fi에서 가짜 '열어라' 응답을 꾸며도 열리지 않습니다. 명령은 한 번만 실행됩니다.
+- 출입 기록에 누른 관리자 이름과 "관리자 원격 열기"로 남습니다. 마스터 QR처럼 관리자 권한이라 긴급 잠금 중에도 열 수 있습니다.
+
 ## 보안 설계 요점
 
 - QR 내용은 `LA1.<예약ID>.<발급 시각(10초 단위)>.<HMAC 서명 16자>` 입니다. 서버 비밀키(`QR_SECRET`)로 서명하므로 위조할 수 없습니다.
@@ -70,6 +78,7 @@ firmware/                     ESP-IDF 5.5 프로젝트
   main/main.c                 QR 인식 → 서버 검증 → 문 열기
   main/camera_qr.c            esp_video(V4L2)로 카메라 캡처 + quirc 디코딩
   main/server.c               HTTPS 통신
+  main/remote.c               관리자 원격 열기 명령 대기 (롱 폴링)
   main/door.c                 릴레이/부저 제어
   main/wifi.c                 Wi-Fi (C6 경유 esp_wifi_remote)
   main/Kconfig.projbuild      menuconfig 설정 (Wi-Fi, 서버 URL, 단말 키, 릴레이 핀)
@@ -86,11 +95,12 @@ firmware/                     ESP-IDF 5.5 프로젝트
 | `GET /api/admin/users`, `PATCH .../:id`, `POST .../:id/activate·block` | 사용자 정보 수정, 가입 승인 |
 | `POST /api/admin/rooms`, `PATCH /api/admin/rooms/:id` | 실습실 추가, 운영 여부와 자동 승인 규칙 |
 | `GET/POST /api/admin/devices`, `PATCH .../:id`, `POST .../:id/revoke` | 단말 등록(키 발급), 이름·소속 실습실 수정, 키 폐기 |
+| `POST /api/admin/devices/:id/open`, `GET /api/admin/door-commands/:id` | 원격 출입문 열기, 전달 여부 확인 |
 | `GET /api/admin/logs` | 출입 기록: `from`, `to`(한국 날짜, 종료일 포함), `result`, `room_id`, `device_id`, `q`, `order=asc·desc`, `page` (50건씩) |
 | `GET/PATCH /api/admin/settings`, `GET /api/admin/overview` | 기능 설정, 현황 |
 | `GET/POST /api/admin/masters`, `POST .../:id/revoke·reissue`, `GET .../:id/qr` | 마스터 QR |
 | `GET /api/config` | 로그인 화면용 공개 설정 |
-| `POST /api/device/verify`, `/api/device/ping` | 보드 전용 |
+| `POST /api/device/verify`, `/api/device/ping`, `/api/device/commands` | 보드 전용 (`commands`는 원격 열기 롱 폴링) |
 
 ## 서버 배포
 
@@ -126,10 +136,11 @@ npm run deploy                             # lab.audreaming.com 도메인과 인
 |---|---|
 | VCC (DC+) | 5V |
 | GND (DC-) | GND |
-| IN | GPIO32 (menuconfig에서 변경 가능) |
+| IN | GPIO27 (menuconfig에서 변경 가능) |
 
 - 트리거 점퍼는 **High**로 두고 menuconfig의 "Relay is active-high"를 켭니다. Low 트리거로 쓰면 그 옵션을 끕니다.
-- 헤더에서 다른 기능과 겹치지 않는 GPIO: 1, 2, 3, 4, 20, 32, 33, 45, 46, 47
+- 기본 릴레이 핀은 GPIO27입니다. 예전에 만든 `firmware/sdkconfig`가 있으면 거기에 저장된 값(32)이 그대로 쓰이므로 menuconfig에서 27로 바꾸거나 `CONFIG_LAB_RELAY_GPIO=27`로 고칩니다.
+- 헤더에서 다른 기능과 겹치지 않는 GPIO: 1, 2, 3, 4, 20, 27, 32, 33, 45, 46, 47
 - 도어락(12V 전기정/EM락 등)은 릴레이의 COM/NO(또는 NC) 접점으로 별도 전원과 연결합니다. 도어락 전원을 보드 5V에서 끌어오지 마세요.
 
 **카메라:** 내장 2MP MIPI 카메라. SCCB는 터치와 같은 I2C 버스(GPIO7/8)를 씁니다. 센서 모델이 공개되지 않아 SC2336, SC202CS, OV2710, GC2145를 자동 감지하게 해 두었습니다.

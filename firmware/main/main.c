@@ -157,6 +157,7 @@ void app_main(void)
     if (err != ESP_OK) ESP_LOGE(TAG, "음성 안내 사용 불가: %s", esp_err_to_name(err));
     wifi_start();
     xTaskCreate(ping_task, "ping", 10240, NULL, 3, NULL);
+    remote_start();
     if (s_verify_queue) xTaskCreate(verify_task, "verify", 10240, NULL, 4, NULL);
     else ESP_LOGE(TAG, "출입 확인 큐 메모리 부족");
     err = camera_qr_start(on_qr);

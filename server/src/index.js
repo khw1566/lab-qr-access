@@ -15,6 +15,8 @@ const SESSION_DAYS = 14;
 const KST_OFFSET_MS = 9 * 3600_000;
 const SPECIAL_DURATION_MS = 30 * 60_000;
 const SPECIAL_ACTIVATION_MS = 24 * 3600_000;
+const GRANT_MAX_DAYS = 31; // 관리자 출입권한 부여 한 번에 만들 수 있는 최대 일수
+const PRIVACY_CONSENT_VERSION = '2026-11-06'; // 가입 화면의 개인정보 수집·이용 동의 안내문 버전. 안내문을 고치면 함께 바꾼다.
 const REMOTE_OPEN_TTL_MS = 20_000; // 원격 열기 명령은 이 안에 보드가 가져가야 실행된다
 const COMMAND_WAIT_MAX_MS = 25_000; // 보드 롱 폴링 최대 대기 (펌웨어 HTTP 제한 시간보다 짧게)
 const COMMAND_CHECK_MS = 1_000; // 롱 폴링 중 새 명령 확인 주기
@@ -229,7 +231,7 @@ function publicInfo(s) {
 
 // 신청 목록에서는 큰 서명 이미지를 빼고 보낸다
 const RES_COLS = `r.id, r.user_id, r.room_id, r.start_at, r.end_at, r.purpose, r.status, r.decided_by, r.decided_at,
-  r.reject_reason, r.created_at, r.printer_type, r.advisor_name, r.phone, r.department, (r.advisor_sig IS NOT NULL) AS has_sig`;
+  r.reject_reason, r.created_at, r.printer_type, r.advisor_name, r.phone, r.department, r.granted_by, (r.advisor_sig IS NOT NULL) AS has_sig`;
 
 const kstHour = (ms) => new Date(ms + KST_OFFSET_MS).getUTCHours() + new Date(ms + KST_OFFSET_MS).getUTCMinutes() / 60;
 const kstDay = (ms) => new Date(ms + KST_OFFSET_MS).toISOString().slice(0, 10);
@@ -378,7 +380,7 @@ async function route(req, env, url) {
 
   // ===== 인증 =====
   if (path === '/api/auth/register' && method === 'POST') {
-    const { student_no, name, password, setup_code } = await body(req);
+    const { student_no, name, password, setup_code, privacy_consent } = await body(req);
     const s = await getSettings(env);
     // 첫 관리자 만들기: 비밀값 ADMIN_SETUP_CODE를 가입 화면의 "관리자 코드"에 넣으면 바로 관리자가 된다
     const isAdmin = !!(env.ADMIN_SETUP_CODE && setup_code && safeEqual(String(setup_code), env.ADMIN_SETUP_CODE));
@@ -390,14 +392,17 @@ async function route(req, env, url) {
     if (!/^[0-9A-Za-z]{4,20}$/.test(student_no || '')) throw new HttpError(400, '학번은 영문/숫자 4~20자입니다.');
     if (!name || String(name).trim().length > 30) throw new HttpError(400, '이름을 확인해 주세요.');
     if (!password || password.length < 8) throw new HttpError(400, '비밀번호는 8자 이상이어야 합니다.');
-    const salt = randomHex(16);
+    // 개인정보 수집·이용 동의는 필수다. 화면 체크를 건너뛴 요청도 여기서 막는다.
+    if (privacy_consent !== true) throw new HttpError(400, '개인정보 수집·이용에 동의해야 가입할 수 있습니다.');
+    const salt = randomHex(16), now = Date.now();
     const status = isAdmin || !s.require_user_approval ? 'active' : 'pending';
     try {
       await env.DB.prepare(
-        'INSERT INTO users (student_no, name, pw_hash, pw_salt, role, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        `INSERT INTO users (student_no, name, pw_hash, pw_salt, role, status, created_at, privacy_consent_at, privacy_consent_version)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
         .bind(student_no, String(name).trim(), await hashPassword(password, salt), salt, isAdmin ? 'admin' : 'student',
-          status, Date.now())
+          status, now, now, PRIVACY_CONSENT_VERSION)
         .run();
     } catch (e) {
       if (/UNIQUE constraint failed.*student_no/i.test(String(e))) throw new HttpError(409, '이미 가입된 학번입니다.');
@@ -748,13 +753,57 @@ async function adminRoute(req, env, path, method, admin, url) {
     const { total } = await env.DB.prepare(`SELECT COUNT(*) AS total FROM users ${filter}`).bind(...vals).first();
     const page_size = 50, pages = Math.max(1, Math.ceil(total / page_size)), page = Math.min(Number(rawPage), pages);
     const { results } = await env.DB.prepare(
-      `SELECT id, student_no, name, phone, department, role, status, created_at,
+      `SELECT id, student_no, name, phone, department, role, status, created_at, privacy_consent_at,
        (role = 'student' AND status = 'blocked' AND ${USER_NO_HISTORY}) AS can_release
        FROM users ${filter} ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?`,
     )
       .bind(...vals, page_size, (page - 1) * page_size)
       .all();
     return json({ users: results, total, page, pages, page_size });
+  }
+
+  // 관리자 출입권한 부여: 학생이 직접 신청·승인받는 절차를 관리자가 대신 처리한다.
+  // 기간 안의 날마다 같은 시간대의 승인된 이용 건을 만든다. 학생은 평소처럼 출입증 탭에서 QR을 연다.
+  if ((m = path.match(/^\/api\/admin\/users\/(\d+)\/grant$/)) && method === 'POST') {
+    const b = await body(req);
+    const target = await env.DB.prepare('SELECT id, status FROM users WHERE id = ?').bind(id(m[1])).first();
+    if (!target) throw new HttpError(404, '사용자를 찾을 수 없습니다.');
+    if (target.status !== 'active') throw new HttpError(409, '사용 중인 계정에만 출입권한을 줄 수 있습니다.');
+    const room = await env.DB.prepare('SELECT id FROM rooms WHERE id = ? AND enabled = 1').bind(id(b.room_id)).first();
+    if (!room) throw new HttpError(404, '운영 중인 실습실을 골라 주세요.');
+    const dayRe = /^(\d{4})-(\d{2})-(\d{2})$/, timeRe = /^(\d{2}):(\d{2})$/;
+    const from = String(b.from || '').match(dayRe), to = String(b.to || '').match(dayRe);
+    if (!from || !to) throw new HttpError(400, '기간을 확인해 주세요.');
+    const st = String(b.start_time || '').match(timeRe), et = String(b.end_time || '').match(timeRe);
+    const startMin = st ? +st[1] * 60 + +st[2] : NaN, endMin = et ? +et[1] * 60 + +et[2] : NaN;
+    if (!(startMin >= 0 && startMin < 1440 && endMin > startMin && endMin <= 1440 && +st[2] < 60 && +et[2] < 60))
+      throw new HttpError(400, '출입 시간을 확인해 주세요. 끝 시각이 시작 시각보다 늦어야 합니다.');
+    const fromMs = Date.UTC(+from[1], +from[2] - 1, +from[3]), toMs = Date.UTC(+to[1], +to[2] - 1, +to[3]);
+    if (!Number.isFinite(fromMs) || !Number.isFinite(toMs) || toMs < fromMs) throw new HttpError(400, '끝 날짜가 시작 날짜보다 빠릅니다.');
+    const days = (toMs - fromMs) / 86400_000 + 1;
+    if (days > GRANT_MAX_DAYS) throw new HttpError(400, `한 번에 ${GRANT_MAX_DAYS}일까지 부여할 수 있습니다.`);
+    const purpose = String(b.purpose || '').trim().slice(0, 200) || '관리자 출입권한 부여';
+    const skipClosed = b.skip_closed !== false;
+    const closed = closedDays(await getSettings(env));
+    const { results: existing } = await env.DB.prepare(
+      `SELECT start_at, end_at FROM reservations WHERE user_id = ? AND status IN ('pending','approved') AND end_at > ? AND start_at < ?`,
+    ).bind(target.id, fromMs - KST_OFFSET_MS, toMs + 86400_000 - KST_OFFSET_MS).all();
+    const stmts = [], skipped = [];
+    for (let i = 0; i < days; i++) {
+      const midnight = fromMs + i * 86400_000 - KST_OFFSET_MS; // 그날 0시 (KST)
+      const start = midnight + startMin * 60000, end = midnight + endMin * 60000, day = kstDay(start);
+      const wd = new Date(start + KST_OFFSET_MS).getUTCDay();
+      if (skipClosed && (wd === 0 || wd === 6 || closed[day])) { skipped.push({ day, why: closed[day] || '주말' }); continue; }
+      if (end <= now) { skipped.push({ day, why: '지난 시간' }); continue; }
+      if (existing.some((r) => r.start_at < end && r.end_at > start)) { skipped.push({ day, why: '이미 신청·승인된 시간과 겹침' }); continue; }
+      stmts.push(env.DB.prepare(
+        `INSERT INTO reservations (user_id, room_id, start_at, end_at, purpose, status, decided_by, decided_at, created_at, granted_by)
+         VALUES (?, ?, ?, ?, ?, 'approved', ?, ?, ?, ?)`,
+      ).bind(target.id, room.id, start, end, purpose, admin.id, now, now, admin.id));
+    }
+    if (!stmts.length) throw new HttpError(409, '만들 수 있는 날이 없습니다. 기간과 주말·휴일 제외 설정을 확인해 주세요.');
+    await env.DB.batch(stmts);
+    return json({ ok: true, created: stmts.length, skipped });
   }
 
   if ((m = path.match(/^\/api\/admin\/users\/(\d+)\/password$/)) && method === 'POST') {

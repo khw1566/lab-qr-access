@@ -107,7 +107,7 @@ test('existing log room is backfilled on migration and browser script parses', (
 test('rejecting a pending signup releases the student number and creates a new identity on signup', async () => {
   const {db,request} = await fixture();
   db.exec("UPDATE users SET status='pending' WHERE id=2; INSERT INTO settings(key,value) VALUES('require_user_approval','1')");
-  const signup={student_no:'20260001',name:'올바른 이름',password:'new-password-123'};
+  const signup={student_no:'20260001',name:'올바른 이름',password:'new-password-123',privacy_consent:true};
   assert.equal((await request('/api/auth/register',{method:'POST',body:signup,uid:null})).status,409);
   assert.equal((await request('/api/admin/users/2/reject',{method:'POST',uid:null})).status,401);
   assert.equal((await request('/api/admin/users/2/reject',{method:'POST'})).released,true);
@@ -126,7 +126,7 @@ test('legacy pending block requests reject signup; legacy blocked entries requir
   assert.equal((await request('/api/admin/users/2/block',{method:'POST'})).released,true);
   assert.equal(db.prepare('SELECT id FROM users WHERE id=2').get(),undefined);
   db.exec("INSERT INTO users(id,student_no,name,pw_hash,pw_salt,status,created_at) VALUES(3,'20260001','기존 반려','hash','salt','blocked',3)");
-  const signup={student_no:'20260001',name:'재가입',password:'new-password-123'};
+  const signup={student_no:'20260001',name:'재가입',password:'new-password-123',privacy_consent:true};
   assert.equal((await request('/api/auth/register',{method:'POST',body:signup,uid:null})).status,409);
   assert.equal((await request('/api/admin/users?status=blocked')).users[0].can_release,1);
   assert.equal((await request('/api/admin/users/3/release',{method:'POST',uid:null})).status,401);
@@ -398,7 +398,7 @@ test('signup rejection comment is shown only after password verification and nev
  assert.equal(wrong.status,401);assert.ok(!wrong.error.includes(reason));
  const login=await request('/api/auth/login',{uid:null,method:'POST',body:{student_no:'20260001',password:'signup-password'}});
  assert.equal(login.status,403);assert.ok(login.error.includes(reason));
- assert.equal((await request('/api/auth/register',{uid:null,method:'POST',body:{student_no:'20260001',name:'수정 가입',password:'new-password'}})).status,200);
+ assert.equal((await request('/api/auth/register',{uid:null,method:'POST',body:{student_no:'20260001',name:'수정 가입',password:'new-password',privacy_consent:true}})).status,200);
  assert.equal(db.prepare("SELECT * FROM signup_rejections WHERE student_no='20260001'").get(),undefined);
  db.close();
 });
@@ -475,5 +475,62 @@ test('idle remote-open polling does not refresh web screens, a delivered command
   const v1 = await ver();
   assert.equal((await poll()).command,'open');
   assert.notEqual(await ver(),v1);
+  db.close();
+});
+
+test('signup requires privacy consent and records when it was given', async () => {
+  const {db,request} = await fixture();
+  const signup={student_no:'20269999',name:'동의 확인',password:'consent-password'};
+  for (const privacy_consent of [undefined,false,'true',1]) {
+    const r=await request('/api/auth/register',{uid:null,method:'POST',body:{...signup,privacy_consent}});
+    assert.equal(r.status,400); assert.ok(r.error.includes('개인정보'));
+  }
+  assert.equal(db.prepare("SELECT id FROM users WHERE student_no='20269999'").get(),undefined);
+  const before=Date.now();
+  assert.equal((await request('/api/auth/register',{uid:null,method:'POST',body:{...signup,privacy_consent:true}})).status,200);
+  const u=db.prepare("SELECT privacy_consent_at,privacy_consent_version FROM users WHERE student_no='20269999'").get();
+  assert.ok(u.privacy_consent_at>=before); assert.ok(u.privacy_consent_version);
+  const listed=(await request('/api/admin/users?status=all')).users.find((x)=>x.student_no==='20269999');
+  assert.equal(listed.privacy_consent_at,u.privacy_consent_at);
+  db.close();
+});
+
+test('admin grants time-limited access on behalf of a user and the user can open QR', async () => {
+  const {db,request} = await fixture();
+  const kst=(ms)=>new Date(ms+9*3600_000).toISOString().slice(0,10);
+  const from=kst(Date.now()+86400_000), to=kst(Date.now()+10*86400_000);
+  const body={room_id:1,from,to,start_time:'00:00',end_time:'24:00',skip_closed:false,purpose:'졸업 작품'};
+  assert.equal((await request('/api/admin/users/2/grant',{method:'POST',body,uid:2})).status,403);
+  assert.equal((await request('/api/admin/users/2/grant',{method:'POST',body:{...body,end_time:'08:00',start_time:'09:00'}})).status,400);
+  assert.equal((await request('/api/admin/users/2/grant',{method:'POST',body:{...body,to:kst(Date.now()+60*86400_000)}})).status,400);
+  const r=await request('/api/admin/users/2/grant',{method:'POST',body});
+  assert.equal(r.status,200); assert.equal(r.created,10); assert.deepEqual(r.skipped,[]);
+  const rows=db.prepare("SELECT * FROM reservations WHERE user_id=2 ORDER BY start_at").all();
+  assert.equal(rows.length,10); assert.ok(rows.every((x)=>x.status==='approved'&&x.granted_by===1&&x.decided_by===1&&x.end_at-x.start_at===86400_000));
+  assert.equal(kst(rows[0].start_at),from);
+  // 같은 기간 다시 부여하면 겹쳐서 만들 날이 없다
+  assert.equal((await request('/api/admin/users/2/grant',{method:'POST',body})).status,409);
+  // 오늘 지금을 포함하는 부여 → 학생이 QR을 받을 수 있다
+  const today=kst(Date.now());
+  db.exec('DELETE FROM reservations');
+  const now=await request('/api/admin/users/2/grant',{method:'POST',body:{...body,from:today,to:today}});
+  assert.equal(now.created,1);
+  const res=(await request('/api/reservations',{uid:2})).reservations[0];
+  assert.equal(res.granted_by,1);
+  assert.equal((await request(`/api/reservations/${res.id}/qr`,{uid:2})).status,200);
+  // 정지된 계정에는 부여할 수 없다
+  db.exec("UPDATE users SET status='blocked' WHERE id=2");
+  assert.equal((await request('/api/admin/users/2/grant',{method:'POST',body})).status,409);
+  db.close();
+});
+
+test('grant skips weekends and holidays by default', async () => {
+  const {db,request} = await fixture();
+  const r=await request('/api/admin/users/2/grant',{method:'POST',body:{room_id:1,from:'2027-02-05',to:'2027-02-10',start_time:'09:00',end_time:'18:00'}});
+  // 2027-02-05 금, 06~09 설 연휴(토·일 포함), 10 수
+  assert.equal(r.status,200);
+  assert.deepEqual(r.skipped.map((x)=>x.day),['2027-02-06','2027-02-07','2027-02-08','2027-02-09']);
+  assert.equal(r.skipped[0].why,'설날 연휴');
+  assert.equal(r.created,2);
   db.close();
 });

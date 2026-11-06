@@ -107,7 +107,7 @@ test('existing log room is backfilled on migration and browser script parses', (
 test('rejecting a pending signup releases the student number and creates a new identity on signup', async () => {
   const {db,request} = await fixture();
   db.exec("UPDATE users SET status='pending' WHERE id=2; INSERT INTO settings(key,value) VALUES('require_user_approval','1')");
-  const signup={student_no:'20260001',name:'올바른 이름',password:'new-password-123'};
+  const signup={student_no:'20260001',name:'올바른 이름',password:'new-password-123',privacy_consent:true};
   assert.equal((await request('/api/auth/register',{method:'POST',body:signup,uid:null})).status,409);
   assert.equal((await request('/api/admin/users/2/reject',{method:'POST',uid:null})).status,401);
   assert.equal((await request('/api/admin/users/2/reject',{method:'POST'})).released,true);
@@ -126,7 +126,7 @@ test('legacy pending block requests reject signup; legacy blocked entries requir
   assert.equal((await request('/api/admin/users/2/block',{method:'POST'})).released,true);
   assert.equal(db.prepare('SELECT id FROM users WHERE id=2').get(),undefined);
   db.exec("INSERT INTO users(id,student_no,name,pw_hash,pw_salt,status,created_at) VALUES(3,'20260001','기존 반려','hash','salt','blocked',3)");
-  const signup={student_no:'20260001',name:'재가입',password:'new-password-123'};
+  const signup={student_no:'20260001',name:'재가입',password:'new-password-123',privacy_consent:true};
   assert.equal((await request('/api/auth/register',{method:'POST',body:signup,uid:null})).status,409);
   assert.equal((await request('/api/admin/users?status=blocked')).users[0].can_release,1);
   assert.equal((await request('/api/admin/users/3/release',{method:'POST',uid:null})).status,401);
@@ -398,7 +398,7 @@ test('signup rejection comment is shown only after password verification and nev
  assert.equal(wrong.status,401);assert.ok(!wrong.error.includes(reason));
  const login=await request('/api/auth/login',{uid:null,method:'POST',body:{student_no:'20260001',password:'signup-password'}});
  assert.equal(login.status,403);assert.ok(login.error.includes(reason));
- assert.equal((await request('/api/auth/register',{uid:null,method:'POST',body:{student_no:'20260001',name:'수정 가입',password:'new-password'}})).status,200);
+ assert.equal((await request('/api/auth/register',{uid:null,method:'POST',body:{student_no:'20260001',name:'수정 가입',password:'new-password',privacy_consent:true}})).status,200);
  assert.equal(db.prepare("SELECT * FROM signup_rejections WHERE student_no='20260001'").get(),undefined);
  db.close();
 });
@@ -475,5 +475,22 @@ test('idle remote-open polling does not refresh web screens, a delivered command
   const v1 = await ver();
   assert.equal((await poll()).command,'open');
   assert.notEqual(await ver(),v1);
+  db.close();
+});
+
+test('signup requires privacy consent and records when it was given', async () => {
+  const {db,request} = await fixture();
+  const signup={student_no:'20269999',name:'동의 확인',password:'consent-password'};
+  for (const privacy_consent of [undefined,false,'true',1]) {
+    const r=await request('/api/auth/register',{uid:null,method:'POST',body:{...signup,privacy_consent}});
+    assert.equal(r.status,400); assert.ok(r.error.includes('개인정보'));
+  }
+  assert.equal(db.prepare("SELECT id FROM users WHERE student_no='20269999'").get(),undefined);
+  const before=Date.now();
+  assert.equal((await request('/api/auth/register',{uid:null,method:'POST',body:{...signup,privacy_consent:true}})).status,200);
+  const u=db.prepare("SELECT privacy_consent_at,privacy_consent_version FROM users WHERE student_no='20269999'").get();
+  assert.ok(u.privacy_consent_at>=before); assert.ok(u.privacy_consent_version);
+  const listed=(await request('/api/admin/users?status=all')).users.find((x)=>x.student_no==='20269999');
+  assert.equal(listed.privacy_consent_at,u.privacy_consent_at);
   db.close();
 });

@@ -72,6 +72,16 @@ a.btn { text-decoration: none; }
 .btn.block { width: 100%; }
 
 .field { display: grid; gap: 6px; }
+.consent { border: 1px solid var(--line); border-radius: 10px; background: var(--sunken); padding: 12px 14px; display: grid; gap: 8px; }
+.consent .check { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; font-weight: 500; cursor: pointer; }
+.consent .check input { width: 18px; height: 18px; margin: 1px 0 0; flex: none; accent-color: var(--accent); }
+.consent .req { color: var(--bad); font-weight: 600; }
+.consent details summary { font-size: 13px; color: var(--muted); cursor: pointer; width: fit-content; }
+.consent .terms { margin-top: 8px; max-height: 260px; overflow: auto; font-size: 13px; line-height: 1.55; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+.consent .terms table { width: 100%; border-collapse: collapse; margin: 6px 0; }
+.consent .terms th, .consent .terms td { border: 1px solid var(--line); padding: 6px 8px; text-align: left; vertical-align: top; }
+.consent .terms th { width: 76px; background: var(--sunken); font-weight: 600; }
+.consent .terms p { margin: 6px 0; }
 .field > span { font-size: 13px; font-weight: 500; color: var(--muted); }
 .input, select.input, textarea.input {
   width: 100%; min-height: 46px; padding: 10px 12px; border-radius: var(--r);
@@ -467,6 +477,22 @@ dialog .row.end { justify-content: flex-end; }
     <div id="adminCodeWrap" hidden>
       <label class="field"><span>관리자 코드 (관리자 계정을 만들 때만)</span><input class="input mono" id="setupCode" autocomplete="off"></label>
     </div>
+    <div class="consent" id="consentWrap" hidden>
+      <label class="check"><input type="checkbox" id="privacyConsent"><span><span class="req">[필수]</span> 개인정보 수집·이용에 동의합니다.</span></label>
+      <details>
+        <summary>내용 보기</summary>
+        <div class="terms">
+          <p>실습실 출입 관리를 위해 아래와 같이 개인정보를 수집·이용합니다. 내용을 읽고 동의 여부를 결정해 주세요.</p>
+          <table>
+            <tr><th>수집 항목</th><td>(가입 시) 학번, 이름, 비밀번호(암호화하여 저장)<br>(이용 신청 시) 학부(과), 연락처, 지도교수 이름 및 서명<br>(이용 중 자동 생성) 이용 신청·승인 내역, 출입 일시와 출입문 기록</td></tr>
+            <tr><th>수집·이용 목적</th><td>본인 확인, 실습실 이용 신청 접수와 승인, 출입 QR 발급과 출입 통제, 출입 기록 관리 및 안전·장비 사고 발생 시 확인, 이용 관련 연락과 알림</td></tr>
+            <tr><th>보유·이용 기간</th><td>졸업·수료 등으로 이용이 끝나거나 가입 정보 삭제를 요청할 때까지 보유하며, 그 뒤 지체 없이 파기합니다. 단, 출입 기록은 안전 관리를 위해 기록일로부터 1년간 보관한 뒤 파기합니다.</td></tr>
+          </table>
+          <p><b>동의를 거부할 권리 및 불이익</b><br>개인정보 수집·이용에 대한 동의를 거부할 수 있습니다. 다만 위 정보는 출입 관리에 꼭 필요하므로, 동의하지 않으면 가입과 실습실 이용 신청, 출입 QR 발급을 할 수 없습니다.</p>
+          <p>수집한 정보는 위 목적 외로 이용하거나 제3자에게 제공하지 않습니다. 열람·정정·삭제 요청은 실습실 관리자에게 하시면 됩니다.</p>
+        </div>
+      </details>
+    </div>
     <button class="btn block" id="authBtn" type="submit">로그인</button>
     <button class="btn quiet sm" id="adminCodeToggle" type="button" hidden>관리자 계정 만들기</button>
     <p class="small muted" id="authHint" hidden>가입 후 관리자가 승인하면 로그인할 수 있습니다.</p>
@@ -805,7 +831,7 @@ function setAuthMode(mode) {
   authMode = mode;
   $$('[data-auth]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.auth === mode)));
   const reg = mode === 'register';
-  $('#nameWrap').hidden = !reg; $('#adminCodeToggle').hidden = !(reg && config && config.admin_setup_open);
+  $('#nameWrap').hidden = !reg; $('#consentWrap').hidden = !reg; $('#adminCodeToggle').hidden = !(reg && config && config.admin_setup_open);
   if (!reg) $('#adminCodeWrap').hidden = true;
   $('#authHint').hidden = !(reg && config.require_user_approval);
   $('#authBtn').textContent = reg ? '가입하기' : '로그인';
@@ -820,7 +846,9 @@ $('#authForm').onsubmit = async (e) => {
   try {
     if (authMode === 'register') {
       const setup_code = $('#adminCodeWrap').hidden ? undefined : $('#setupCode').value.trim() || undefined;
-      const r = await api('/api/auth/register', { method: 'POST', body: { student_no, name: $('#sname').value.trim(), password, setup_code } });
+      const privacy_consent = $('#privacyConsent').checked;
+      if (!privacy_consent) { toast('개인정보 수집·이용에 동의해야 가입할 수 있습니다.'); $('#privacyConsent').focus(); return; }
+      const r = await api('/api/auth/register', { method: 'POST', body: { student_no, name: $('#sname').value.trim(), password, setup_code, privacy_consent } });
       if (r.status === 'pending') { toast('가입 신청을 보냈습니다. 관리자 승인 후 로그인할 수 있습니다.'); setAuthMode('login'); return; }
     }
     await api('/api/auth/login', { method: 'POST', body: { student_no, password } });
@@ -1396,7 +1424,7 @@ A.users = async () => {
     if (u.can_release && !self) btns.push(`<button class="btn secondary sm" type="button" data-u="${u.id}" data-op="release">가입 정보 삭제</button>`);
     return `<tr><td><b>${esc(u.name)}</b>${self ? ' <span class="small muted">(나)</span>' : ''}</td><td class="mono">${esc(u.student_no)}</td>
       <td class="small">${esc(u.department || '-')}<div class="muted">${esc(u.phone || '-')}</div></td><td>${u.role === 'admin' ? '<span class="pill master">관리자</span>' : '<span class="small muted">학생</span>'}</td>
-      <td class="small">${({pending:"가입 대기",active:"사용 중",blocked:"정지"})[u.status]}<div class="muted">${fDate(u.created_at)} 가입</div></td><td class="actions">${btns.join('')}</td></tr>`;
+      <td class="small">${({pending:"가입 대기",active:"사용 중",blocked:"정지"})[u.status]}<div class="muted">${fDate(u.created_at)} 가입</div><div class="muted">${u.privacy_consent_at ? `개인정보 동의 ${fDate(u.privacy_consent_at)}` : '개인정보 동의 기록 없음'}</div></td><td class="actions">${btns.join('')}</td></tr>`;
   }).join('');
   $('#adminMain').innerHTML = head('사용자', '학번·이름으로 검색하고 계정 정보와 비밀번호를 관리합니다.', seg) +
     `<form class="panel stack" id="userSearchForm" style="padding:16px;margin-bottom:16px">

@@ -15,6 +15,7 @@ const SESSION_DAYS = 14;
 const KST_OFFSET_MS = 9 * 3600_000;
 const SPECIAL_DURATION_MS = 30 * 60_000;
 const SPECIAL_ACTIVATION_MS = 24 * 3600_000;
+const PRIVACY_CONSENT_VERSION = '2026-11-06'; // 가입 화면의 개인정보 수집·이용 동의 안내문 버전. 안내문을 고치면 함께 바꾼다.
 const REMOTE_OPEN_TTL_MS = 20_000; // 원격 열기 명령은 이 안에 보드가 가져가야 실행된다
 const COMMAND_WAIT_MAX_MS = 25_000; // 보드 롱 폴링 최대 대기 (펌웨어 HTTP 제한 시간보다 짧게)
 const COMMAND_CHECK_MS = 1_000; // 롱 폴링 중 새 명령 확인 주기
@@ -378,7 +379,7 @@ async function route(req, env, url) {
 
   // ===== 인증 =====
   if (path === '/api/auth/register' && method === 'POST') {
-    const { student_no, name, password, setup_code } = await body(req);
+    const { student_no, name, password, setup_code, privacy_consent } = await body(req);
     const s = await getSettings(env);
     // 첫 관리자 만들기: 비밀값 ADMIN_SETUP_CODE를 가입 화면의 "관리자 코드"에 넣으면 바로 관리자가 된다
     const isAdmin = !!(env.ADMIN_SETUP_CODE && setup_code && safeEqual(String(setup_code), env.ADMIN_SETUP_CODE));
@@ -390,14 +391,17 @@ async function route(req, env, url) {
     if (!/^[0-9A-Za-z]{4,20}$/.test(student_no || '')) throw new HttpError(400, '학번은 영문/숫자 4~20자입니다.');
     if (!name || String(name).trim().length > 30) throw new HttpError(400, '이름을 확인해 주세요.');
     if (!password || password.length < 8) throw new HttpError(400, '비밀번호는 8자 이상이어야 합니다.');
-    const salt = randomHex(16);
+    // 개인정보 수집·이용 동의는 필수다. 화면 체크를 건너뛴 요청도 여기서 막는다.
+    if (privacy_consent !== true) throw new HttpError(400, '개인정보 수집·이용에 동의해야 가입할 수 있습니다.');
+    const salt = randomHex(16), now = Date.now();
     const status = isAdmin || !s.require_user_approval ? 'active' : 'pending';
     try {
       await env.DB.prepare(
-        'INSERT INTO users (student_no, name, pw_hash, pw_salt, role, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        `INSERT INTO users (student_no, name, pw_hash, pw_salt, role, status, created_at, privacy_consent_at, privacy_consent_version)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
         .bind(student_no, String(name).trim(), await hashPassword(password, salt), salt, isAdmin ? 'admin' : 'student',
-          status, Date.now())
+          status, now, now, PRIVACY_CONSENT_VERSION)
         .run();
     } catch (e) {
       if (/UNIQUE constraint failed.*student_no/i.test(String(e))) throw new HttpError(409, '이미 가입된 학번입니다.');
@@ -748,7 +752,7 @@ async function adminRoute(req, env, path, method, admin, url) {
     const { total } = await env.DB.prepare(`SELECT COUNT(*) AS total FROM users ${filter}`).bind(...vals).first();
     const page_size = 50, pages = Math.max(1, Math.ceil(total / page_size)), page = Math.min(Number(rawPage), pages);
     const { results } = await env.DB.prepare(
-      `SELECT id, student_no, name, phone, department, role, status, created_at,
+      `SELECT id, student_no, name, phone, department, role, status, created_at, privacy_consent_at,
        (role = 'student' AND status = 'blocked' AND ${USER_NO_HISTORY}) AS can_release
        FROM users ${filter} ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?`,
     )

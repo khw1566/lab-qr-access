@@ -320,7 +320,13 @@ export default {
     const url = new URL(req.url);
     if (!url.pathname.startsWith('/api/')) return env.ASSETS.fetch(req);
     try {
-      return await route(req, env, url);
+      const res = await route(req, env, url);
+      // 데이터를 바꾸는 요청이 성공하면 데이터 버전을 올린다 → 열려 있는 웹 화면이 /api/version으로 알아채고 새로 불러옴
+      if (req.method !== 'GET' && res.status < 400 && !QUIET_WRITES.has(url.pathname)) {
+        const v = await bumpDataVersion(env);
+        if (v && !url.pathname.startsWith('/api/device/')) res.headers.set('x-data-version', v);
+      }
+      return res;
     } catch (e) {
       if (e instanceof HttpError) return fail(e.status, e.message);
       console.error(e);
@@ -331,6 +337,17 @@ export default {
 
 const id = (v) => Number(v);
 
+// 화면에 보이는 데이터를 바꾸지 않는 쓰기 요청 (버전을 올리면 모든 화면이 쓸데없이 새로 불러옴)
+const QUIET_WRITES = new Set(['/api/device/ping', '/api/auth/login', '/api/auth/logout', '/api/notifications/read']);
+async function bumpDataVersion(env) {
+  const v = `${Date.now().toString(36)}.${crypto.randomUUID().slice(0, 8)}`;
+  try {
+    await env.DB.prepare("INSERT INTO settings (key, value) VALUES ('data_version', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
+      .bind(v).run();
+    return v;
+  } catch (e) { console.error('data_version', e); return null; }
+}
+
 async function route(req, env, url) {
   const path = url.pathname;
   const method = req.method;
@@ -340,6 +357,12 @@ async function route(req, env, url) {
   if (path === '/api/device/verify' && method === 'POST') return deviceSigned(req, env, deviceVerify);
   if (path === '/api/device/ping' && method === 'POST') {
     return deviceSigned(req, env, async (_req, _env, dev) => json({ ok: true, device: dev.name, server_time: Date.now() }));
+  }
+
+  // ===== 데이터 버전 (웹 화면이 주기적으로 물어보고, 바뀌었을 때만 목록을 새로 불러옴) =====
+  if (path === '/api/version' && method === 'GET') {
+    const row = await env.DB.prepare("SELECT value FROM settings WHERE key = 'data_version'").first();
+    return json({ v: row ? row.value : '0' }, 200, { 'cache-control': 'no-store' });
   }
 
   // ===== 로그인 전 화면용 공개 설정 =====

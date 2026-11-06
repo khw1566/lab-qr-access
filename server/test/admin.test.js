@@ -410,3 +410,21 @@ test('signup rejection archive and removal roll back together and preserve accou
  assert.equal(db.prepare('SELECT COUNT(*) n FROM signup_rejections').get().n,0);assert.ok(db.prepare('SELECT id FROM users WHERE id=2').get());
  db.close();
 });
+
+test('data version changes only after successful data writes, so web screens refresh only when needed', async () => {
+ const {request,db}=await fixture();
+ const ver=async()=>(await request('/api/version',{uid:null})).v;
+ const v0=await ver();
+ assert.equal(await ver(),v0);
+ await request('/api/admin/users',{});
+ assert.equal(await ver(),v0,'GET does not bump');
+ assert.equal((await request('/api/admin/users/2',{method:'PATCH',body:{name:''}})).status>=400,true);
+ assert.equal(await ver(),v0,'failed write does not bump');
+ await request('/api/auth/logout',{method:'POST'});
+ assert.equal(await ver(),v0,'logout does not bump');
+ assert.equal((await request('/api/admin/rooms',{method:'POST',body:{name:'실습실 3'}})).status,200);
+ const v1=await ver();
+ assert.notEqual(v1,v0);
+ assert.equal((await request('/api/admin/settings')).settings.data_version,undefined,'version is not a setting');
+ db.close();
+});

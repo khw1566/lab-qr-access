@@ -655,10 +655,31 @@ function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.ad
 async function api(path, opts = {}) {
   const res = await fetch(path, { method: opts.method || 'GET', headers: { 'content-type': 'application/json' }, body: opts.body ? JSON.stringify(opts.body) : undefined });
   const data = await res.json().catch(() => ({}));
-  if (res.status === 401 && me && !path.startsWith('/api/auth')) { me = null; route(); }
+  if (res.status === 401 && me && !path.startsWith('/api/auth')) { me = null; cache.clear(); route(); }
   if (res.status === 403 && path.startsWith('/api/admin/') && me && me.role === 'admin') setTimeout(adminDenied);
   if (!res.ok) throw Object.assign(new Error(data.error || '요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.'), { status: res.status });
+  if ((opts.method || 'GET') !== 'GET' && !path.startsWith('/api/notifications')) dataChanged(res.headers.get('x-data-version'));
   return data;
+}
+
+// ---------- 데이터 캐시 ----------
+// 탭마다 서버에 다시 묻지 않도록 GET 결과를 기억해 두고, 서버의 데이터 버전이 바뀌었을 때만 버린다.
+// - 이 화면에서 무언가를 바꾸면(POST/PATCH) 바로 버리고 새 버전을 받는다
+// - 다른 사람이 바꾼 것은 /api/version을 15초마다 물어봐서 알아챈다 → 지금 보는 화면을 조용히 다시 그림
+const cache = new Map();
+let dataVer = null;
+async function cached(path, maxAge = 0) {
+  const hit = cache.get(path);
+  if (hit && hit.ver === dataVer && (!maxAge || Date.now() - hit.at < maxAge)) return hit.data;
+  const ver = dataVer;
+  const promise = api(path);
+  cache.set(path, { ver, at: Date.now(), data: promise });
+  try { return await promise; }
+  catch (e) { if (cache.get(path)?.data === promise) cache.delete(path); throw e; }
+}
+function dataChanged(ver) {
+  cache.clear();
+  if (ver) { dataVer = ver; schedulePrefetch(); }
 }
 const kd = (ms) => new Date(ms + KST);
 const pad = (n) => String(n).padStart(2, '0');
@@ -693,10 +714,10 @@ function editRecord(title, fields, save) {
     ? `<select class="input" name="${f.key}">${f.options.map((o) => `<option value="${o.id}" ${o.id == f.value ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}</select>`
     : `<input class="input" name="${f.key}" value="${esc(f.value || '')}" maxlength="${f.max}" ${f.required ? 'required' : ''}>`}</label>`).join('')}
     <p class="small" data-error role="alert" style="color:var(--bad)" hidden></p>
-    <div class="row end"><button class="btn secondary" type="button" data-cancel>취소</button><button class="btn" type="submit">저장</button></div></form>`;
+    <div class="row end"><button class="btn secondary" type="button" data-dismiss>취소</button><button class="btn" type="submit">저장</button></div></form>`;
   document.body.append(d);
   d.onclose = () => d.remove();
-  $('[data-cancel]', d).onclick = () => d.close();
+  $('[data-dismiss]', d).onclick = () => d.close();
   $('form', d).onsubmit = async (e) => {
     e.preventDefault(); const btn = $('button[type="submit"]', d); btn.disabled = true;
     try { await save(Object.fromEntries(new FormData(e.target))); d.close(); toast('저장했습니다.'); reload(); }
@@ -953,7 +974,7 @@ function resItem(r, now) {
 let mine = [];
 async function loadMine() {
   try {
-    const { reservations, server_time } = await api('/api/reservations');
+    const { reservations, server_time } = await cached('/api/reservations');
     skew = server_time - Date.now(); mine = reservations;
   } catch (e) { $('#upcomingList').innerHTML = $('#historyList').innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
   const now = Date.now() + skew;
@@ -984,6 +1005,8 @@ async function loadMine() {
   $('#historyList').innerHTML = mine.length ? mine.map((r) => resItem(r, now)).join('') : '<div class="empty">최근 2주간 신청 내역이 없습니다.</div>';
 }
 document.addEventListener('click', async (e) => {
+  // 대화상자 안의 버튼은 목록의 '신청 취소'와 무관 (정보 수정 창 닫기가 취소 확인을 띄우던 문제)
+  if (e.target.closest('dialog')) return;
   const q = e.target.closest('[data-qr]'), c = e.target.closest('[data-cancel]');
   if (q) {
     const r = mine.find((x) => x.id == q.dataset.qr);
@@ -1008,7 +1031,7 @@ const specialTime = (r) => r.status === 'approved'
 async function loadSpecial() {
   const targets = ['#specialPassList', '#specialHistoryList', '#specialRequestList'];
   try {
-    const { requests, server_time } = await api('/api/special-requests');
+    const { requests, server_time } = await cached('/api/special-requests');
     specialMine = requests; const now = server_time;
     const cards = (list) => list.map((r) => `<div class="panel stack" style="padding:16px;margin-top:10px">
       <div class="row"><b>${esc(r.room_name)}</b><span class="pill ${r.status === 'approved' && specialEnd(r) > now ? 'granted' : 'off'}">${specialState(r, now)}</span></div>
@@ -1022,7 +1045,7 @@ async function loadSpecial() {
         (cards(list) || '<p class="small muted">특별 출입신청이 없습니다.</p>');
     }
     if (location.hash === '#special') {
-      const { rooms: rs } = await api('/api/rooms');
+      const { rooms: rs } = await cached('/api/rooms');
       const keep = $('#specialRoom').value;
       $('#specialRoom').innerHTML = rs.map((r) => `<option value="${r.id}">${esc(r.name)}</option>`).join('');
       if (rs.some((r) => r.id == keep)) $('#specialRoom').value = keep;
@@ -1039,7 +1062,7 @@ $('#specialForm').onsubmit = async (e) => {
 };
 document.addEventListener('click', async (e) => {
   const q = e.target.closest('[data-special-qr]'), c = e.target.closest('[data-special-cancel]');
-  if (e.target.closest('[data-special-refresh]')) loadSpecial();
+  if (e.target.closest('[data-special-refresh]')) { cache.delete('/api/special-requests'); loadSpecial(); }
   if (q) {
     const r = specialMine.find((x) => x.id == q.dataset.specialQr);
     openQr({ title: `${r.room_name} · 특별 출입`, sub: specialTime(r), countLabel: '화면 QR · ',
@@ -1207,14 +1230,23 @@ function showAdmin(sec) {
   if (!A[sec]) sec = 'overview';
   adminSection = sec;
   $$('[data-a]').forEach((a) => { if (a.dataset.a === sec) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
-  $('#adminMain').innerHTML = '<div class="empty">불러오는 중…</div>';
-  A[sec]().catch((e) => { $('#adminMain').innerHTML = `<div class="empty">${esc(e.message)}</div>`; });
+  // 캐시에 있으면 바로 그려지므로, 실제로 기다릴 때만 '불러오는 중'을 띄움
+  const slow = setTimeout(() => { if (adminSection === sec) $('#adminMain').innerHTML = '<div class="empty">불러오는 중…</div>'; }, 150);
+  const done = A[sec]().catch((e) => { $('#adminMain').innerHTML = `<div class="empty">${esc(e.message)}</div>`; }).finally(() => clearTimeout(slow));
   refreshCounts();
+  return done;
 }
+// 관리자 화면들이 쓰는 목록 주소 (미리 불러오기와 화면이 같은 캐시를 쓰도록 한곳에서 만든다)
+const AP = {
+  requests: () => '/api/admin/reservations?status=' + reqFilter,
+  special: () => '/api/admin/special-requests?status=' + specialFilter,
+  users: () => '/api/admin/users?' + new URLSearchParams({ status: userFilter, q: userSearch, page: userPage }),
+  logs: () => '/api/admin/logs?' + new URLSearchParams(logFilter),
+};
 const reload = () => showAdmin(adminSection);
 async function refreshCounts() {
   try {
-    const o = await api('/api/admin/overview');
+    const o = await cached('/api/admin/overview', 30000);
     const set = (el, n) => { el.hidden = !n; el.textContent = n; };
     set($('#cntSpecial'), o.pending_special);
     set($('#cntReq'), o.pending_reservations); set($('#cntUsers'), o.pending_users);
@@ -1224,7 +1256,7 @@ async function refreshCounts() {
 const head = (title, desc, extra = '') => `<div class="main-head"><div><h2>${title}</h2>${desc ? `<p class="muted small">${desc}</p>` : ''}</div>${extra}</div>`;
 
 A.overview = async () => {
-  const o = await api('/api/admin/overview');
+  const o = await cached('/api/admin/overview', 30000);
   const devs = o.devices.length ? o.devices.map((d) => `<tr><td><b>${esc(d.name)}</b><div class="small muted">${esc(d.room_name)}</div></td>
     <td><span class="pill ${d.online ? 'on' : 'off'}">${d.online ? '연결됨' : '연결 끊김'}</span></td>
     <td class="small muted">${d.last_seen_at ? '마지막 신호 ' + ago(d.last_seen_at) : '아직 연결된 적 없음'}</td></tr>`).join('')
@@ -1243,7 +1275,7 @@ A.overview = async () => {
 
 let reqFilter = 'pending';
 A.requests = async () => {
-  const { reservations } = await api('/api/admin/reservations?status=' + reqFilter);
+  const { reservations } = await cached(AP.requests());
   const seg = `<div class="seg" role="group">${[['pending', '승인 대기'], ['approved', '승인됨'], ['rejected', '반려']].map(([k, l]) => `<button type="button" data-rf="${k}" aria-pressed="${k === reqFilter}">${l}</button>`).join('')}</div>`;
   const rows = reservations.map((r) => `<tr>
     <td><b>${esc(r.name)}</b> <span class="mono small muted">${esc(r.student_no)}</span>${r.department || r.phone ? `<div class="small muted">${esc(r.department || '')}${r.phone ? ` · <span class="mono">${esc(r.phone)}</span>` : ''}</div>` : ''}</td>
@@ -1271,7 +1303,7 @@ A.requests = async () => {
 
 let specialFilter = 'pending';
 A.special = async () => {
-  const { requests, server_time } = await api('/api/admin/special-requests?status=' + specialFilter);
+  const { requests, server_time } = await cached(AP.special());
   const seg = `<div class="seg row">${[['pending','승인 대기'],['approved','발급됨'],['rejected','반려'],['cancelled','취소'],['revoked','승인 취소']].map(([v,t]) => `<button data-special-filter="${v}" aria-pressed="${v === specialFilter}">${t}</button>`).join('')}</div>`;
   const rows = requests.map((r) => `<tr><td><b>${esc(r.name)}</b><div class="mono small muted">${esc(r.student_no)}</div></td>
     <td>${esc(r.room_name)}</td><td class="small">${esc(r.purpose)}${r.reject_reason ? `<div class="muted admin-comment">관리자 멘트: ${esc(r.reject_reason)}</div>` : ''}</td>
@@ -1327,7 +1359,7 @@ function changeUserPassword(user) {
 
 let userFilter = 'all', userSearch = '', userPage = 1;
 A.users = async () => {
-  const { users, total, page, pages, page_size } = await api('/api/admin/users?' + new URLSearchParams({ status: userFilter, q: userSearch, page: userPage }));
+  const { users, total, page, pages, page_size } = await cached(AP.users());
   userPage = page;
   const seg = `<div class="seg" role="group">${[['all', '전체'], ['pending', '가입 대기'], ['active', '사용 중'], ['blocked', '정지']].map(([k, l]) => `<button type="button" data-uf="${k}" aria-pressed="${k === userFilter}">${l}</button>`).join('')}</div>`;
   const rows = users.map((u) => {
@@ -1386,7 +1418,7 @@ A.users = async () => {
 
 let masters = [];
 A.master = async () => {
-  const [{ masters: ms, server_time }, { rooms: rs }] = await Promise.all([api('/api/admin/masters'), api('/api/rooms?all=1')]);
+  const [{ masters: ms, server_time }, { rooms: rs }] = await Promise.all([cached('/api/admin/masters'), cached('/api/rooms?all=1')]);
   masters = ms;
   const card = (m) => {
     const dead = m.revoked || m.expires_at < server_time;
@@ -1484,7 +1516,7 @@ function qrPng(text) {
 }
 
 A.equipment = async () => {
-  const { settings: s } = await api('/api/admin/settings');
+  const { settings: s } = await cached('/api/admin/settings');
   const down = new Set(s.printer_down);
   const ps = info.printers.map((p) => ({ ...p, down: down.has(p.id) }));
   $('#adminMain').innerHTML = head('장비 상태', '장비를 누르면 사용 가능 ↔ 점검 중이 바뀝니다. 첫 화면 배치도와 신청 화면에 바로 반영됩니다.') +
@@ -1501,7 +1533,7 @@ A.equipment = async () => {
 };
 
 A.rooms = async () => {
-  const { rooms: rs } = await api('/api/rooms?all=1');
+  const { rooms: rs } = await cached('/api/rooms?all=1');
   const card = (r) => `<form class="panel room-card" data-room="${r.id}" novalidate>
     <div class="row"><label class="field grow"><span>실습실 이름</span><input class="input" data-f="name" value="${esc(r.name)}" maxlength="40"></label>
       <label class="row small" style="padding-top:22px"><span class="switch"><input type="checkbox" data-f="enabled" ${r.enabled ? 'checked' : ''}><i></i></span>운영 중</label></div>
@@ -1531,7 +1563,7 @@ A.rooms = async () => {
 };
 
 A.devices = async () => {
-  const [{ devices, server_time }, { rooms: rs }] = await Promise.all([api('/api/admin/devices'), api('/api/rooms?all=1')]);
+  const [{ devices, server_time }, { rooms: rs }] = await Promise.all([cached('/api/admin/devices'), cached('/api/rooms?all=1')]);
   const rows = devices.map((d) => {
     const online = d.active && d.last_seen_at && server_time - d.last_seen_at < 180000;
     return `<tr><td><b>${esc(d.name)}</b></td><td>${esc(d.room_name)}</td>
@@ -1577,7 +1609,7 @@ const logDefaults = { from: '', to: '', result: '', room_id: '', device_id: '', 
 let logFilter = { ...logDefaults };
 A.logs = async () => {
   const [data, { rooms: rs }, { devices }] = await Promise.all([
-    api('/api/admin/logs?' + new URLSearchParams(logFilter)), api('/api/rooms?all=1'), api('/api/admin/devices'),
+    cached(AP.logs()), cached('/api/rooms?all=1'), cached('/api/admin/devices'),
   ]);
   const { logs, total, page, pages, page_size } = data;
   logFilter.page = page;
@@ -1616,7 +1648,7 @@ A.logs = async () => {
 };
 
 A.features = async () => {
-  const { settings: s } = await api('/api/admin/settings');
+  const { settings: s } = await cached('/api/admin/settings');
   const sw = (k, title, desc, cls = '') => `<div class="setting ${cls}"><div class="txt"><b>${title}</b><span>${desc}</span></div>
     <div class="ctl"><span class="switch"><input type="checkbox" data-s="${k}" aria-label="${title}" ${s[k] ? 'checked' : ''}><i></i></span></div></div>`;
   const num = (k, title, desc, unit, min, max, step = 1) => `<div class="setting"><div class="txt"><b>${title}</b><span>${desc}</span></div>
@@ -1678,15 +1710,89 @@ function applyChrome() {
   $('#noticeBanner').hidden = !settings.notice; $('#noticeBanner').textContent = settings.notice || '';
   $('#lockBanner').hidden = !settings.lockdown;
 }
+// ---------- 한 번에 불러오기 + 바뀌었을 때만 새로고침 ----------
+// 로그인하면 모든 탭의 목록을 미리 받아 두고, 탭을 옮길 때는 캐시로 바로 그린다.
+function prefetchPaths() {
+  if (!me) return [];
+  const ps = ['/api/reservations', '/api/special-requests', '/api/rooms'];
+  if (me.role === 'admin') ps.push('/api/admin/overview', AP.requests(), AP.special(), AP.users(), '/api/admin/masters',
+    '/api/rooms?all=1', '/api/admin/settings', '/api/admin/devices', AP.logs());
+  return ps;
+}
+let prefetchTimer = null;
+function schedulePrefetch() {
+  clearTimeout(prefetchTimer);
+  prefetchTimer = setTimeout(() => { for (const p of prefetchPaths()) cached(p).catch(() => {}); }, 300);
+}
+// 입력 중이거나 창이 열려 있으면 다시 그리지 않음 (입력한 내용을 날리지 않도록). 다음 확인 때 다시 시도.
+function viewBusy(root) {
+  if (document.querySelector('dialog[open]')) return true;
+  const a = document.activeElement;
+  if (a && root.contains(a) && a.matches('input, textarea, select')) return true;
+  return $$('input, textarea', root).some((el) => (el.type === 'checkbox' || el.type === 'radio') ? el.checked !== el.defaultChecked : el.value !== el.defaultValue)
+    || $$('select', root).some((el) => [...el.options].some((o) => o.selected !== o.defaultSelected));
+}
+let staleView = false;
+async function refreshView() {
+  staleView = false;
+  const h = location.hash.slice(1) || 'home';
+  if (h.startsWith('admin')) {
+    if (!me || me.role !== 'admin' || $('#adminView').hidden) return;
+    if (viewBusy($('#adminMain'))) { staleView = true; return; }
+    const y = window.scrollY;
+    await A[adminSection]().catch(() => {}); refreshCounts();
+    window.scrollTo(0, y);
+  } else if (h === 'pass' || h === 'history') { if (me) await Promise.all([loadMine(), loadSpecial()]); }
+  else if (h === 'special') { if (me) { if (viewBusy($('#s-special'))) staleView = true; else await loadSpecial(); } }
+  else if (h === 'home') renderHome();
+  // 'new'(이용 신청서)는 입력 중인 양식이라 다시 그리지 않음. 실습실 목록만 refreshGlobals에서 갱신됨.
+}
+async function refreshGlobals() {
+  try { info = await cached('/api/config'); } catch {}
+  if (me) {
+    try { const r = await cached('/api/me'); if (r.user) { Object.assign(me, r.user); settings = { ...settings, ...r.settings }; } } catch {}
+    try { rooms = (await cached('/api/rooms')).rooms; fillRooms(); } catch {}
+    if (me && me.role === 'admin') try { settings = { ...settings, ...(await cached('/api/admin/settings')).settings }; } catch {}
+  }
+  if (info) applyChrome();
+}
+let versionBusy = false, versionTicks = 0;
+async function checkVersion() {
+  if (versionBusy || document.hidden) return;
+  versionBusy = true; versionTicks++;
+  const h = location.hash.slice(1) || 'home';
+  try {
+    const { v } = await api('/api/version');
+    if (v !== dataVer) {
+      dataVer = v; cache.clear();
+      await refreshGlobals(); await refreshView(); schedulePrefetch();
+    } else if (staleView) {
+      await refreshView();
+    } else if ((h === 'admin' || h === 'admin-overview') && versionTicks % 2 === 0) {
+      // 단말 연결 상태는 시간이 지나면 바뀌므로 현황은 30초마다 다시 받음 (cached의 30초 maxAge)
+      await refreshView();
+    } else if ((h === 'pass' || h === 'history') && versionTicks % 4 === 0) {
+      // 시간이 지나면 'QR 열림' 표시가 바뀌므로 1분마다 캐시로 다시 그림 (서버 요청 없음)
+      await refreshView();
+    }
+  } catch {} finally { versionBusy = false; }
+}
+setInterval(checkVersion, 15000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) checkVersion(); });
+window.addEventListener('focus', checkVersion);
+
 async function boot(next) {
-  try { info = await api('/api/config'); } catch { info = null; }
-  try { const r = await api('/api/me'); me = r.user; settings = r.settings; } catch { me = null; settings = { ...(info || {}) }; }
+  cache.clear();
+  try { dataVer = (await api('/api/version')).v; } catch { dataVer = null; }
+  try { info = await cached('/api/config'); } catch { info = null; }
+  try { const r = await cached('/api/me'); me = r.user; settings = r.settings; } catch { me = null; settings = { ...(info || {}) }; }
   if (info) applyChrome();
   if (me) {
     $('#whoName').textContent = `${me.name} · ${me.student_no}`;
     applyChrome();
-    rooms = (await api('/api/rooms')).rooms; fillRooms();
-    if (me.role === 'admin') settings = { ...settings, ...(await api('/api/admin/settings')).settings };
+    rooms = (await cached('/api/rooms')).rooms; fillRooms();
+    if (me.role === 'admin') settings = { ...settings, ...(await cached('/api/admin/settings')).settings };
+    schedulePrefetch();
   }
   if (next && location.hash.slice(1) !== next) { location.hash = next; return; }
   route();

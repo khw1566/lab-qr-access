@@ -3,6 +3,7 @@
 #include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "esp_app_desc.h"
 #include "esp_log.h"
 #include "lvgl.h"
 #include "sdkconfig.h"
@@ -13,6 +14,15 @@ static const char *TAG = "ui_settings";
 
 #define MAX_APS 20
 #define LOCK_WAIT_MS 1000
+
+// 관리자 PIN 화면 왼쪽 아래 문의 안내. 문구를 바꾸면 tools/gen_hangul_font.py를 다시 실행한다.
+#define CONTACT_NAME   "취직자리 구하는 근로학생 김형우가 만들었습니다. 혹시 이런거 필요하시면 저 일시켜 주세요 ㅠ"
+#define CONTACT_EMAIL  "여기로 연락 주세요!! audreaming3@gmail.com 밑의 github들어가시면 제가 만든 프로젝트들 많아요"
+#define CONTACT_URL    "https://github.com/khw1566/lab-qr-access"
+#define CONTACT_QR     108
+// 문의 칸은 키패드 아래 화면 맨 아래 띠(y 484~600)에 둔다. 글자는 너비 안에서 줄바꿈되고 4줄까지 들어간다.
+#define CONTACT_Y      484
+#define CONTACT_TEXT_X 164
 
 static const char *const s_pin_map[] = {
     "1", "2", "3", "\n",
@@ -230,6 +240,30 @@ static void pin_page_build(void)
     lv_obj_set_style_text_font(matrix, &lab_font_28, 0);
     lv_obj_add_event_cb(matrix, on_pin_key, LV_EVENT_VALUE_CHANGED, NULL);
 
+    // 보드에 어떤 펌웨어가 들어 있는지 바로 보이게 한다 (git 버전, 빌드 시각, 릴레이 핀, 열림 시간)
+    const esp_app_desc_t *app = esp_app_get_description();
+    char info[128];
+    snprintf(info, sizeof(info), "FW %s  %s %s\nrelay %d,%d,%d  %dms", app->version, app->date, app->time,
+             CONFIG_LAB_RELAY_GPIO, CONFIG_LAB_RELAY_GPIO2, CONFIG_LAB_RELAY_GPIO3, CONFIG_LAB_DOOR_MIN_OPEN_MS);
+    lv_obj_t *build = label_create(s_pin_page, info, &lab_font_24);
+    lv_obj_set_pos(build, 64, 412);
+    lv_obj_set_width(build, 520);
+    lv_label_set_long_mode(build, LV_LABEL_LONG_DOT);
+    lv_obj_set_style_text_color(build, UI_MUTED, 0);
+
+    // 담당자 문의: 프로젝트 GitHub QR과 연락처
+    lv_obj_t *qr = lv_qrcode_create(s_pin_page);
+    lv_qrcode_set_size(qr, CONTACT_QR);
+    lv_qrcode_set_dark_color(qr, lv_color_black());
+    lv_qrcode_set_light_color(qr, lv_color_white());
+    lv_qrcode_update(qr, CONTACT_URL, strlen(CONTACT_URL));
+    lv_obj_set_pos(qr, 36, CONTACT_Y);
+    lv_obj_t *who = label_create(s_pin_page, CONTACT_NAME "\n" CONTACT_EMAIL, &lab_font_24);
+    lv_obj_set_pos(who, CONTACT_TEXT_X, CONTACT_Y);
+    lv_obj_set_size(who, LCD_H_RES - CONTACT_TEXT_X - 36, LCD_V_RES - CONTACT_Y);
+    lv_label_set_long_mode(who, LV_LABEL_LONG_WRAP);
+    lv_obj_set_style_text_line_space(who, 2, 0);
+    lv_obj_set_style_text_color(who, UI_MUTED, 0);
 }
 
 static void wifi_page_build(void)

@@ -24,6 +24,10 @@ static void remote_task(void *arg)
                 voice_play(VOICE_GRANTED);
                 door_signal(true);
             }
+            if (cmd.live) {
+                ESP_LOGI(TAG, "관리자 실시간 보기 요청 (소리 듣기 %s)", cmd.live_mic ? "허용" : "꺼짐");
+                live_request(cmd.live_mic);
+            }
             continue;   // 바로 다음 대기 요청을 건다
         }
         // 404: 원격 열기를 지원하지 않는 서버 버전. 그 밖의 실패는 잠시 뒤 다시 시도한다.

@@ -36,7 +36,7 @@ async function fixture() {
     }), env);
     return { ...await response.json(), status: response.status, setCookie: response.headers.get('set-cookie')?.split(';')[0] };
   };
-  return { db, request, key };
+  return { db, request, key, env };
 }
 
 test('user edit persists profile, protects credentials and rejects invalid or duplicate data', async () => {
@@ -533,4 +533,50 @@ test('grant skips weekends and holidays by default', async () => {
   assert.equal(r.skipped[0].why,'설날 연휴');
   assert.equal(r.created,2);
   db.close();
+});
+
+test('live view: admin websocket opens a session, board gets a live command and joins the relay', async () => {
+  const { db, request, key, env } = await fixture();
+  const calls = [];
+  env.LIVE = {
+    idFromName: (n) => n,
+    get: (n) => ({ fetch: async (r) => { calls.push({ name: n, role: r.headers.get('x-live-role'), session: r.headers.get('x-live-session'), mic: r.headers.get('x-live-mic') }); return Response.json({ relayed: true }); } }),
+  };
+  const ws = { upgrade: 'websocket' };
+  // 마이크는 기본 꺼짐
+  const viewer = await request('/api/admin/devices/1/live', { headers: { ...ws, origin: 'https://test.local' } });
+  assert.equal(viewer.relayed, true);
+  assert.deepEqual(calls[0], { name: 'device:1', role: 'viewer', session: '1', mic: '0' });
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM live_sessions WHERE device_id=1 AND ended_at IS NULL').get().n, 1);
+  // 다른 사이트에서 연 연결은 거부
+  assert.equal((await request('/api/admin/devices/1/live', { headers: { ...ws, origin: 'https://evil.example' } })).status, 403);
+  // 학생은 불가
+  assert.equal((await request('/api/admin/devices/1/live', { headers: ws, uid: 2 })).status, 403);
+
+  const dev = { authorization: `Bearer ${key}` };
+  const poll = await request('/api/device/commands', { method: 'POST', body: { wait_ms: 0 }, headers: dev, uid: null });
+  assert.equal(poll.command, 'live');
+  assert.equal(poll.mic, false);
+  // 실시간 보기 명령은 출입 기록을 남기지 않는다
+  assert.equal(db.prepare("SELECT COUNT(*) n FROM access_logs WHERE reason='remote'").get().n, 0);
+  assert.equal((await request('/api/device/live', { headers: { ...dev, ...ws }, uid: null })).relayed, true);
+  assert.equal(calls.at(-1).role, 'device');
+  assert.equal((await request('/api/device/live', { headers: ws, uid: null })).status, 401);
+
+  // 원격 열기는 실시간 보기 명령과 섞이지 않는다
+  const open = await request('/api/admin/devices/1/open', { method: 'POST' });
+  const poll2 = await request('/api/device/commands', { method: 'POST', body: { wait_ms: 0 }, headers: dev, uid: null });
+  assert.equal(poll2.command, 'open');
+  assert.equal(poll2.id, open.id);
+
+  // 기능 설정에서 끄면 막힌다
+  await request('/api/admin/settings', { method: 'PATCH', body: { live_view: false } });
+  assert.equal((await request('/api/admin/devices/1/live', { headers: ws })).status, 403);
+  assert.equal((await request('/api/device/live', { headers: { ...dev, ...ws }, uid: null })).status, 403);
+  await request('/api/admin/settings', { method: 'PATCH', body: { live_view: true, live_mic: true } });
+  await request('/api/admin/devices/1/live', { headers: ws });
+  assert.equal(calls.at(-1).mic, '1');
+  const { sessions } = await request('/api/admin/live-sessions');
+  assert.equal(sessions.length, 2);
+  assert.equal(sessions[0].admin_name, '관리자');
 });

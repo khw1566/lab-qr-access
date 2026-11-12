@@ -566,3 +566,31 @@ void ui_preview_commit(void)
     lv_image_set_src(s_preview, &s_frames[s_shown]);
     display_unlock();
 }
+
+// 관리자 실시간 보기 연결 중 표시: 어느 화면에서든 보이도록 맨 위 레이어에 붙인다.
+// 사람들이 카메라·음성 연결을 알 수 있게 연결하는 동안 계속 띄워 둔다.
+static lv_obj_t *s_live_pill, *s_live_label;
+
+void ui_live(bool on, bool mic)
+{
+    if (!display_lock(LOCK_WAIT_MS * 5)) return;
+    if (!s_live_pill) {
+        s_live_pill = lv_obj_create(lv_layer_top());
+        lv_obj_remove_style_all(s_live_pill);
+        lv_obj_remove_flag(s_live_pill, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_remove_flag(s_live_pill, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_set_size(s_live_pill, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+        lv_obj_set_style_bg_color(s_live_pill, UI_RED, 0);
+        lv_obj_set_style_bg_opa(s_live_pill, LV_OPA_COVER, 0);
+        lv_obj_set_style_radius(s_live_pill, LV_RADIUS_CIRCLE, 0);
+        lv_obj_set_style_pad_hor(s_live_pill, 22, 0);
+        lv_obj_set_style_pad_ver(s_live_pill, 8, 0);
+        lv_obj_align(s_live_pill, LV_ALIGN_TOP_MID, 0, UI_BAR_H + 10);
+        s_live_label = lv_label_create(s_live_pill);
+        lv_obj_set_style_text_font(s_live_label, &lab_font_24, 0);
+        lv_obj_set_style_text_color(s_live_label, lv_color_white(), 0);
+    }
+    lv_label_set_text(s_live_label, mic ? "관리자가 영상과 음성으로 연결 중입니다" : "관리자가 카메라 영상으로 연결 중입니다");
+    set_hidden(s_live_pill, !on);
+    display_unlock();
+}

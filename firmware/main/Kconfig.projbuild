@@ -28,6 +28,13 @@ menu "Lab Door Config"
         config LAB_ADMIN_PIN
             string "단말 설정 화면 비밀번호 (저장소에 올리지 말고 sdkconfig에만 둘 것)"
             default ""
+        config LAB_ADMIN_PIN_OPENS_DOOR
+            bool "코드 입력 화면에서 관리자 비밀번호로 문 열기 (서버 확인 없음, 비상용)"
+            default y
+            help
+                출입 코드 입력 화면에 위 비밀번호를 넣으면 서버에 묻지 않고 바로 문을 연다.
+                서버·Wi-Fi 장애 때 쓰는 비상용이라 긴급 잠금 중에도 열리고 서버 출입 기록에 남지 않는다.
+                비밀번호를 바꾸려면 펌웨어를 다시 구워야 한다.
     endmenu
 
     menu "Weather (상단 바 날씨)"
@@ -86,19 +93,53 @@ menu "Lab Door Config"
         config LAB_AUDIO_AMP_GPIO
             int "Speaker amplifier enable GPIO"
             default 11
+        config LAB_AUDIO_DIN_GPIO
+            int "ES8311 I2S mic data GPIO (ASDOUT, -1 = 마이크 안 씀)"
+            default 48
+            help
+                ES8311의 마이크 ADC 출력(ASDOUT)이 연결된 P4 핀. 보드 회로도로 확인하지 못한 값이라
+                실시간 보기에서 소리가 안 들리면 회로도를 보고 바꾸거나 -1로 꺼 두세요.
+    endmenu
+
+    menu "Live view (관리자 실시간 보기)"
+        config LAB_LIVE_ENABLE
+            bool "관리자 실시간 보기 (카메라 영상, 소리 듣기, 말하기)"
+            default y
+            help
+                관리자가 웹에서 실시간 보기를 열면 보드가 서버 중계에 wss로 붙어 카메라 영상을 보내고
+                관리자의 말을 스피커로 재생한다. 소리 듣기는 서버 기능 설정에서 허용한 경우만 동작한다.
+                영상과 음성은 보드에도 서버에도 저장하지 않는다.
+        config LAB_LIVE_JPEG_QUALITY
+            int "JPEG 품질 (1~100, 낮을수록 데이터가 적음)"
+            depends on LAB_LIVE_ENABLE
+            range 1 100
+            default 50
     endmenu
 
     menu "Door relay"
         config LAB_RELAY_GPIO
             int "Relay control GPIO (기본 GPIO27, 5V 1채널 옵토 릴레이 IN)"
             default 27
+        config LAB_RELAY_GPIO2
+            int "추가 릴레이 GPIO 2 (같은 신호로 함께 켬, -1 = 사용 안 함)"
+            default 26
+        config LAB_RELAY_GPIO3
+            int "추가 릴레이 GPIO 3 (같은 신호로 함께 켬, -1 = 사용 안 함)"
+            default 33
+            help
+                ESP32-P4의 GPIO24/25는 USB Serial/JTAG(D-/D+)로도 쓰인다. 보드의 USB 포트(COM22)가 이 핀에
+                연결되어 있으면 GPIO25를 출력으로 쓰는 순간 USB 시리얼이 끊기므로 쓰지 않는다.
+                기본값은 2x13 헤더의 GPIO33이다.
         config LAB_RELAY_ACTIVE_HIGH
             bool "Relay is active-high"
             default y
+        config LAB_DOOR_MIN_OPEN_MS
+            int "최소 문 열림 신호 시간 (ms, 서버 설정이 더 짧아도 이만큼 유지)"
+            default 15000
 
         config LAB_DOOR_MAX_OPEN_MS
             int "Max door open pulse (ms)"
-            default 10000
+            default 15000
         config LAB_BUZZER_GPIO
             int "Status buzzer/LED GPIO (-1 = 사용 안 함)"
             default -1

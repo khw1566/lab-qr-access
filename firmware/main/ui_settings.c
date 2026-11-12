@@ -14,6 +14,12 @@ static const char *TAG = "ui_settings";
 #define MAX_APS 20
 #define LOCK_WAIT_MS 1000
 
+// 관리자 PIN 화면 왼쪽 아래 문의 안내. 문구를 바꾸면 tools/gen_hangul_font.py를 다시 실행한다.
+#define CONTACT_NAME   "김형우"
+#define CONTACT_EMAIL  "audreaming3@gmail.com"
+#define CONTACT_URL    "https://github.com/khw1566/lab-qr-access"
+#define CONTACT_QR     140
+
 static const char *const s_pin_map[] = {
     "1", "2", "3", "\n",
     "4", "5", "6", "\n",
@@ -230,6 +236,21 @@ static void pin_page_build(void)
     lv_obj_set_style_text_font(matrix, &lab_font_28, 0);
     lv_obj_add_event_cb(matrix, on_pin_key, LV_EVENT_VALUE_CHANGED, NULL);
 
+    // 담당자 문의: 프로젝트 GitHub QR과 연락처
+    lv_obj_t *qr = lv_qrcode_create(s_pin_page);
+    lv_qrcode_set_size(qr, CONTACT_QR);
+    lv_qrcode_set_dark_color(qr, lv_color_black());
+    lv_qrcode_set_light_color(qr, lv_color_white());
+    lv_qrcode_update(qr, CONTACT_URL, strlen(CONTACT_URL));
+    lv_obj_set_pos(qr, 64, 428);
+    lv_obj_t *title = label_create(s_pin_page, "담당자 문의", &lab_font_28);
+    lv_obj_set_pos(title, 224, 432);
+    lv_obj_t *who = label_create(s_pin_page, CONTACT_NAME "\n" CONTACT_EMAIL, &lab_font_24);
+    lv_obj_set_pos(who, 224, 474);
+    lv_obj_set_style_text_line_space(who, 6, 0);
+    lv_obj_t *hint = label_create(s_pin_page, "QR: GitHub 저장소", &lab_font_24);
+    lv_obj_set_pos(hint, 224, 540);
+    lv_obj_set_style_text_color(hint, UI_MUTED, 0);
 }
 
 static void wifi_page_build(void)

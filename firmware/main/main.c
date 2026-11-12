@@ -51,6 +51,8 @@ static bool submit_request(const char *value, bool manual)
     return true;
 }
 
+static bool is_admin_pin(const char *code);
+
 bool access_submit_code(const char *code)
 {
     return ((strlen(code) == 8 && strspn(code, "0123456789") == 8) || is_admin_pin(code)) && submit_request(code, true);

@@ -56,7 +56,7 @@ void door_init(void)
 
 void door_open(int ms)
 {
-    // 서버의 문 열림 시간이 짧아도 최소 CONFIG_LAB_DOOR_MIN_OPEN_MS(기본 5초)는 신호를 유지한다
+    // 서버의 문 열림 시간이 짧아도 최소 CONFIG_LAB_DOOR_MIN_OPEN_MS(기본 15초)는 신호를 유지한다
     if (ms < CONFIG_LAB_DOOR_MIN_OPEN_MS) ms = CONFIG_LAB_DOOR_MIN_OPEN_MS;
     if (ms > CONFIG_LAB_DOOR_MAX_OPEN_MS) ms = CONFIG_LAB_DOOR_MAX_OPEN_MS;
     ESP_LOGI(TAG, "릴레이 켬 %d ms", ms);

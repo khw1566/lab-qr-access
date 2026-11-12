@@ -135,11 +135,11 @@ menu "Lab Door Config"
             default y
         config LAB_DOOR_MIN_OPEN_MS
             int "최소 문 열림 신호 시간 (ms, 서버 설정이 더 짧아도 이만큼 유지)"
-            default 5000
+            default 15000
 
         config LAB_DOOR_MAX_OPEN_MS
             int "Max door open pulse (ms)"
-            default 10000
+            default 15000
         config LAB_BUZZER_GPIO
             int "Status buzzer/LED GPIO (-1 = 사용 안 함)"
             default -1

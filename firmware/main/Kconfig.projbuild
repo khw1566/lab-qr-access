@@ -28,6 +28,13 @@ menu "Lab Door Config"
         config LAB_ADMIN_PIN
             string "단말 설정 화면 비밀번호 (저장소에 올리지 말고 sdkconfig에만 둘 것)"
             default ""
+        config LAB_ADMIN_PIN_OPENS_DOOR
+            bool "코드 입력 화면에서 관리자 비밀번호로 문 열기 (서버 확인 없음, 비상용)"
+            default y
+            help
+                출입 코드 입력 화면에 위 비밀번호를 넣으면 서버에 묻지 않고 바로 문을 연다.
+                서버·Wi-Fi 장애 때 쓰는 비상용이라 긴급 잠금 중에도 열리고 서버 출입 기록에 남지 않는다.
+                비밀번호를 바꾸려면 펌웨어를 다시 구워야 한다.
     endmenu
 
     menu "Weather (상단 바 날씨)"

@@ -53,7 +53,7 @@ static bool submit_request(const char *value, bool manual)
 
 bool access_submit_code(const char *code)
 {
-    return strlen(code) == 8 && strspn(code, "0123456789") == 8 && submit_request(code, true);
+    return ((strlen(code) == 8 && strspn(code, "0123456789") == 8) || is_admin_pin(code)) && submit_request(code, true);
 }
 
 // 카메라 태스크에서 호출된다. 서버 통신은 verify_task가 맡아 미리보기가 멈추지 않는다.
@@ -77,9 +77,31 @@ static void on_qr(const char *payload)
 }
 
 // 결과 화면을 띄웠으면 true를 돌려준다
+// 코드 입력 화면에서 펌웨어에 넣은 관리자 비밀번호(CONFIG_LAB_ADMIN_PIN)를 입력하면 서버 확인 없이 연다.
+// 서버나 Wi-Fi가 안 될 때의 비상용이라 긴급 잠금과 상관없이 열리고, 서버 출입 기록에는 남지 않는다.
+static bool is_admin_pin(const char *code)
+{
+#if CONFIG_LAB_ADMIN_PIN_OPENS_DOOR
+    const char *pin = CONFIG_LAB_ADMIN_PIN;
+    size_t n = strlen(pin);
+    if (n < 4 || strlen(code) != n) return false;
+    uint8_t diff = 0;   // 상수 시간 비교
+    for (size_t i = 0; i < n; i++) diff |= (uint8_t)(pin[i] ^ code[i]);
+    return diff == 0;
+#else
+    return false;
+#endif
+}
+
 static bool verify_one(const verify_request_t *request)
 {
-    verify_result_t r = request->manual ? server_verify_code(request->value) : server_verify(request->value);
+    verify_result_t r;
+    if (request->manual && is_admin_pin(request->value)) {
+        ESP_LOGW(TAG, "관리자 비밀번호로 문 열기 (서버 확인 없음)");
+        r = (verify_result_t){ .ok = true, .reachable = true, .open_ms = CONFIG_LAB_DOOR_MIN_OPEN_MS };
+    } else {
+        r = request->manual ? server_verify_code(request->value) : server_verify(request->value);
+    }
     if (!request->manual && r.reachable && strcmp(r.reason, "duplicate_scan") == 0) {
         // 방금 통과한 QR이 다시 찍힌 경우로, 거부가 아니므로 조용히 넘어간다
         ESP_LOGI(TAG, "중복 인식 무시");

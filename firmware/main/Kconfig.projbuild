@@ -113,9 +113,22 @@ menu "Lab Door Config"
         config LAB_RELAY_GPIO
             int "Relay control GPIO (기본 GPIO27, 5V 1채널 옵토 릴레이 IN)"
             default 27
+        config LAB_RELAY_GPIO2
+            int "추가 릴레이 GPIO 2 (같은 신호로 함께 켬, -1 = 사용 안 함)"
+            default 26
+        config LAB_RELAY_GPIO3
+            int "추가 릴레이 GPIO 3 (같은 신호로 함께 켬, -1 = 사용 안 함)"
+            default 25
+            help
+                ESP32-P4의 GPIO24/25는 USB Serial/JTAG(D-/D+)로도 쓰인다. 보드의 USB 포트(COM22)가 이 핀에
+                연결되어 있으면 GPIO25를 출력으로 쓰는 순간 USB 시리얼이 끊긴다. 그때는 -1로 바꾸고,
+                굽기는 BOOT 버튼을 누른 채 리셋해 다운로드 모드로 들어가서 한다.
         config LAB_RELAY_ACTIVE_HIGH
             bool "Relay is active-high"
             default y
+        config LAB_DOOR_MIN_OPEN_MS
+            int "최소 문 열림 신호 시간 (ms, 서버 설정이 더 짧아도 이만큼 유지)"
+            default 5000
 
         config LAB_DOOR_MAX_OPEN_MS
             int "Max door open pulse (ms)"

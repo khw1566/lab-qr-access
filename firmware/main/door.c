@@ -34,14 +34,27 @@ static void relay_init(void)
         mask |= 1ULL << s_relay_pins[i];
     }
     if (!mask) return;
-    gpio_config_t io = { .pin_bit_mask = mask, .mode = GPIO_MODE_OUTPUT };
+    // 입력도 같이 켜 두면 gpio_get_level로 핀에 실제로 나간 전압 상태를 되읽을 수 있다 (진단용)
+    gpio_config_t io = { .pin_bit_mask = mask, .mode = GPIO_MODE_INPUT_OUTPUT };
     gpio_config(&io);
     relay_set(false);
     ESP_LOGI(TAG, "릴레이 핀 GPIO %d, %d, %d (%s 동작)", CONFIG_LAB_RELAY_GPIO, CONFIG_LAB_RELAY_GPIO2, CONFIG_LAB_RELAY_GPIO3,
              CONFIG_LAB_RELAY_ACTIVE_HIGH ? "High" : "Low");
 }
 
-static void close_cb(void *arg) { relay_set(false); }
+// 핀에 실제로 걸린 레벨을 로그로 남긴다. 켰는데 0으로 읽히면 핀이 다른 기능(USB 등)에 잡혀 있거나 외부에서 눌린 것이다.
+static void relay_log(const char *when)
+{
+    int level[RELAY_PIN_COUNT];
+    for (size_t i = 0; i < RELAY_PIN_COUNT; i++) level[i] = s_relay_pins[i] >= 0 ? gpio_get_level(s_relay_pins[i]) : -1;
+    ESP_LOGI(TAG, "%s: GPIO%d=%d GPIO%d=%d GPIO%d=%d", when, s_relay_pins[0], level[0], s_relay_pins[1], level[1], s_relay_pins[2], level[2]);
+}
+
+static void close_cb(void *arg)
+{
+    relay_set(false);
+    relay_log("릴레이 끔");
+}
 
 void door_init(void)
 {
@@ -62,6 +75,7 @@ void door_open(int ms)
     ESP_LOGI(TAG, "릴레이 켬 %d ms", ms);
     esp_timer_stop(s_close_timer);
     relay_set(true);
+    relay_log("릴레이 켬 직후 핀 상태");
     esp_timer_start_once(s_close_timer, (uint64_t)ms * 1000);
 }
 

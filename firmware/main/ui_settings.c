@@ -3,6 +3,7 @@
 #include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "esp_app_desc.h"
 #include "esp_log.h"
 #include "lvgl.h"
 #include "sdkconfig.h"
@@ -238,6 +239,17 @@ static void pin_page_build(void)
     keypad_style(matrix);
     lv_obj_set_style_text_font(matrix, &lab_font_28, 0);
     lv_obj_add_event_cb(matrix, on_pin_key, LV_EVENT_VALUE_CHANGED, NULL);
+
+    // 보드에 어떤 펌웨어가 들어 있는지 바로 보이게 한다 (git 버전, 빌드 시각, 릴레이 핀, 열림 시간)
+    const esp_app_desc_t *app = esp_app_get_description();
+    char info[128];
+    snprintf(info, sizeof(info), "FW %s  %s %s\nrelay %d,%d,%d  %dms", app->version, app->date, app->time,
+             CONFIG_LAB_RELAY_GPIO, CONFIG_LAB_RELAY_GPIO2, CONFIG_LAB_RELAY_GPIO3, CONFIG_LAB_DOOR_MIN_OPEN_MS);
+    lv_obj_t *build = label_create(s_pin_page, info, &lab_font_24);
+    lv_obj_set_pos(build, 64, 412);
+    lv_obj_set_width(build, 520);
+    lv_label_set_long_mode(build, LV_LABEL_LONG_DOT);
+    lv_obj_set_style_text_color(build, UI_MUTED, 0);
 
     // 담당자 문의: 프로젝트 GitHub QR과 연락처
     lv_obj_t *qr = lv_qrcode_create(s_pin_page);

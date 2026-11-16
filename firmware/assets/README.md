@@ -1,6 +1,6 @@
 # 단말 아이콘 이미지
 
-아이콘은 PC에서 만든 이미지로 표시한다. 오른쪽 아트는 `main/ui_art.c`가 실시간으로 계산하며 정적인 아트 이미지를 사용하지 않는다.
+아이콘은 PC에서 만든 이미지로 표시한다. 오른쪽 로고는 아래 "울산대 로고"의 벡터에서 만든 A8 이미지이고, 바깥으로 퍼지는 윤곽선은 `main/ui_art.c`가 그린다.
 
 - Lucide 아이콘: `https://github.com/lucide-icons/lucide`, `source/LUCIDE-LICENSE` 포함. 원본 `circle-question-mark`와 `fingerprint-pattern`은 각각 `circle-help.svg`, `fingerprint.svg`로 보관한다.
 - 설정 아이콘: Google Material Design Icons의 `action/settings`, `source/MATERIAL-LICENSE` 포함.
@@ -14,3 +14,9 @@
 3. Pillow가 설치된 Python에서 `python firmware/tools/gen_ui_assets.py`
 
 `main/assets/`의 파일과 `main/ui_assets.c`, `main/ui_assets.h`가 생성된다. 사용한 각 아이콘은 프로젝트에 포함된 원본으로 재생성할 수 있다.
+
+## 울산대 로고
+
+- 원본: `logo/uou-logo-source.png` (500×532, 사용자 제공)
+- 벡터: `logo/uou-logo.svg`. 원본 윤곽을 직선과 3차 베지어 곡선 12개로 다시 그린 경로 하나다. 원본과 겹치는 비율(IoU) 99.8%.
+- 단말용: `python firmware/tools/gen_logo_art.py`가 SVG 경로를 8배로 채운 뒤 면적 평균으로 줄여 `main/assets/logo_art.a8`(332×332 중 211×224)과 퍼지는 윤곽선 `main/logo_contours.h`를 만든다. Pillow, numpy, opencv-python 필요.

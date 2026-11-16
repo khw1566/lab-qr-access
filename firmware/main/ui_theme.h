@@ -4,12 +4,22 @@
 #include "ui_icons.h"
 
 // C안: 파란 안내 바, 흰 바탕, 남색 글자. 크기는 1024×600 기준이다.
-#define UI_BLUE       lv_color_hex(0x0070c0)
+// 강조색·글자색·연한 바탕·선 색은 설정 화면의 테마에서 고른다 (ui.c의 ui_palette_apply, 단말 재시작 후 적용).
+typedef struct {
+    uint32_t accent, ink, muted, soft, line;
+} ui_palette_hex_t;
+typedef struct {
+    lv_color_t accent, ink, muted, soft, line;
+} ui_palette_t;
+extern ui_palette_t ui_palette;
+extern const ui_palette_hex_t ui_themes[];   // SETTINGS_THEME_COUNT개, 0번이 기본 파랑
+void ui_palette_apply(int theme);
+#define UI_BLUE       (ui_palette.accent)
 #define UI_GRAY       lv_color_hex(0xadadad)
-#define UI_INK        lv_color_hex(0x142979)
-#define UI_MUTED      lv_color_hex(0x4e6080)
-#define UI_SOFT       lv_color_hex(0xedf1ff)
-#define UI_LINE       lv_color_hex(0xcbd6ef)
+#define UI_INK        (ui_palette.ink)
+#define UI_MUTED      (ui_palette.muted)
+#define UI_SOFT       (ui_palette.soft)
+#define UI_LINE       (ui_palette.line)
 #define UI_GREEN      lv_color_hex(0x08764d)
 #define UI_RED        lv_color_hex(0xb73734)
 #define UI_AMBER      lv_color_hex(0x955c13)

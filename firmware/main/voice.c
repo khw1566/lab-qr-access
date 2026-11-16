@@ -24,7 +24,6 @@ static const char *TAG = "voice";
 
 #define RATE        16000
 #define CHUNK       512     // 한 번에 쓰는 mono 샘플 수
-#define VOLUME      80
 #define MIC_GAIN_DB 30.0f
 #define TALK_BUF    (16000)             // 말하기 수신 버퍼 (8 kHz s16 기준 약 1초)
 #define TALK_HOLD_MS 300                // 말하기 재생 직후 이 시간 동안은 마이크를 보내지 않는다 (울림 방지)
@@ -34,22 +33,28 @@ static const char *TAG = "voice";
 #define CONFIG_LAB_AUDIO_DIN_GPIO -1
 #endif
 
+// 음성은 VOICE_COUNT 종류를 모두 펌웨어에 넣고 설정 화면에서 고른다.
+// 0번은 voice/<문구>.pcm, 1번부터는 voice/v<번호>_<문구>.pcm (tools/gen_voice.py의 VOICES 순서)
 #define CLIP(name) \
     extern const uint8_t name##_start[] asm("_binary_" #name "_pcm_start"); \
     extern const uint8_t name##_end[] asm("_binary_" #name "_pcm_end");
-CLIP(scan)
-CLIP(checking)
-CLIP(granted)
-CLIP(denied)
-CLIP(offline)
+#define VOICE_SET(p) CLIP(p##scan) CLIP(p##checking) CLIP(p##granted) CLIP(p##denied) CLIP(p##offline)
+#define VOICE_ROW(p) { \
+    [VOICE_SCAN] = {p##scan_start, p##scan_end}, \
+    [VOICE_CHECKING] = {p##checking_start, p##checking_end}, \
+    [VOICE_GRANTED] = {p##granted_start, p##granted_end}, \
+    [VOICE_DENIED] = {p##denied_start, p##denied_end}, \
+    [VOICE_OFFLINE] = {p##offline_start, p##offline_end}, \
+}
+VOICE_SET()
+VOICE_SET(v1_)
+VOICE_SET(v2_)
+VOICE_SET(v3_)
 
-static const uint8_t *const s_clips[][2] = {
-    [VOICE_SCAN] = {scan_start, scan_end},
-    [VOICE_CHECKING] = {checking_start, checking_end},
-    [VOICE_GRANTED] = {granted_start, granted_end},
-    [VOICE_DENIED] = {denied_start, denied_end},
-    [VOICE_OFFLINE] = {offline_start, offline_end},
+static const uint8_t *const s_clips[VOICE_COUNT][5][2] = {
+    VOICE_ROW(), VOICE_ROW(v1_), VOICE_ROW(v2_), VOICE_ROW(v3_),
 };
+_Static_assert(VOICE_COUNT == 4, "voice.c의 VOICE_SET 목록과 CMakeLists.txt를 함께 고칠 것");
 
 static QueueHandle_t s_queue;
 static StreamBufferHandle_t s_talk;
@@ -108,7 +113,7 @@ static esp_err_t codec_start(void)
     ESP_RETURN_ON_FALSE(s_codec, ESP_ERR_NO_MEM, TAG, "코덱 장치");
     esp_codec_dev_sample_info_t format = { .sample_rate = RATE, .channel = 2, .bits_per_sample = 16 };
     ESP_RETURN_ON_FALSE(esp_codec_dev_open(s_codec, &format) == ESP_CODEC_DEV_OK, ESP_FAIL, TAG, "코덱 열기");
-    esp_codec_dev_set_out_vol(s_codec, VOLUME);
+    esp_codec_dev_set_out_vol(s_codec, settings_volume());
     if (rx) {
         esp_codec_dev_set_in_gain(s_codec, MIC_GAIN_DB);
         s_has_mic = true;
@@ -169,8 +174,9 @@ static void voice_task(void *arg)
         TickType_t wait = (s_talk && xStreamBufferBytesAvailable(s_talk)) ? 0 : pdMS_TO_TICKS(20);
         if (xQueueReceive(s_queue, &clip, wait) == pdTRUE) {
             if (clip == VOICE_CHIME) { play_chime(); continue; }
-            const int16_t *pcm = (const int16_t *)s_clips[clip][0];
-            size_t total = (s_clips[clip][1] - s_clips[clip][0]) / 2;
+            int voice = settings_voice_id();
+            const int16_t *pcm = (const int16_t *)s_clips[voice][clip][0];
+            size_t total = (s_clips[voice][clip][1] - s_clips[voice][clip][0]) / 2;
             for (size_t at = 0; at < total; at += CHUNK) {
                 // 새 안내가 들어오면 지금 것은 끊고 새 것을 재생한다
                 if (uxQueueMessagesWaiting(s_queue)) break;
@@ -193,14 +199,30 @@ esp_err_t voice_start(void)
     return ESP_OK;
 }
 
-void voice_play(voice_clip_t clip)
+static void enqueue(voice_clip_t clip)
 {
     if (s_queue) xQueueOverwrite(s_queue, &clip);
 }
 
+void voice_play(voice_clip_t clip)
+{
+    if (settings_voice_on()) enqueue(clip);
+}
+
+void voice_preview(void)
+{
+    enqueue(VOICE_GRANTED);
+}
+
+void voice_set_volume(int percent)
+{
+    if (s_codec) esp_codec_dev_set_out_vol(s_codec, percent < 0 ? 0 : percent > 100 ? 100 : percent);
+}
+
+// 실시간 보기 연결 알림음은 관리자가 보고 있다는 표시라 음성 안내를 꺼도 울린다
 void voice_chime(void)
 {
-    voice_play(VOICE_CHIME);
+    enqueue(VOICE_CHIME);
 }
 
 bool voice_mic_available(void)

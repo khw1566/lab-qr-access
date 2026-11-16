@@ -1,5 +1,6 @@
 // Wi-Fi 연결. ESP32-P4는 esp_wifi_remote/esp_hosted를 통해 보드의 ESP32-C6를 쓰지만 API는 동일하다.
 // 설정 화면에서 고른 네트워크는 NVS에 저장하고, 없으면 menuconfig 값을 쓴다.
+// 연결했던 네트워크는 최대 WIFI_SAVED_MAX개를 최근 순으로 저장해 설정 화면에서 다시 연결하거나 지울 수 있다.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -24,6 +25,9 @@ static EventGroupHandle_t s_evt;
 #define NVS_SPACE "lab-wifi"
 
 static char s_ssid[33], s_password[65];
+typedef struct { char ssid[33]; char pass[65]; } saved_net_t;
+static saved_net_t s_saved[WIFI_SAVED_MAX];   // [0]이 가장 최근
+static int s_saved_count;
 static volatile bool s_paused;  // 검색 중에는 자동 재접속을 멈춘다
 static esp_timer_handle_t s_dhcp_timer;
 static void sntp_start_once(void);
@@ -113,33 +117,73 @@ static void sntp_start_once(void)
     if (esp_netif_sntp_init(&config) != ESP_OK) ESP_LOGW(TAG, "NTP 시작 실패");
 }
 
+static void saved_store(void)
+{
+    nvs_handle_t nvs;
+    esp_err_t err = nvs_open(NVS_SPACE, NVS_READWRITE, &nvs);
+    if (err == ESP_OK) {
+        err = s_saved_count ? nvs_set_blob(nvs, "saved", s_saved, s_saved_count * sizeof(saved_net_t))
+                            : nvs_erase_key(nvs, "saved");
+        if (err == ESP_ERR_NVS_NOT_FOUND) err = ESP_OK;
+        // 마지막으로 고른 네트워크 (부팅 때 이것부터 접속). 목록이 비면 menuconfig 값으로 돌아간다.
+        if (err == ESP_OK && s_saved_count) {
+            err = nvs_set_str(nvs, "ssid", s_saved[0].ssid);
+            if (err == ESP_OK) err = nvs_set_str(nvs, "pass", s_saved[0].pass);
+        } else if (err == ESP_OK) {
+            nvs_erase_key(nvs, "ssid");
+            nvs_erase_key(nvs, "pass");
+        }
+        if (err == ESP_OK) err = nvs_commit(nvs);
+        nvs_close(nvs);
+    }
+    if (err != ESP_OK) ESP_LOGE(TAG, "Wi-Fi 목록 저장 실패: %s", esp_err_to_name(err));
+}
+
+static int saved_find(const char *ssid)
+{
+    for (int i = 0; i < s_saved_count; i++) if (strcmp(s_saved[i].ssid, ssid) == 0) return i;
+    return -1;
+}
+
+// 맨 앞에 넣는다. 이미 있으면 앞으로 옮기고 비밀번호를 새 값으로 바꾼다. 꽉 차면 가장 오래된 것을 버린다.
+static void saved_put_front(const char *ssid, const char *pass)
+{
+    int at = saved_find(ssid);
+    if (at < 0) at = s_saved_count < WIFI_SAVED_MAX ? s_saved_count++ : WIFI_SAVED_MAX - 1;
+    memmove(&s_saved[1], &s_saved[0], at * sizeof(saved_net_t));
+    strlcpy(s_saved[0].ssid, ssid, sizeof(s_saved[0].ssid));
+    strlcpy(s_saved[0].pass, pass, sizeof(s_saved[0].pass));
+}
+
 static void credentials_load(void)
 {
     strlcpy(s_ssid, CONFIG_LAB_WIFI_SSID, sizeof(s_ssid));
     strlcpy(s_password, CONFIG_LAB_WIFI_PASSWORD, sizeof(s_password));
     nvs_handle_t nvs;
     if (nvs_open(NVS_SPACE, NVS_READONLY, &nvs) != ESP_OK) return;
+    size_t blob_len = sizeof(s_saved);
+    if (nvs_get_blob(nvs, "saved", s_saved, &blob_len) == ESP_OK && blob_len % sizeof(saved_net_t) == 0) {
+        s_saved_count = blob_len / sizeof(saved_net_t);
+        for (int i = 0; i < s_saved_count; i++) {
+            s_saved[i].ssid[sizeof(s_saved[i].ssid) - 1] = 0;
+            s_saved[i].pass[sizeof(s_saved[i].pass) - 1] = 0;
+        }
+    }
     size_t ssid_len = sizeof(s_ssid), password_len = sizeof(s_password);
     char ssid[sizeof(s_ssid)], password[sizeof(s_password)];
     if (nvs_get_str(nvs, "ssid", ssid, &ssid_len) == ESP_OK &&
         nvs_get_str(nvs, "pass", password, &password_len) == ESP_OK) {
         strlcpy(s_ssid, ssid, sizeof(s_ssid));
         strlcpy(s_password, password, sizeof(s_password));
+        // 목록 기능 이전 펌웨어에서 저장한 네트워크도 목록에 넣는다
+        if (saved_find(ssid) < 0 && s_saved_count < WIFI_SAVED_MAX) {
+            saved_net_t *net = &s_saved[s_saved_count++];
+            strlcpy(net->ssid, ssid, sizeof(net->ssid));
+            strlcpy(net->pass, password, sizeof(net->pass));
+        }
     }
     nvs_close(nvs);
-}
-
-static void credentials_save(void)
-{
-    nvs_handle_t nvs;
-    esp_err_t err = nvs_open(NVS_SPACE, NVS_READWRITE, &nvs);
-    if (err == ESP_OK) {
-        err = nvs_set_str(nvs, "ssid", s_ssid);
-        if (err == ESP_OK) err = nvs_set_str(nvs, "pass", s_password);
-        if (err == ESP_OK) err = nvs_commit(nvs);
-        nvs_close(nvs);
-    }
-    if (err != ESP_OK) ESP_LOGE(TAG, "Wi-Fi 설정 저장 실패: %s", esp_err_to_name(err));
+    ESP_LOGI(TAG, "저장된 Wi-Fi %d개", s_saved_count);
 }
 
 static esp_err_t config_apply(void)
@@ -211,15 +255,53 @@ int wifi_scan(wifi_ap_t *out, int max)
     return count;
 }
 
-void wifi_connect_to(const char *ssid, const char *password)
+static void connect_now(const char *ssid, const char *password)
 {
     strlcpy(s_ssid, ssid, sizeof(s_ssid));
     strlcpy(s_password, password, sizeof(s_password));
-    credentials_save();
     s_paused = true;
     esp_wifi_disconnect();
     if (config_apply() != ESP_OK) ESP_LOGE(TAG, "Wi-Fi 설정 적용 실패");
     s_paused = false;
+    s_dhcp_failures = 0;
     show_connecting();
     esp_wifi_connect();
+}
+
+void wifi_connect_to(const char *ssid, const char *password)
+{
+    saved_put_front(ssid, password);
+    saved_store();
+    connect_now(ssid, password);
+}
+
+int wifi_saved_list(char ssids[][33], int max)
+{
+    int n = s_saved_count < max ? s_saved_count : max;
+    for (int i = 0; i < n; i++) strlcpy(ssids[i], s_saved[i].ssid, 33);
+    return n;
+}
+
+bool wifi_saved_connect(const char *ssid)
+{
+    int at = saved_find(ssid);
+    if (at < 0) return false;
+    saved_net_t net = s_saved[at];
+    wifi_connect_to(net.ssid, net.pass);
+    return true;
+}
+
+void wifi_saved_forget(const char *ssid)
+{
+    int at = saved_find(ssid);
+    if (at < 0) return;
+    memmove(&s_saved[at], &s_saved[at + 1], (s_saved_count - at - 1) * sizeof(saved_net_t));
+    s_saved_count--;
+    memset(&s_saved[s_saved_count], 0, sizeof(saved_net_t));
+    saved_store();
+    ESP_LOGI(TAG, "저장된 Wi-Fi 삭제: %s", ssid);
+    if (strcmp(ssid, s_ssid) != 0) return;
+    // 지금 쓰는 네트워크를 지웠으면 다음 저장 네트워크, 없으면 menuconfig 네트워크로 옮긴다
+    if (s_saved_count) connect_now(s_saved[0].ssid, s_saved[0].pass);
+    else connect_now(CONFIG_LAB_WIFI_SSID, CONFIG_LAB_WIFI_PASSWORD);
 }

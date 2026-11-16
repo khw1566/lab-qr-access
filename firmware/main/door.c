@@ -69,9 +69,11 @@ void door_init(void)
 
 void door_open(int ms)
 {
-    // 서버의 문 열림 시간이 짧아도 최소 CONFIG_LAB_DOOR_MIN_OPEN_MS(기본 15초)는 신호를 유지한다
-    if (ms < CONFIG_LAB_DOOR_MIN_OPEN_MS) ms = CONFIG_LAB_DOOR_MIN_OPEN_MS;
-    if (ms > CONFIG_LAB_DOOR_MAX_OPEN_MS) ms = CONFIG_LAB_DOOR_MAX_OPEN_MS;
+    // 문 열림 신호 시간은 단말 설정 화면에서 정한 값(기본 CONFIG_LAB_DOOR_MIN_OPEN_MS)으로 고정한다.
+    // 서버가 보낸 시간(ms)은 로그에만 남긴다.
+    int server_ms = ms;
+    ms = settings_door_ms();
+    if (server_ms != ms) ESP_LOGI(TAG, "서버 요청 %d ms 대신 단말 설정 %d ms 사용", server_ms, ms);
     ESP_LOGI(TAG, "릴레이 켬 %d ms", ms);
     esp_timer_stop(s_close_timer);
     relay_set(true);

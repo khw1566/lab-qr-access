@@ -215,8 +215,15 @@ esp_err_t display_start(void)
 
     // QR 스캔이 코어 1을 쓰므로 화면 갱신은 코어 0에 둔다
     if (xTaskCreatePinnedToCore(lvgl_task, "lvgl", 8192, NULL, 4, NULL, 0) != pdPASS) return ESP_ERR_NO_MEM;
-    backlight_set(80);
+    backlight_set(settings_brightness());
     return ESP_OK;
+}
+
+void display_set_brightness(int percent)
+{
+    if (percent < SETTINGS_BRIGHT_MIN) percent = SETTINGS_BRIGHT_MIN;
+    if (percent > 100) percent = 100;
+    backlight_set(percent);
 }
 
 bool display_lock(uint32_t timeout_ms)

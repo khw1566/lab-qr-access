@@ -26,15 +26,20 @@ menu "Lab Door Config"
             string "Device key (관리자 화면 > 단말 등록에서 발급)"
             default ""
         config LAB_ADMIN_PIN
-            string "단말 설정 화면 비밀번호 (저장소에 올리지 말고 sdkconfig에만 둘 것)"
+            string "단말 설정 화면 기본 비밀번호 (저장소에 올리지 말고 sdkconfig에만 둘 것)"
             default ""
+            help
+                단말 설정 > 단말 비밀번호에서 바꾸면 NVS에 저장된 새 비밀번호를 쓰고 이 값은 무시한다.
+                '기본값으로 되돌리기'를 누르면 다시 이 값을 쓴다. 새 비밀번호를 잊었으면
+                NVS를 지운다: python -m esptool --chip esp32p4 -p COM22 erase_region 0x9000 0x6000
+                (저장된 Wi-Fi와 다른 단말 설정도 함께 지워진다)
         config LAB_ADMIN_PIN_OPENS_DOOR
             bool "코드 입력 화면에서 관리자 비밀번호로 문 열기 (서버 확인 없음, 비상용)"
             default y
             help
                 출입 코드 입력 화면에 위 비밀번호를 넣으면 서버에 묻지 않고 바로 문을 연다.
                 서버·Wi-Fi 장애 때 쓰는 비상용이라 긴급 잠금 중에도 열리고 서버 출입 기록에 남지 않는다.
-                비밀번호를 바꾸려면 펌웨어를 다시 구워야 한다.
+                단말 설정 화면에서 비밀번호를 바꾸면 새 비밀번호로 열린다.
     endmenu
 
     menu "Weather (상단 바 날씨)"
@@ -134,11 +139,15 @@ menu "Lab Door Config"
             bool "Relay is active-high"
             default y
         config LAB_DOOR_MIN_OPEN_MS
-            int "최소 문 열림 신호 시간 (ms, 서버 설정이 더 짧아도 이만큼 유지)"
+            int "기본 문 열림 신호 시간 (ms, 단말 설정 화면에서 1~60초로 바꿀 수 있음)"
+            range 1000 60000
             default 15000
+            help
+                출입이 승인되면 릴레이를 이 시간 동안 켠다. 단말 설정 > 문 열림 시간에서 바꾸면
+                NVS에 저장된 값을 쓰고 이 값은 처음 켠 단말의 기본값으로만 쓰인다.
 
         config LAB_DOOR_MAX_OPEN_MS
-            int "Max door open pulse (ms)"
+            int "(사용 안 함) 예전 최대 문 열림 시간, 지금은 단말 설정값을 쓴다"
             default 15000
         config LAB_BUZZER_GPIO
             int "Status buzzer/LED GPIO (-1 = 사용 안 함)"

@@ -292,13 +292,17 @@ static void on_code_key(lv_event_t *event)
         lv_textarea_delete_char(s_code_input);
         lv_label_set_text(s_code_error, "");
     } else if (strcmp(key, "확인") == 0) {
+        // 출입 코드는 숫자 8자리다. 설정 화면에서 바꾼 단말 비밀번호(4~16자리)도 여기서 비상 문 열기에 쓰므로
+        // 길이가 달라도 main.c(access_submit_code)에 넘겨 비밀번호인지 확인한다.
         const char *value = lv_textarea_get_text(s_code_input);
-        if (strlen(value) != 8) { lv_label_set_text(s_code_error, "숫자 8자리를 입력하세요"); return; }
-        char code[9];
+        size_t len = strlen(value);
+        if (len < SETTINGS_PIN_MIN || len > SETTINGS_PIN_MAX) { lv_label_set_text(s_code_error, "숫자 8자리를 입력하세요"); return; }
+        char code[SETTINGS_PIN_MAX + 1];
         strlcpy(code, value, sizeof(code));
         lv_textarea_set_text(s_code_input, "");
         lv_label_set_text(s_code_error, "");
-        if (!access_submit_code(code)) lv_label_set_text(s_code_error, "잠시 후 다시 입력하세요");
+        if (!access_submit_code(code))
+            lv_label_set_text(s_code_error, len == 8 ? "잠시 후 다시 입력하세요" : "숫자 8자리를 입력하세요");
     } else {
         lv_label_set_text(s_code_error, "");
         lv_textarea_add_text(s_code_input, key);
@@ -315,7 +319,7 @@ static void code_build(lv_obj_t *screen)
     s_code_input = lv_textarea_create(s_code);
     lv_textarea_set_one_line(s_code_input, true);
     lv_textarea_set_accepted_chars(s_code_input, "0123456789");
-    lv_textarea_set_max_length(s_code_input, 8);
+    lv_textarea_set_max_length(s_code_input, SETTINGS_PIN_MAX);   // 8자리 출입 코드 또는 4~16자리 단말 비밀번호
     lv_textarea_set_cursor_click_pos(s_code_input, false);
     lv_obj_set_pos(s_code_input, 40, 176);
     lv_obj_set_size(s_code_input, 512, 88);

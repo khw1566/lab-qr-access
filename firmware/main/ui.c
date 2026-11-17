@@ -38,6 +38,26 @@ static volatile bool s_scan_visible, s_preview_paused, s_overlay_shown;
 static tab_t s_tab = TAB_HOME;
 static int64_t s_clock_offset_ms;
 
+// 테마 (main/app.h의 SETTINGS_THEME_COUNT와 개수를 맞춘다). 이름은 ui_settings.c의 s_theme_names.
+const ui_palette_hex_t ui_themes[SETTINGS_THEME_COUNT] = {
+    { 0x0070c0, 0x142979, 0x4e6080, 0xedf1ff, 0xcbd6ef },   // 파랑 (기본)
+    { 0x00788a, 0x0b3a44, 0x48676d, 0xe6f4f5, 0xc0dfe3 },   // 청록
+    { 0x1b7f4b, 0x123d27, 0x4b6a58, 0xe9f5ee, 0xc5e2d0 },   // 초록
+    { 0x5b3fb5, 0x2a1c63, 0x5e5782, 0xf0edff, 0xd6cff2 },   // 보라
+    { 0x3d4f5c, 0x1c262b, 0x5a6870, 0xeef1f3, 0xcfd8dc },   // 진회색
+};
+ui_palette_t ui_palette;
+
+void ui_palette_apply(int theme)
+{
+    if (theme < 0 || theme >= SETTINGS_THEME_COUNT) theme = 0;
+    const ui_palette_hex_t *hex = &ui_themes[theme];
+    ui_palette = (ui_palette_t){
+        .accent = lv_color_hex(hex->accent), .ink = lv_color_hex(hex->ink), .muted = lv_color_hex(hex->muted),
+        .soft = lv_color_hex(hex->soft), .line = lv_color_hex(hex->line),
+    };
+}
+
 static void set_hidden(lv_obj_t *obj, bool hidden)
 {
     if (hidden) lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN);
@@ -272,13 +292,17 @@ static void on_code_key(lv_event_t *event)
         lv_textarea_delete_char(s_code_input);
         lv_label_set_text(s_code_error, "");
     } else if (strcmp(key, "확인") == 0) {
+        // 출입 코드는 숫자 8자리다. 설정 화면에서 바꾼 단말 비밀번호(4~16자리)도 여기서 비상 문 열기에 쓰므로
+        // 길이가 달라도 main.c(access_submit_code)에 넘겨 비밀번호인지 확인한다.
         const char *value = lv_textarea_get_text(s_code_input);
-        if (strlen(value) != 8) { lv_label_set_text(s_code_error, "숫자 8자리를 입력하세요"); return; }
-        char code[9];
+        size_t len = strlen(value);
+        if (len < SETTINGS_PIN_MIN || len > SETTINGS_PIN_MAX) { lv_label_set_text(s_code_error, "숫자 8자리를 입력하세요"); return; }
+        char code[SETTINGS_PIN_MAX + 1];
         strlcpy(code, value, sizeof(code));
         lv_textarea_set_text(s_code_input, "");
         lv_label_set_text(s_code_error, "");
-        if (!access_submit_code(code)) lv_label_set_text(s_code_error, "잠시 후 다시 입력하세요");
+        if (!access_submit_code(code))
+            lv_label_set_text(s_code_error, len == 8 ? "잠시 후 다시 입력하세요" : "숫자 8자리를 입력하세요");
     } else {
         lv_label_set_text(s_code_error, "");
         lv_textarea_add_text(s_code_input, key);
@@ -295,7 +319,7 @@ static void code_build(lv_obj_t *screen)
     s_code_input = lv_textarea_create(s_code);
     lv_textarea_set_one_line(s_code_input, true);
     lv_textarea_set_accepted_chars(s_code_input, "0123456789");
-    lv_textarea_set_max_length(s_code_input, 8);
+    lv_textarea_set_max_length(s_code_input, SETTINGS_PIN_MAX);   // 8자리 출입 코드 또는 4~16자리 단말 비밀번호
     lv_textarea_set_cursor_click_pos(s_code_input, false);
     lv_obj_set_pos(s_code_input, 40, 176);
     lv_obj_set_size(s_code_input, 512, 88);
@@ -396,6 +420,7 @@ static void on_art_tick(lv_timer_t *timer)
 
 void ui_build(void)
 {
+    ui_palette_apply(settings_theme());
     for (int i = 0; i < 2; i++) {
         s_buffers[i] = heap_caps_calloc(1, UI_PREVIEW_W * UI_PREVIEW_H * 2, MALLOC_CAP_SPIRAM);
         s_frames[i].header.cf = LV_COLOR_FORMAT_RGB565;

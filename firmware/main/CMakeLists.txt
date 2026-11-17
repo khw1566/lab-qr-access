@@ -1,5 +1,5 @@
 idf_component_register(
-    SRCS "display.c" "ui.c" "ui_settings.c" "lab_font.c" "panel_init.c" "main.c" "board.c" "wifi.c" "camera_qr.c" "door.c" "server.c"
+    SRCS "display.c" "settings.c" "ui.c" "ui_settings.c" "lab_font.c" "panel_init.c" "main.c" "board.c" "wifi.c" "camera_qr.c" "door.c" "server.c"
          "voice.c" "ui_assets.c" "ui_art.c" "weather.c" "remote.c" "live.c"
     INCLUDE_DIRS "."
     REQUIRES esp_wifi esp_netif esp_event nvs_flash esp_http_client esp-tls mbedtls
@@ -7,7 +7,11 @@ idf_component_register(
              esp_video esp_wifi_remote esp_lcd_jd9165 esp_lcd_touch_gt911 esp_codec_dev lvgl vfs quirc ov02c10
              esp_driver_jpeg esp_websocket_client esp_app_format
     # 안내 음성은 tools/gen_voice.py가 만든다
+    # 음성 4종: 0번 voice/<문구>.pcm, 1~3번 voice/v<번호>_<문구>.pcm (main/voice.c의 VOICE_SET과 같은 순서)
     EMBED_FILES "voice/scan.pcm" "voice/checking.pcm" "voice/granted.pcm" "voice/denied.pcm" "voice/offline.pcm"
+                "voice/v1_scan.pcm" "voice/v1_checking.pcm" "voice/v1_granted.pcm" "voice/v1_denied.pcm" "voice/v1_offline.pcm"
+                "voice/v2_scan.pcm" "voice/v2_checking.pcm" "voice/v2_granted.pcm" "voice/v2_denied.pcm" "voice/v2_offline.pcm"
+                "voice/v3_scan.pcm" "voice/v3_checking.pcm" "voice/v3_granted.pcm" "voice/v3_denied.pcm" "voice/v3_offline.pcm"
                 "assets/icon_0.a8" "assets/icon_1.a8" "assets/icon_2.a8"
                 "assets/icon_3.a8" "assets/icon_4.a8" "assets/icon_5.a8"
                 "assets/icon_6.a8" "assets/icon_7.a8" "assets/icon_8.a8"

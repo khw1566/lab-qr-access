@@ -1,4 +1,5 @@
 # Name,   Type, SubType, Offset,  Size
+# 음성 4종(약 2MB)을 넣으면서 앱 영역을 6MB에서 10MB로 늘렸다. nvs 위치는 그대로라 저장한 설정이 유지된다.
 nvs,      data, nvs,     0x9000,  0x6000
 phy_init, data, phy,     0xf000,  0x1000
-factory,  app,  factory, 0x10000, 0x600000
+factory,  app,  factory, 0x10000, 0xA00000

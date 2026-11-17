@@ -79,12 +79,12 @@ static void on_qr(const char *payload)
 }
 
 // 결과 화면을 띄웠으면 true를 돌려준다
-// 코드 입력 화면에서 펌웨어에 넣은 관리자 비밀번호(CONFIG_LAB_ADMIN_PIN)를 입력하면 서버 확인 없이 연다.
+// 코드 입력 화면에서 단말 비밀번호(설정 화면에서 바꾼 값, 없으면 CONFIG_LAB_ADMIN_PIN)를 입력하면 서버 확인 없이 연다.
 // 서버나 Wi-Fi가 안 될 때의 비상용이라 긴급 잠금과 상관없이 열리고, 서버 출입 기록에는 남지 않는다.
 static bool is_admin_pin(const char *code)
 {
 #if CONFIG_LAB_ADMIN_PIN_OPENS_DOOR
-    const char *pin = CONFIG_LAB_ADMIN_PIN;
+    const char *pin = settings_admin_pin();
     size_t n = strlen(pin);
     if (n < 4 || strlen(code) != n) return false;
     uint8_t diff = 0;   // 상수 시간 비교
@@ -100,7 +100,7 @@ static bool verify_one(const verify_request_t *request)
     verify_result_t r;
     if (request->manual && is_admin_pin(request->value)) {
         ESP_LOGW(TAG, "관리자 비밀번호로 문 열기 (서버 확인 없음)");
-        r = (verify_result_t){ .ok = true, .reachable = true, .open_ms = CONFIG_LAB_DOOR_MIN_OPEN_MS };
+        r = (verify_result_t){ .ok = true, .reachable = true, .open_ms = settings_door_ms() };
     } else {
         r = request->manual ? server_verify_code(request->value) : server_verify(request->value);
     }
@@ -172,6 +172,7 @@ void app_main(void)
         ESP_ERROR_CHECK(nvs_flash_erase());
         ESP_ERROR_CHECK(nvs_flash_init());
     }
+    settings_load();   // 화면 밝기·테마·음성·문 열림 시간이 이 값을 쓴다
     door_init();
     s_verify_queue = xQueueCreate(1, sizeof(verify_request_t));
     // 화면이나 카메라가 실패해도 재부팅을 반복하지 않고 나머지 기능은 계속 동작한다

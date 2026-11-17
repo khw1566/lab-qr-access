@@ -6,8 +6,17 @@ firmware/managed_components/
 firmware/sdkconfig
 firmware/sdkconfig.old
 firmware/dependencies.lock
-firmware/tools/.google_tts_key
 /.playwright-cli/
 /output/
 /firmware/.vscode/
+__pycache__/
+*.pyc
 
+# API 키·비밀값: 어떤 폴더에 두든 커밋되지 않게 한다
+.google_tts_key
+.gemini_key
+*.key
+*_key.txt
+.env
+.env.*
+*.pem

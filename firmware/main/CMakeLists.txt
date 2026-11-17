@@ -7,11 +7,13 @@ idf_component_register(
              esp_video esp_wifi_remote esp_lcd_jd9165 esp_lcd_touch_gt911 esp_codec_dev lvgl vfs quirc ov02c10
              esp_driver_jpeg esp_websocket_client esp_app_format
     # 안내 음성은 tools/gen_voice.py가 만든다
-    # 음성 4종: 0번 voice/<문구>.pcm, 1~3번 voice/v<번호>_<문구>.pcm (main/voice.c의 VOICE_SET과 같은 순서)
+    # 음성 6종(4번 제주 사투리, 5번 경상도 사투리): 0번 voice/<문구>.pcm, 1~5번 voice/v<번호>_<문구>.pcm (main/voice.c의 VOICE_SET과 같은 순서)
     EMBED_FILES "voice/scan.pcm" "voice/checking.pcm" "voice/granted.pcm" "voice/denied.pcm" "voice/offline.pcm"
                 "voice/v1_scan.pcm" "voice/v1_checking.pcm" "voice/v1_granted.pcm" "voice/v1_denied.pcm" "voice/v1_offline.pcm"
                 "voice/v2_scan.pcm" "voice/v2_checking.pcm" "voice/v2_granted.pcm" "voice/v2_denied.pcm" "voice/v2_offline.pcm"
                 "voice/v3_scan.pcm" "voice/v3_checking.pcm" "voice/v3_granted.pcm" "voice/v3_denied.pcm" "voice/v3_offline.pcm"
+                "voice/v4_scan.pcm" "voice/v4_checking.pcm" "voice/v4_granted.pcm" "voice/v4_denied.pcm" "voice/v4_offline.pcm"
+                "voice/v5_scan.pcm" "voice/v5_checking.pcm" "voice/v5_granted.pcm" "voice/v5_denied.pcm" "voice/v5_offline.pcm"
                 "assets/icon_0.a8" "assets/icon_1.a8" "assets/icon_2.a8"
                 "assets/icon_3.a8" "assets/icon_4.a8" "assets/icon_5.a8"
                 "assets/icon_6.a8" "assets/icon_7.a8" "assets/icon_8.a8"

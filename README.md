@@ -175,7 +175,7 @@ npm run deploy                             # lab.audreaming.com 도메인과 인
 - **Wi-Fi**: 연결했던 네트워크를 최근 순으로 최대 8개 저장합니다. 목록에서 바로 연결하거나 삭제할 수 있고, 지금 쓰는 네트워크를 지우면 다음 저장 네트워크(없으면 menuconfig 값)로 옮깁니다. "새 네트워크"에서 검색해 연결하면 목록에 추가됩니다.
 - **문 열림 시간**: 릴레이를 켜는 시간 1~60초 (기본 menuconfig `LAB_DOOR_MIN_OPEN_MS`). 서버가 보낸 시간보다 이 값이 우선합니다. "문 열기 시험"으로 릴레이를 바로 켜 볼 수 있습니다.
 - **단말 비밀번호**: 숫자 4~16자리로 바꿉니다. 설정 화면과 코드 입력 화면의 비상 문 열기에 모두 쓰입니다. "기본값으로 되돌리기"는 menuconfig `LAB_ADMIN_PIN`으로 돌아갑니다. 새 비밀번호를 잊으면 `python -m esptool --chip esp32p4 -p COM22 erase_region 0x9000 0x6000`으로 NVS를 지웁니다 (저장된 Wi-Fi도 지워짐).
-- **음성 안내**: 켜기/끄기, 음성 4종(여성 2, 남성 2), 볼륨. 음성은 `firmware/tools/gen_voice.py`가 Google TTS로 PC에서 미리 만들어 펌웨어에 넣으므로 보드에는 API 키가 없습니다. 키는 환경 변수 `GOOGLE_TTS_KEY`나 `firmware/tools/.google_tts_key`(git 제외)에 둡니다.
+- **음성 안내**: 켜기/끄기, 음성 6종(여성 2, 남성 2, 제주 사투리, 경상도 사투리), 볼륨. 음성은 `firmware/tools/gen_voice.py`가 PC에서 미리 만들어 펌웨어에 넣으므로 보드에는 API 키가 없습니다. 표준어 4종은 Google Cloud TTS(Chirp3-HD)로, 사투리 2종은 말투를 지시할 수 있는 Gemini TTS로 만들고 문구도 사투리로 바꿔 씁니다. 키는 환경 변수 `GOOGLE_TTS_KEY`/`GEMINI_API_KEY`나 `firmware/tools/.google_tts_key`/`firmware/tools/.gemini_key`(git 제외)에 둡니다. 사투리만 다시 만들 때: `python tools/gen_voice.py --only 4,5`
 - **화면 밝기·테마**: 밝기는 바로 적용, 테마(파랑·청록·초록·보라·진회색)는 단말을 다시 시작하며 적용됩니다.
 
 음성 4종을 넣으면서 앱 파티션을 10MB로 늘렸습니다(`firmware/partitions.csv`). NVS 위치는 그대로라 기존 Wi-Fi 설정은 유지됩니다.

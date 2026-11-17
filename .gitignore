@@ -11,3 +11,4 @@ firmware/tools/.google_tts_key
 /output/
 /firmware/.vscode/
 
+firmware/tools/.gemini_key

@@ -12,7 +12,7 @@ i2c_master_bus_handle_t board_i2c_bus(void);
 typedef enum { VOICE_SCAN, VOICE_CHECKING, VOICE_GRANTED, VOICE_DENIED, VOICE_OFFLINE } voice_clip_t;
 esp_err_t voice_start(void);
 void voice_play(voice_clip_t clip);                      // 설정에서 음성 안내를 끄면 재생하지 않는다
-#define VOICE_COUNT 4                                    // 음성 종류 (tools/gen_voice.py의 VOICES와 같다)
+#define VOICE_COUNT 6                                    // 음성 종류 (tools/gen_voice.py의 VOICES와 같다)
 void voice_preview(void);                                // 설정 화면 미리 듣기 (끄기와 상관없이 재생)
 void voice_set_volume(int percent);                      // 0~100, 바로 적용
 void voice_chime(void);                                  // 실시간 연결 알림음

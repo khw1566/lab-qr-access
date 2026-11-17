@@ -50,11 +50,13 @@ VOICE_SET()
 VOICE_SET(v1_)
 VOICE_SET(v2_)
 VOICE_SET(v3_)
+VOICE_SET(v4_)
+VOICE_SET(v5_)
 
 static const uint8_t *const s_clips[VOICE_COUNT][5][2] = {
-    VOICE_ROW(), VOICE_ROW(v1_), VOICE_ROW(v2_), VOICE_ROW(v3_),
+    VOICE_ROW(), VOICE_ROW(v1_), VOICE_ROW(v2_), VOICE_ROW(v3_), VOICE_ROW(v4_), VOICE_ROW(v5_),
 };
-_Static_assert(VOICE_COUNT == 4, "voice.c의 VOICE_SET 목록과 CMakeLists.txt를 함께 고칠 것");
+_Static_assert(VOICE_COUNT == 6, "voice.c의 VOICE_SET 목록과 CMakeLists.txt를 함께 고칠 것");
 
 static QueueHandle_t s_queue;
 static StreamBufferHandle_t s_talk;

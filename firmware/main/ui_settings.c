@@ -30,7 +30,7 @@ static const char *TAG = "ui_settings";
 #define CONTACT_TEXT_X 164
 
 // 음성 이름은 tools/gen_voice.py의 VOICES 순서와 같다
-static const char *const s_voice_names[VOICE_COUNT] = { "여성 1", "여성 2", "남성 1", "남성 2" };
+static const char *const s_voice_names[VOICE_COUNT] = { "여성 1", "여성 2", "남성 1", "남성 2", "제주 사투리", "경상도 사투리" };
 // 테마 이름은 ui.c의 ui_themes 순서와 같다
 static const char *const s_theme_names[SETTINGS_THEME_COUNT] = { "파랑", "청록", "초록", "보라", "진회색" };
 
@@ -41,7 +41,7 @@ static const char *const s_pin_map[] = {
     "지움", "0", "확인", "",
 };
 
-static const char *const s_voice_map[] = { "여성 1", "여성 2", "남성 1", "남성 2", "" };
+static const char *const s_voice_map[] = { "여성 1", "여성 2", "남성 1", "남성 2", "제주", "경상도", "" };
 
 typedef enum { PAGE_PIN, PAGE_MENU, PAGE_WIFI, PAGE_SCAN, PAGE_PASS, PAGE_DOOR, PAGE_PINSET, PAGE_VOICE, PAGE_DISPLAY, PAGE_COUNT } page_t;
 static lv_obj_t *s_root, *s_pages[PAGE_COUNT];

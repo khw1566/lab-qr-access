@@ -68,11 +68,12 @@ DIALECT_LINES = {
         'offline': '서버에 연결이 안 됩니더. 쪼매 있다가 다시 해 보이소.',
     },
 }
+# Gemini 3.8 TTS는 본문을 그대로 읽으므로 말투 지시는 speech_metadata.style에 따로 넣는다 (본문에 넣으면 지시문까지 읽는다).
 DIALECT_STYLE = {
-    'jeju': ('제주도에서 나고 자란 다정한 중년 여성 안내원처럼, 제주 사투리(제주어) 억양과 말끝을 살려 '
-             '또렷하고 따뜻하게, 약간 느긋한 속도로 말해 주세요. 표준어 억양으로 바꾸지 마세요. 다음 문장:'),
-    'gyeongsang': ('부산·경상도에서 나고 자란 친근한 중년 남성 안내원처럼, 경상도 사투리 특유의 높낮이와 '
-                   '힘 있는 말끝을 살려 또렷하고 시원하게 말해 주세요. 표준어 억양으로 바꾸지 마세요. 다음 문장:'),
+    'jeju': ('제주도 토박이 중년 여성의 진한 제주 사투리(제주어) 억양. 제주어 특유의 말끝 높낮이를 살리고 '
+             '표준어 억양으로 바꾸지 않는다. 따뜻하고 또렷하게, 약간 느긋한 속도.'),
+    'gyeongsang': ('부산 토박이 중년 남성의 진한 경상도 사투리 억양. 높낮이(성조)가 뚜렷하고 말끝이 힘 있게 '
+                   '떨어진다. 표준어 억양으로 바꾸지 않는다. 친근하고 시원하게, 또렷한 속도.'),
 }
 
 
@@ -131,7 +132,8 @@ def resample(pcm, src):
 
 
 def synthesize_gemini(key, voice, dialect, text):
-    body = {'contents': [{'parts': [{'text': f'{DIALECT_STYLE[dialect]}\n{text}'}]}],
+    body = {'contents': [{'parts': [{'text': text,
+                                     'speech_metadata': {'speaker': '안내원', 'style': DIALECT_STYLE[dialect]}}]}],
             'generationConfig': {'responseModalities': ['AUDIO'],
                                  'speechConfig': {'voiceConfig': {'prebuiltVoiceConfig': {'voiceName': voice}}}}}
     request = urllib.request.Request(
@@ -150,10 +152,16 @@ def synthesize_gemini(key, voice, dialect, text):
             raise SystemExit(f'Gemini TTS HTTP {error.code}: {detail}') from None
     part = data['candidates'][0]['content']['parts'][0]['inlineData']
     mime = part.get('mimeType', '')
-    match = re.search(r'rate=(\d+)', mime)
+    audio = base64.b64decode(part['data'])
+    if 'wav' in mime.lower() or audio[:4] == b'RIFF':
+        with wave.open(io.BytesIO(audio), 'rb') as wav:
+            if (wav.getnchannels(), wav.getsampwidth()) != (1, 2):
+                raise SystemExit('mono PCM16 WAV가 아닌 Gemini 응답')
+            return trim(resample(wav.readframes(wav.getnframes()), wav.getframerate()))
     if 'L16' not in mime and 'pcm' not in mime.lower():
         raise SystemExit(f'예상하지 못한 Gemini 오디오 형식: {mime}')
-    return trim(resample(base64.b64decode(part['data']), int(match.group(1)) if match else 24000))
+    match = re.search(r'rate=(\d+)', mime)
+    return trim(resample(audio, int(match.group(1)) if match else 24000))
 
 
 def trim(pcm, threshold=300, pad=0.12):

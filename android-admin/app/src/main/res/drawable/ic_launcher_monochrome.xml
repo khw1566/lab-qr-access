@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 테마 아이콘(단색)용: 문 윤곽 + 체크 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <group android:scaleX="0.07" android:scaleY="0.07" android:translateX="13.82" android:translateY="16.62">
+        <path android:fillColor="#FFFFFFFF" android:fillType="evenOdd" android:pathData="M316,184h312a44,44 0 0 1 44,44v576a44,44 0 0 1 -44,44h-312a44,44 0 0 1 -44,-44v-576a44,44 0 0 1 44,-44zM342,248h92a14,14 0 0 1 14,14v92a14,14 0 0 1 -14,14h-92a14,14 0 0 1 -14,-14v-92a14,14 0 0 1 14,-14zM510,248h92a14,14 0 0 1 14,14v92a14,14 0 0 1 -14,14h-92a14,14 0 0 1 -14,-14v-92a14,14 0 0 1 14,-14zM342,416h92a14,14 0 0 1 14,14v92a14,14 0 0 1 -14,14h-92a14,14 0 0 1 -14,-14v-92a14,14 0 0 1 14,-14z" />
+    </group>
+</vector>

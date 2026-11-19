@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- branding/icon.svg 에서 바깥 둥근 사각형을 뺀 전경 (적응형 아이콘 안전 영역에 맞게 축소) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <group android:scaleX="0.07" android:scaleY="0.07" android:translateX="13.82" android:translateY="16.62">
+        <path android:fillColor="#FF374151" android:pathData="M308,160h328a60,60 0 0 1 60,60v584a60,60 0 0 1 -60,60h-328a60,60 0 0 1 -60,-60v-584a60,60 0 0 1 60,-60z" />
+        <path android:fillColor="#FFFFFFFF" android:pathData="M316,184h312a44,44 0 0 1 44,44v576a44,44 0 0 1 -44,44h-312a44,44 0 0 1 -44,-44v-576a44,44 0 0 1 44,-44z" />
+        <path android:fillColor="#FF111827" android:pathData="M342,248h92a14,14 0 0 1 14,14v92a14,14 0 0 1 -14,14h-92a14,14 0 0 1 -14,-14v-92a14,14 0 0 1 14,-14zM510,248h92a14,14 0 0 1 14,14v92a14,14 0 0 1 -14,14h-92a14,14 0 0 1 -14,-14v-92a14,14 0 0 1 14,-14zM342,416h92a14,14 0 0 1 14,14v92a14,14 0 0 1 -14,14h-92a14,14 0 0 1 -14,-14v-92a14,14 0 0 1 14,-14z" />
+        <path android:fillColor="#FFFFFFFF" android:pathData="M356,270h64a6,6 0 0 1 6,6v64a6,6 0 0 1 -6,6h-64a6,6 0 0 1 -6,-6v-64a6,6 0 0 1 6,-6zM524,270h64a6,6 0 0 1 6,6v64a6,6 0 0 1 -6,6h-64a6,6 0 0 1 -6,-6v-64a6,6 0 0 1 6,-6zM356,438h64a6,6 0 0 1 6,6v64a6,6 0 0 1 -6,6h-64a6,6 0 0 1 -6,-6v-64a6,6 0 0 1 6,-6z" />
+        <path android:fillColor="#FF111827" android:pathData="M372,288h32a4,4 0 0 1 4,4v32a4,4 0 0 1 -4,4h-32a4,4 0 0 1 -4,-4v-32a4,4 0 0 1 4,-4zM540,288h32a4,4 0 0 1 4,4v32a4,4 0 0 1 -4,4h-32a4,4 0 0 1 -4,-4v-32a4,4 0 0 1 4,-4zM372,456h32a4,4 0 0 1 4,4v32a4,4 0 0 1 -4,4h-32a4,4 0 0 1 -4,-4v-32a4,4 0 0 1 4,-4zM500,416h28a4,4 0 0 1 4,4v28a4,4 0 0 1 -4,4h-28a4,4 0 0 1 -4,-4v-28a4,4 0 0 1 4,-4zM584,416h28a4,4 0 0 1 4,4v28a4,4 0 0 1 -4,4h-28a4,4 0 0 1 -4,-4v-28a4,4 0 0 1 4,-4zM542,458h28a4,4 0 0 1 4,4v28a4,4 0 0 1 -4,4h-28a4,4 0 0 1 -4,-4v-28a4,4 0 0 1 4,-4zM500,500h28a4,4 0 0 1 4,4v28a4,4 0 0 1 -4,4h-28a4,4 0 0 1 -4,-4v-28a4,4 0 0 1 4,-4z" />
+        <path android:fillColor="#FF111827" android:pathData="M594,640a22,22 0 1 0 44,0a22,22 0 1 0 -44,0z" />
+        <path android:fillColor="#FF0B1220" android:pathData="M564,740a168,168 0 1 0 336,0a168,168 0 1 0 -336,0z" />
+        <path android:fillColor="#FF22C55E" android:pathData="M592,740a140,140 0 1 0 280,0a140,140 0 1 0 -280,0z" />
+        <path android:strokeColor="#FFFFFFFF" android:strokeWidth="40" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M664,742 L714,792 L806,694" />
+    </group>
+</vector>

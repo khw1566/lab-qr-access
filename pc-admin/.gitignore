@@ -1,0 +1,8 @@
+.venv/
+.wheels/
+.fetch.py
+build/
+dist/
+__pycache__/
+*.pyc
+smoke-out/

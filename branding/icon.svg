@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- 실습실 출입통제 앱 아이콘: 출입문 + QR 파인더 패턴 + 열림(체크) 배지 -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1F2937"/>
+      <stop offset="1" stop-color="#0B1220"/>
+    </linearGradient>
+  </defs>
+  <rect x="32" y="32" width="960" height="960" rx="216" fill="url(#bg)"/>
+  <!-- 문틀 그림자 -->
+  <rect x="248" y="160" width="448" height="704" rx="60" fill="#374151"/>
+  <!-- 문 -->
+  <rect x="272" y="184" width="400" height="664" rx="44" fill="#FFFFFF"/>
+  <!-- QR 파인더 패턴 3개 -->
+  <g fill="#111827">
+    <rect x="328" y="248" width="120" height="120" rx="14"/>
+    <rect x="496" y="248" width="120" height="120" rx="14"/>
+    <rect x="328" y="416" width="120" height="120" rx="14"/>
+  </g>
+  <g fill="#FFFFFF">
+    <rect x="350" y="270" width="76" height="76" rx="6"/>
+    <rect x="518" y="270" width="76" height="76" rx="6"/>
+    <rect x="350" y="438" width="76" height="76" rx="6"/>
+  </g>
+  <g fill="#111827">
+    <rect x="368" y="288" width="40" height="40" rx="4"/>
+    <rect x="536" y="288" width="40" height="40" rx="4"/>
+    <rect x="368" y="456" width="40" height="40" rx="4"/>
+    <!-- 데이터 모듈 -->
+    <rect x="496" y="416" width="36" height="36" rx="4"/>
+    <rect x="580" y="416" width="36" height="36" rx="4"/>
+    <rect x="538" y="458" width="36" height="36" rx="4"/>
+    <rect x="496" y="500" width="36" height="36" rx="4"/>
+  </g>
+  <!-- 손잡이 -->
+  <circle cx="616" cy="640" r="22" fill="#111827"/>
+  <!-- 열림 배지 -->
+  <circle cx="732" cy="740" r="168" fill="#0B1220"/>
+  <circle cx="732" cy="740" r="140" fill="#22C55E"/>
+  <path d="M664 742 L714 792 L806 694" fill="none" stroke="#FFFFFF" stroke-width="40" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

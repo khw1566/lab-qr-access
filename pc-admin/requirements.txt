@@ -1,0 +1,7 @@
+PySide6-Essentials>=6.8
+requests>=2.31
+websocket-client>=1.7
+qrcode>=7.4
+sounddevice>=0.4.6
+pyinstaller>=6.6
+pillow>=10.0  # branding/make_icons.py 의 ICO 만들기용 (앱에는 들어가지 않음)
